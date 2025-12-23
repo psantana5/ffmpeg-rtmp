@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  nginx-rtmp:
+    image: tiangolo/nginx-rtmp:latest
+    container_name: nginx-rtmp
+    ports:
+      - "1935:1935"
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./streams:/tmp/hls
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  nginx-exporter:
+    image:  mauricioabreu/nginx-rtmp-exporter
+    container_name: nginx-exporter
+    environment:
+      - NGINX_RTMP_URL=http://nginx-rtmp/stat
+    ports:
+      - "9113:9113"
+    depends_on:
+      nginx-rtmp:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    user: root
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    user: root
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  rapl-exporter:
+    build: ./rapl-exporter
+    container_name: rapl-exporter
+    privileged: true
+    volumes:
+      - /sys/class/powercap:/sys/class/powercap:ro
+      - /sys/devices:/sys/devices:ro
+    ports:
+      - "9500:9500"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - RAPL_EXPORTER_PORT=9500
+
+  docker-stats-exporter:
+    build: ./docker-stats-exporter
+    container_name: docker-stats-exporter
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+    ports:
+      - "9501:9501"
+    restart: unless-stopped
+    environment:
+      - DOCKER_STATS_PORT=9501
+
+networks:
+  streaming-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

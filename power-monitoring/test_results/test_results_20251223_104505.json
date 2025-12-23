@@ -1,0 +1,113 @@
+{
+  "test_date": "2025-12-23T10:45:05.666218",
+  "scenarios": [
+    {
+      "name": "Baseline (Idle)",
+      "bitrate": "0k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1766479012.2245302,
+      "end_time": 1766479132.2246702
+    },
+    {
+      "name": "1 Mbps Stream",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766479162.226793,
+      "end_time": 1766479462.2271774
+    },
+    {
+      "name": "2.5 Mbps Stream",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766479522.3414533,
+      "end_time": 1766479822.3417802
+    },
+    {
+      "name": "5 Mbps Stream",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766479882.4313607,
+      "end_time": 1766480182.431683
+    },
+    {
+      "name": "10 Mbps Stream",
+      "bitrate": "10000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766480242.5255353,
+      "end_time": 1766480542.5258107
+    },
+    {
+      "name": "480p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "854x480",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766480602.6170766,
+      "end_time": 1766480902.617519
+    },
+    {
+      "name": "720p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766480962.708104,
+      "end_time": 1766481262.708515
+    },
+    {
+      "name": "1080p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766481322.86513,
+      "end_time": 1766481622.8655007
+    },
+    {
+      "name": "30fps @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766481682.97224,
+      "end_time": 1766481982.9726498
+    },
+    {
+      "name": "60fps @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 60,
+      "duration": 300,
+      "start_time": 1766482043.0653086,
+      "end_time": 1766482343.0656598
+    },
+    {
+      "name": "2 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766482407.175252,
+      "end_time": 1766482707.175799
+    },
+    {
+      "name": "4 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "start_time": 1766482775.3091426,
+      "end_time": 1766483075.3095212
+    }
+  ]
+}

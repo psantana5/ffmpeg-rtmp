@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: 'nginx-rtmp'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+        labels:
+          service: 'nginx-rtmp'
+  
+  - job_name: 'rapl-power'
+    static_configs:
+      - targets: ['rapl-exporter:9500']
+        labels:
+          service: 'power-monitoring'
+  
+  - job_name: 'docker-stats'
+    static_configs:
+      - targets: ['localhost:9501']
+        labels:
+          service: 'docker-overhead'
