@@ -31,7 +31,6 @@ help:
 	@echo "  make nvidia-up-build Build + start stack with NVIDIA profile"
 	@echo ""
 	@echo "Prometheus/Grafana"
-	@echo "  make targets         Print Prometheus scrape targets"
 	@echo "  make prom-reload     Reload Prometheus config"
 	@echo ""
 	@echo "Tests"
@@ -68,22 +67,6 @@ ps:
 logs:
 	@test -n "$(SERVICE)" || (echo "SERVICE is required. Example: make logs SERVICE=prometheus" && exit 2)
 	$(COMPOSE) logs -f --tail=200 $(SERVICE)
-
-targets:
-	$(PYTHON) - <<'PY'
-import json, urllib.request
-url='http://localhost:9090/api/v1/targets'
-with urllib.request.urlopen(url, timeout=10) as r:
-    data=json.load(r)
-active=data.get('data',{}).get('activeTargets',[])
-print('Active targets:', len(active))
-for t in active:
-    labels=t.get('labels',{})
-    job=labels.get('job','?')
-    inst=labels.get('instance','?')
-    health=t.get('health','?')
-    print(f"- job={job:16s} instance={inst:24s} health={health}")
-PY
 
 prom-reload:
 	curl -fsS -X POST http://localhost:9090/-/reload >/dev/null

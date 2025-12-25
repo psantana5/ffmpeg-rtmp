@@ -11,6 +11,11 @@ services:
     restart: unless-stopped
     networks:
       - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/hls/stream.m3u8"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   alertmanager:
     image: prom/alertmanager:latest
