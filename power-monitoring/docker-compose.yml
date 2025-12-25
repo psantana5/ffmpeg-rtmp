@@ -13,8 +13,21 @@ services:
     restart: unless-stopped
     networks:
       - streaming-net
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    networks:
+      - streaming-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9093/-/healthy"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -25,7 +38,7 @@ services:
     environment:
       - NGINX_RTMP_URL=http://nginx-rtmp/stat
     ports:
-      - "9113:9113"
+      - "9728:9728"
     depends_on:
       nginx-rtmp:
         condition: service_healthy
@@ -39,6 +52,7 @@ services:
     user: root
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -96,6 +110,73 @@ services:
     restart: unless-stopped
     environment:
       - DOCKER_STATS_PORT=9501
+    networks:
+      - streaming-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
+    container_name: dcgm-exporter
+    profiles:
+      - nvidia
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9400:9400"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - DCGM_EXPORTER_LISTEN=:9400
+
+  results-exporter:
+    build: ./results-exporter
+    container_name: results-exporter
+    volumes:
+      - ./test_results:/results
+    ports:
+      - "9502:9502"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - RESULTS_EXPORTER_PORT=9502
+      - RESULTS_DIR=/results
+      - PROMETHEUS_URL=http://prometheus:9090
 
 networks:
   streaming-net:

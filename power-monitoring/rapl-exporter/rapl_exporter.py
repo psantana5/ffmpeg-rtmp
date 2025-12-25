@@ -16,6 +16,32 @@ class RAPLReader:
         self.base_path = Path("/sys/class/powercap")
         self.zones = self._discover_zones()
         self.previous_readings = {}
+        self.energy_state = {}
+        self._initialize_energy_state()
+
+    def _initialize_energy_state(self):
+        """Initialize cumulative energy counters for all discovered zones."""
+        self.energy_state = {}
+
+        for zone_name, zone_info in self.zones.items():
+            main_key = zone_name
+            main_energy = self._read_energy_uj(zone_info["path"])
+            if main_energy is not None:
+                self.energy_state[main_key] = {
+                    "prev_energy_uj": main_energy,
+                    "max_range_uj": zone_info["max_range"],
+                    "total_joules": 0.0,
+                }
+
+            for subzone_name, subzone_info in zone_info["subzones"].items():
+                sub_key = f"{zone_name}_{subzone_name}"
+                sub_energy = self._read_energy_uj(subzone_info["path"])
+                if sub_energy is not None:
+                    self.energy_state[sub_key] = {
+                        "prev_energy_uj": sub_energy,
+                        "max_range_uj": subzone_info["max_range"],
+                        "total_joules": 0.0,
+                    }
 
     def _discover_zones(self):
         """Discover available RAPL zones (package, core, uncore, dram, etc.)"""
@@ -123,6 +149,53 @@ class RAPLReader:
 
         return power_data
 
+    def get_energy_joules_total(self):
+        """Return monotonically increasing cumulative energy in joules per zone since exporter start."""
+        energy_totals = {}
+
+        for zone_name, zone_info in self.zones.items():
+            current_main_energy = self._read_energy_uj(zone_info["path"])
+            if current_main_energy is not None:
+                energy_totals[zone_name] = self._update_energy_state(
+                    key=zone_name,
+                    current_energy_uj=current_main_energy,
+                    max_range_uj=zone_info["max_range"],
+                )
+
+            for subzone_name, subzone_info in zone_info["subzones"].items():
+                sub_key = f"{zone_name}_{subzone_name}"
+                current_sub_energy = self._read_energy_uj(subzone_info["path"])
+                if current_sub_energy is not None:
+                    energy_totals[sub_key] = self._update_energy_state(
+                        key=sub_key,
+                        current_energy_uj=current_sub_energy,
+                        max_range_uj=subzone_info["max_range"],
+                    )
+
+        return energy_totals
+
+    def _update_energy_state(self, key, current_energy_uj, max_range_uj):
+        state = self.energy_state.get(key)
+        if not state:
+            self.energy_state[key] = {
+                "prev_energy_uj": current_energy_uj,
+                "max_range_uj": max_range_uj,
+                "total_joules": 0.0,
+            }
+            return 0.0
+
+        prev_energy_uj = state["prev_energy_uj"]
+        energy_delta_uj = current_energy_uj - prev_energy_uj
+
+        if energy_delta_uj < 0 and max_range_uj:
+            energy_delta_uj += max_range_uj
+
+        state["prev_energy_uj"] = current_energy_uj
+        state["max_range_uj"] = max_range_uj
+
+        state["total_joules"] += energy_delta_uj / 1_000_000
+        return state["total_joules"]
+
 
 class MetricsHandler(BaseHTTPRequestHandler):
     rapl_reader = None
@@ -135,6 +208,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
             # Get power readings
             power_data = self.rapl_reader.get_power_watts()
+            energy_data = self.rapl_reader.get_energy_joules_total()
 
             # Generate Prometheus metrics
             output = []
@@ -148,8 +222,24 @@ class MetricsHandler(BaseHTTPRequestHandler):
                 safe_zone = zone.lower().replace("-", "_").replace(" ", "_")
                 output.append(f'rapl_power_watts{{zone="{safe_zone}"}} {watts:.4f}')
 
+            output.append(
+                "# HELP rapl_energy_joules_total Cumulative energy consumption in joules from RAPL since exporter start"
+            )
+            output.append("# TYPE rapl_energy_joules_total counter")
+
+            for zone, joules in energy_data.items():
+                safe_zone = zone.lower().replace("-", "_").replace(" ", "_")
+                output.append(
+                    f'rapl_energy_joules_total{{zone="{safe_zone}"}} {joules:.6f}'
+                )
+
             self.wfile.write("\n".join(output).encode("utf-8"))
             self.wfile.write(b"\n")
+        elif self.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"OK\n")
         else:
             self.send_response(404)
             self.end_headers()
@@ -176,6 +266,7 @@ def main():
     # Initial reading to establish baseline
     time.sleep(1)
     rapl_reader.get_power_watts()
+    rapl_reader.get_energy_joules_total()
 
     # Set up HTTP server
     MetricsHandler.rapl_reader = rapl_reader

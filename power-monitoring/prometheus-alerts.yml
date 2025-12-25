@@ -1,0 +1,38 @@
+groups:
+  - name: power-alerts
+    rules:
+      - alert: HighCpuPackagePower
+        expr: sum(rapl_power_watts{zone=~"package.*"}) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU package power"
+          description: "CPU package power is above 80W for more than 2 minutes. Current value: {{ $value }} W"
+
+      - alert: HighCpuPackagePowerCritical
+        expr: sum(rapl_power_watts{zone=~"package.*"}) > 120
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU package power"
+          description: "CPU package power is above 120W for more than 1 minute. Current value: {{ $value }} W"
+
+      - alert: HighGpuPower
+        expr: sum(DCGM_FI_DEV_POWER_USAGE) > 200
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU power"
+          description: "GPU power is above 200W for more than 2 minutes. Current value: {{ $value }} W"
+
+      - alert: HighGpuPowerCritical
+        expr: sum(DCGM_FI_DEV_POWER_USAGE) > 300
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical GPU power"
+          description: "GPU power is above 300W for more than 1 minute. Current value: {{ $value }} W"
