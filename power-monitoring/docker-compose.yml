@@ -96,6 +96,58 @@ services:
     restart: unless-stopped
     environment:
       - DOCKER_STATS_PORT=9501
+    networks:
+      - streaming-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
+    container_name: dcgm-exporter
+    profiles:
+      - nvidia
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9400:9400"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - DCGM_EXPORTER_LISTEN=:9400
 
 networks:
   streaming-net:

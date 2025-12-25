@@ -10,6 +10,7 @@ import json
 import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import os
+import socket
 
 
 class DockerStatsCollector:
@@ -116,52 +117,66 @@ class MetricsHandler(BaseHTTPRequestHandler):
     
     def do_GET(self):
         if self.path == '/metrics':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/plain; charset=utf-8')
-            self.end_headers()
-            
-            output = []
-            
-            # Docker engine stats
-            engine_stats = self.collector.get_docker_engine_stats()
-            if engine_stats:
-                output.append("# HELP docker_engine_cpu_percent CPU percentage used by Docker engine")
-                output.append("# TYPE docker_engine_cpu_percent gauge")
-                output.append(f"docker_engine_cpu_percent {engine_stats['cpu_percent']:.2f}")
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain; charset=utf-8')
+                self.end_headers()
                 
-                output.append("# HELP docker_engine_memory_percent Memory percentage used by Docker engine")
-                output.append("# TYPE docker_engine_memory_percent gauge")
-                output.append(f"docker_engine_memory_percent {engine_stats['memory_percent']:.2f}")
+                output = []
                 
-                output.append("# HELP docker_engine_memory_kb Memory in KB used by Docker engine")
-                output.append("# TYPE docker_engine_memory_kb gauge")
-                output.append(f"docker_engine_memory_kb {engine_stats['memory_kb']:.0f}")
-            
-            # Container stats
-            containers = self.collector.get_container_stats()
-            if containers:
-                output.append("# HELP docker_container_cpu_percent CPU percentage used by container")
-                output.append("# TYPE docker_container_cpu_percent gauge")
+                # Docker engine stats
+                engine_stats = self.collector.get_docker_engine_stats()
+                if engine_stats:
+                    output.append("# HELP docker_engine_cpu_percent CPU percentage used by Docker engine")
+                    output.append("# TYPE docker_engine_cpu_percent gauge")
+                    output.append(f"docker_engine_cpu_percent {engine_stats['cpu_percent']:.2f}")
+                    
+                    output.append("# HELP docker_engine_memory_percent Memory percentage used by Docker engine")
+                    output.append("# TYPE docker_engine_memory_percent gauge")
+                    output.append(f"docker_engine_memory_percent {engine_stats['memory_percent']:.2f}")
+                    
+                    output.append("# HELP docker_engine_memory_kb Memory in KB used by Docker engine")
+                    output.append("# TYPE docker_engine_memory_kb gauge")
+                    output.append(f"docker_engine_memory_kb {engine_stats['memory_kb']:.0f}")
                 
-                output.append("# HELP docker_container_memory_percent Memory percentage used by container")
-                output.append("# TYPE docker_container_memory_percent gauge")
+                # Container stats
+                containers = self.collector.get_container_stats()
+                if containers:
+                    output.append("# HELP docker_container_cpu_percent CPU percentage used by container")
+                    output.append("# TYPE docker_container_cpu_percent gauge")
+                    
+                    output.append("# HELP docker_container_memory_percent Memory percentage used by container")
+                    output.append("# TYPE docker_container_memory_percent gauge")
+                    
+                    for container in containers:
+                        name = container['name']
+                        output.append(f'docker_container_cpu_percent{{container="{name}"}} {container["cpu_percent"]:.2f}')
+                        output.append(f'docker_container_memory_percent{{container="{name}"}} {container["memory_percent"]:.2f}')
+                    
+                    # Total container CPU usage
+                    total_container_cpu = sum(c['cpu_percent'] for c in containers)
+                    output.append("# HELP docker_containers_total_cpu_percent Total CPU percentage across all containers")
+                    output.append("# TYPE docker_containers_total_cpu_percent gauge")
+                    output.append(f"docker_containers_total_cpu_percent {total_container_cpu:.2f}")
                 
-                for container in containers:
-                    name = container['name']
-                    output.append(f'docker_container_cpu_percent{{container="{name}"}} {container["cpu_percent"]:.2f}')
-                    output.append(f'docker_container_memory_percent{{container="{name}"}} {container["memory_percent"]:.2f}')
-                
-                # Total container CPU usage
-                total_container_cpu = sum(c['cpu_percent'] for c in containers)
-                output.append("# HELP docker_containers_total_cpu_percent Total CPU percentage across all containers")
-                output.append("# TYPE docker_containers_total_cpu_percent gauge")
-                output.append(f"docker_containers_total_cpu_percent {total_container_cpu:.2f}")
-            
-            self.wfile.write('\n'.join(output).encode('utf-8'))
-            self.wfile.write(b'\n')
+                self.wfile.write('\n'.join(output).encode('utf-8'))
+                self.wfile.write(b'\n')
+            except (BrokenPipeError, ConnectionResetError, socket.error):
+                pass
+        elif self.path == '/health':
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'text/plain; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(b'OK\n')
+            except (BrokenPipeError, ConnectionResetError, socket.error):
+                pass
         else:
-            self.send_response(404)
-            self.end_headers()
+            try:
+                self.send_response(404)
+                self.end_headers()
+            except (BrokenPipeError, ConnectionResetError, socket.error):
+                pass
     
     def log_message(self, format, *args):
         pass
