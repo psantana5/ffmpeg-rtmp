@@ -2,10 +2,18 @@ global:
   scrape_interval: 5s
   evaluation_interval: 5s
 
+rule_files:
+  - /etc/prometheus/prometheus-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   - job_name: 'nginx-rtmp'
     static_configs:
-      - targets: ['nginx-exporter:9113']
+      - targets: ['nginx-exporter:9728']
         labels:
           service: 'nginx-rtmp'
   
@@ -38,3 +46,9 @@ scrape_configs:
       - targets: ['dcgm-exporter:9400']
         labels:
           service: 'gpu'
+
+  - job_name: 'results-exporter'
+    static_configs:
+      - targets: ['results-exporter:9502']
+        labels:
+          service: 'analysis'
