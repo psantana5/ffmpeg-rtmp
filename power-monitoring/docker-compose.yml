@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nginx-rtmp:
     image: tiangolo/nginx-rtmp:latest
