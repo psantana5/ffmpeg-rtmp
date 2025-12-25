@@ -269,7 +269,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(1 - rate(node_cpu_seconds_total{mode=\"idle\"}[1m]))",
+          "expr": "avg_over_time(1 - rate(node_cpu_seconds_total{mode=\"idle\"}[1m])[5m:1m])",
           "legendFormat": "CPU utilization",
           "range": true,
           "refId": "A"
