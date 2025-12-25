@@ -14,6 +14,35 @@ def _escape_label_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _parse_bitrate_to_mbps(bitrate: str) -> float | None:
+    """Parse a bitrate string like '2500k', '5M', '1000000' to Mbps."""
+    if not isinstance(bitrate, str):
+        return None
+    s = bitrate.strip().lower()
+    try:
+        if s.endswith('kbps'):
+            val = float(s[:-4]) / 1000.0
+        elif s.endswith('k'):
+            val = float(s[:-1]) / 1000.0
+        elif s.endswith('mbps'):
+            val = float(s[:-4])
+        elif s.endswith('m'):
+            val = float(s[:-1])
+        elif s.endswith('bps'):
+            # raw bits per second
+            val = float(s[:-3]) / 1_000_000.0
+        else:
+            # assume kbps if reasonably large, else Mbps if small integer
+            num = float(s)
+            if num > 1000:
+                val = num / 1000.0
+            else:
+                val = num
+        return val
+    except Exception:
+        return None
+
+
 class PrometheusClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
@@ -117,7 +146,7 @@ class ResultsExporter:
         parts = [f'{k}="{_escape_label_value(str(v))}"' for k, v in labels.items()]
         return "{" + ",".join(parts) + "}"
 
-    def _compute_scenario_stats(self, start: float, end: float) -> dict:
+    def _compute_scenario_stats(self, start: float, end: float, scenario: dict) -> dict:
         duration = max(0.0, float(end) - float(start))
 
         energy_j = 0.0
@@ -130,11 +159,34 @@ class ResultsExporter:
             mean_power = (energy_j / duration) if duration > 0 else 0.0
 
         container_cpu_query = "docker_containers_total_cpu_percent"
-        container_data = self.client.query_range(container_cpu_query, start, end)
+        container_data = self.client.query_range(container_cpu_query, start, end, step="5s")
         container_values = _extract_values(container_data)
         mean_container_cpu = mean(container_values) if container_values else 0.0
 
         total_energy_wh = (energy_j / 3600) if duration > 0 else 0.0
+
+        # Docker overhead is estimated: docker_engine_cpu_percent × total power
+        estimated_docker_overhead_w = 0.0
+        docker_engine_query = "docker_engine_cpu_percent"
+        docker_engine_data = self.client.query_range(docker_engine_query, start, end, step="5s")
+        docker_engine_values = _extract_values(docker_engine_data)
+        mean_docker_engine_cpu = mean(docker_engine_values) if docker_engine_values else 0.0
+        if mean_power > 0:
+            estimated_docker_overhead_w = (mean_docker_engine_cpu / 100.0) * mean_power
+
+        # Normalized energy metrics
+        energy_wh_per_min = None
+        energy_wh_per_mbps = None
+        energy_mj_per_frame = None
+        if total_energy_wh and duration > 0:
+            energy_wh_per_min = total_energy_wh * 60.0 / duration
+        mbps = _parse_bitrate_to_mbps(scenario.get("bitrate", ""))
+        if total_energy_wh and mbps and mbps > 0:
+            energy_wh_per_mbps = total_energy_wh / mbps
+        fps_val = scenario.get("fps")
+        if isinstance(fps_val, (int, float)) and energy_j and duration > 0 and (fps_val * duration) > 0:
+            per_frame_mj = (energy_j / (fps_val * duration)) * 1000.0
+            energy_mj_per_frame = per_frame_mj
 
         return {
             "duration_s": duration,
@@ -142,6 +194,11 @@ class ResultsExporter:
             "total_energy_j": energy_j,
             "total_energy_wh": total_energy_wh,
             "container_cpu_percent": mean_container_cpu,
+            "measured_power_watts": mean_power,  # alias for clarity
+            "estimated_docker_overhead_watts": estimated_docker_overhead_w,
+            "energy_wh_per_min": energy_wh_per_min,
+            "energy_wh_per_mbps": energy_wh_per_mbps,
+            "energy_mj_per_frame": energy_mj_per_frame,
         }
 
     def build_metrics(self) -> str:
@@ -177,12 +234,22 @@ class ResultsExporter:
         output.append("# TYPE results_scenario_duration_seconds gauge")
         output.append("# HELP results_scenario_mean_power_watts Mean CPU package power (W) during scenario")
         output.append("# TYPE results_scenario_mean_power_watts gauge")
+        output.append("# HELP results_scenario_measured_power_watts Measured CPU package power (W) from RAPL")
+        output.append("# TYPE results_scenario_measured_power_watts gauge")
+        output.append("# HELP results_scenario_estimated_docker_overhead_watts Estimated Docker overhead power (W)")
+        output.append("# TYPE results_scenario_estimated_docker_overhead_watts gauge")
         output.append("# HELP results_scenario_total_energy_joules Total energy (J) during scenario (from rapl_energy_joules_total)")
         output.append("# TYPE results_scenario_total_energy_joules gauge")
         output.append("# HELP results_scenario_total_energy_wh Total energy (Wh) during scenario (derived from mean power)")
         output.append("# TYPE results_scenario_total_energy_wh gauge")
         output.append("# HELP results_scenario_container_cpu_percent Mean total container CPU percent during scenario")
         output.append("# TYPE results_scenario_container_cpu_percent gauge")
+        output.append("# HELP results_scenario_energy_wh_per_min Energy per minute (Wh/min)")
+        output.append("# TYPE results_scenario_energy_wh_per_min gauge")
+        output.append("# HELP results_scenario_energy_wh_per_mbps Energy per Mbps (Wh/Mbps)")
+        output.append("# TYPE results_scenario_energy_wh_per_mbps gauge")
+        output.append("# HELP results_scenario_energy_mj_per_frame Energy per frame (mJ/frame)")
+        output.append("# TYPE results_scenario_energy_mj_per_frame gauge")
         output.append("# HELP results_scenario_net_power_watts Mean power above baseline (W)")
         output.append("# TYPE results_scenario_net_power_watts gauge")
         output.append("# HELP results_scenario_net_energy_wh Energy above baseline (Wh)")
@@ -199,7 +266,7 @@ class ResultsExporter:
         baseline = self._find_baseline(scenarios)
         baseline_stats = None
         if baseline and baseline.get("start_time") and baseline.get("end_time"):
-            baseline_stats = self._compute_scenario_stats(baseline["start_time"], baseline["end_time"])
+            baseline_stats = self._compute_scenario_stats(baseline["start_time"], baseline["end_time"], baseline)
 
         for scenario in scenarios:
             start = scenario.get("start_time")
@@ -207,18 +274,26 @@ class ResultsExporter:
             if not start or not end:
                 continue
 
-            stats = self._compute_scenario_stats(start, end)
+            stats = self._compute_scenario_stats(start, end, scenario)
             labels = {"run_id": run_id}
             labels.update(self._scenario_labels(scenario))
             lbl = self._labels_str(labels)
 
             output.append(f"results_scenario_duration_seconds{lbl} {stats['duration_s']:.3f}")
             output.append(f"results_scenario_mean_power_watts{lbl} {stats['mean_power_w']:.4f}")
+            output.append(f"results_scenario_measured_power_watts{lbl} {stats['measured_power_watts']:.4f}")
+            output.append(f"results_scenario_estimated_docker_overhead_watts{lbl} {stats['estimated_docker_overhead_watts']:.4f}")
             output.append(f"results_scenario_total_energy_joules{lbl} {stats['total_energy_j']:.4f}")
             output.append(f"results_scenario_total_energy_wh{lbl} {stats['total_energy_wh']:.6f}")
             output.append(
                 f"results_scenario_container_cpu_percent{lbl} {stats['container_cpu_percent']:.4f}"
             )
+            if stats["energy_wh_per_min"] is not None:
+                output.append(f"results_scenario_energy_wh_per_min{lbl} {stats['energy_wh_per_min']:.6f}")
+            if stats["energy_wh_per_mbps"] is not None:
+                output.append(f"results_scenario_energy_wh_per_mbps{lbl} {stats['energy_wh_per_mbps']:.6f}")
+            if stats["energy_mj_per_frame"] is not None:
+                output.append(f"results_scenario_energy_mj_per_frame{lbl} {stats['energy_mj_per_frame']:.4f}")
 
             if baseline_stats and scenario is not baseline:
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]

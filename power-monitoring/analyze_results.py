@@ -146,7 +146,7 @@ class ResultsAnalyzer:
         
         # Query power consumption
         power_query = 'sum(rapl_power_watts{zone=~"package.*"})'
-        power_data = self.client.query_range(power_query, start, end)
+        power_data = self.client.query_range(power_query, start, end, step='5s')
         power_stats = self.get_metric_stats(power_data)
 
         package_energy_j = self.get_energy_joules('package.*', start, end)
@@ -177,7 +177,7 @@ class ResultsAnalyzer:
         
         # Query DRAM power
         dram_query = 'sum(rapl_power_watts{zone=~".*dram.*"})'
-        dram_data = self.client.query_range(dram_query, start, end)
+        dram_data = self.client.query_range(dram_query, start, end, step='5s')
         dram_stats = self.get_metric_stats(dram_data)
 
         dram_energy_j = self.get_energy_joules('.*dram.*', start, end)
@@ -200,7 +200,7 @@ class ResultsAnalyzer:
         
         # Query Docker overhead
         docker_query = 'docker_engine_cpu_percent'
-        docker_data = self.client.query_range(docker_query, start, end)
+        docker_data = self.client.query_range(docker_query, start, end, step='5s')
         docker_stats = self.get_metric_stats(docker_data)
         
         if docker_stats and power_stats:
@@ -216,7 +216,7 @@ class ResultsAnalyzer:
         
         # Query container CPU
         container_query = 'docker_containers_total_cpu_percent'
-        container_data = self.client.query_range(container_query, start, end)
+        container_data = self.client.query_range(container_query, start, end, step='5s')
         container_stats = self.get_metric_stats(container_data)
         
         if container_stats and power_stats:
