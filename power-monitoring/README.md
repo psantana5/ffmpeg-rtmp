@@ -221,6 +221,30 @@ Extend receivers to Slack/email/webhook as needed.
 
 ---
 
+## Development
+
+### Python dependencies
+
+- Runtime:
+  - `pip install -r requirements.txt`
+- Dev:
+  - `pip install -r requirements-dev.txt`
+
+### Lint / format / tests
+
+- `make lint`
+- `make format`
+- `make test`
+
+### Pre-commit
+
+- Install hooks:
+  - `pre-commit install`
+- Run on all files:
+  - `make pre-commit`
+
+---
+
 ## Operational commands
 
 Recommended: use the Makefile.
