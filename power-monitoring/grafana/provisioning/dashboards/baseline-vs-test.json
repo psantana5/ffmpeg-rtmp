@@ -68,6 +68,48 @@
       },
       "fieldConfig": {
         "defaults": {
+          "unit": "percent",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": ["lastNotNull"]
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "editorMode": "code",
+          "expr": "results_scenario_net_container_cpu_percent{run_id=~\"$run_id\"}",
+          "legendFormat": "{{scenario}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Net Container CPU vs Baseline (%)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
           "unit": "wh",
           "color": { "mode": "palette-classic" },
           "custom": {
@@ -80,7 +122,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
       "id": 2,
       "options": {
         "legend": {
@@ -115,7 +157,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
       "id": 3,
       "options": {
         "showHeader": true
