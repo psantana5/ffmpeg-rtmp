@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+
+# Virtualenv
+.venv/
+venv/
+
+# Local env
+.env
+
+# Generated test artifacts
+test_results/
+
+# Generated HLS output
+streams/*.ts
+streams/*.m3u8
+streams/*.key
+streams/*.json
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store

@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -38,6 +38,12 @@ help:
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
+	@echo ""
+	@echo "Development"
+	@echo "  make lint            Run ruff checks"
+	@echo "  make format          Run ruff formatter"
+	@echo "  make test            Run pytest"
+	@echo "  make pre-commit      Run pre-commit on all files"
 	@echo ""
 	@echo "Examples"
 	@echo "  make logs SERVICE=results-exporter"
@@ -102,3 +108,15 @@ test-batch:
 
 analyze:
 	$(PYTHON) analyze_results.py
+
+lint:
+	$(PYTHON) -m ruff check .
+
+format:
+	$(PYTHON) -m ruff format .
+
+test:
+	$(PYTHON) -m pytest -q
+
+pre-commit:
+	$(PYTHON) -m pre_commit run --all-files

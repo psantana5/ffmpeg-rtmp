@@ -77,7 +77,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (zone) (rapl_power_watts{zone=~\"package.*\"})",
+          "expr": "rapl_power_watts",
           "legendFormat": "{{zone}}",
           "range": true,
           "refId": "A"
