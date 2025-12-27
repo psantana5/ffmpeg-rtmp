@@ -2,16 +2,20 @@
 """
 Automated analysis of test results
 Queries Prometheus and generates comprehensive reports
+Includes energy-aware transcoding recommendations
 """
 
-import requests
+import csv
 import json
+import logging
 import statistics
 import sys
-import logging
 from pathlib import Path
 from typing import Dict, List, Optional
-import csv
+
+import requests
+
+from advisor import TranscodingRecommender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +30,9 @@ class PrometheusClient:
     def __init__(self, base_url: str = 'http://localhost:9090'):
         self.base_url = base_url
         
-    def query_range(self, query: str, start: float, end: float, step: str = '15s') -> Optional[Dict]:
+    def query_range(
+        self, query: str, start: float, end: float, step: str = '15s'
+    ) -> Optional[Dict]:
         """Execute range query"""
         url = f"{self.base_url}/api/v1/query_range"
         params = {
@@ -66,6 +72,7 @@ class ResultsAnalyzer:
     def __init__(self, results_file: Path, prometheus_url: str = 'http://localhost:9090'):
         self.results_file = results_file
         self.client = PrometheusClient(prometheus_url)
+        self.recommender = TranscodingRecommender()
         
         with open(results_file) as f:
             self.data = json.load(f)
@@ -171,8 +178,12 @@ class ResultsAnalyzer:
                 'min_watts': round(power_stats['min'], 2),
                 'max_watts': round(power_stats['max'], 2),
                 'stdev_watts': round(power_stats['stdev'], 2),
-                'total_energy_joules': round(total_energy_j, 2) if total_energy_j is not None else None,
-                'total_energy_wh': round((total_energy_j / 3600), 4) if total_energy_j is not None else None,
+                'total_energy_joules': (
+                    round(total_energy_j, 2) if total_energy_j is not None else None
+                ),
+                'total_energy_wh': (
+                    round((total_energy_j / 3600), 4) if total_energy_j is not None else None
+                ),
             }
         
         # Query DRAM power
@@ -193,9 +204,10 @@ class ResultsAnalyzer:
             if total_dram_j is not None and analysis['duration'] > 0:
                 mean_dram_watts = total_dram_j / analysis['duration']
 
+            dram_energy_wh = round((total_dram_j / 3600), 4) if total_dram_j else None
             analysis['dram_power'] = {
                 'mean_watts': round(mean_dram_watts, 2),
-                'total_energy_wh': round((total_dram_j / 3600), 4) if total_dram_j is not None else None,
+                'total_energy_wh': dram_energy_wh,
             }
         
         # Query Docker overhead
@@ -208,10 +220,11 @@ class ResultsAnalyzer:
             if mean_power_from_energy is not None:
                 base_watts = mean_power_from_energy
             docker_watts = (docker_stats['mean'] / 100) * base_watts
+            docker_pct = (docker_watts / base_watts) * 100 if base_watts > 0 else 0.0
             analysis['docker_overhead'] = {
                 'cpu_percent': round(docker_stats['mean'], 2),
                 'estimated_watts': round(docker_watts, 2),
-                'percentage_of_total': round((docker_watts / base_watts) * 100, 2) if base_watts > 0 else 0.0,
+                'percentage_of_total': round(docker_pct, 2),
             }
         
         # Query container CPU
@@ -242,7 +255,10 @@ class ResultsAnalyzer:
             if analysis:
                 results.append(analysis)
 
-        power_results = [r for r in results if 'power' in r and r['power'].get('mean_watts') is not None]
+        power_results = [
+            r for r in results
+            if 'power' in r and r['power'].get('mean_watts') is not None
+        ]
         baseline = next((r for r in power_results if 'baseline' in r['name'].lower()), None)
         if baseline:
             for r in results:
@@ -252,13 +268,20 @@ class ResultsAnalyzer:
                     'container_cpu_pct': None,
                 }
 
-                if 'power' in r and r['power'].get('mean_watts') is not None and baseline.get('power'):
-                    r['net']['power_w'] = round(r['power']['mean_watts'] - baseline['power']['mean_watts'], 2)
-                    if r['power'].get('total_energy_wh') is not None and baseline['power'].get('total_energy_wh') is not None:
-                        r['net']['energy_wh'] = round(r['power']['total_energy_wh'] - baseline['power']['total_energy_wh'], 4)
+                if 'power' in r and r['power'].get('mean_watts') is not None:
+                    if baseline.get('power'):
+                        baseline_watts = baseline['power']['mean_watts']
+                        r['net']['power_w'] = round(r['power']['mean_watts'] - baseline_watts, 2)
+                        
+                        r_energy = r['power'].get('total_energy_wh')
+                        baseline_energy = baseline['power'].get('total_energy_wh')
+                        if r_energy is not None and baseline_energy is not None:
+                            r['net']['energy_wh'] = round(r_energy - baseline_energy, 4)
 
                 if 'container_usage' in r and 'container_usage' in baseline:
-                    r['net']['container_cpu_pct'] = round(r['container_usage']['cpu_percent'] - baseline['container_usage']['cpu_percent'], 2)
+                    r_cpu = r['container_usage']['cpu_percent']
+                    baseline_cpu = baseline['container_usage']['cpu_percent']
+                    r['net']['container_cpu_pct'] = round(r_cpu - baseline_cpu, 2)
 
                 if r['name'] == baseline['name']:
                     r['net']['power_w'] = 0.0
@@ -266,6 +289,10 @@ class ResultsAnalyzer:
                         r['net']['energy_wh'] = 0.0
                     if r['net']['container_cpu_pct'] is not None:
                         r['net']['container_cpu_pct'] = 0.0
+
+        # Compute efficiency scores and rank scenarios
+        logger.info("Computing energy efficiency scores...")
+        results = self.recommender.analyze_and_rank(results)
 
         return results
     
@@ -283,28 +310,30 @@ class ResultsAnalyzer:
         for result in results:
             print(f"\n{'─' * 100}")
             print(f"Scenario: {result['name']}")
-            print(f"  Configuration: {result['bitrate']} @ {result['resolution']} {result['fps']}fps")
+            config = f"{result['bitrate']} @ {result['resolution']} {result['fps']}fps"
+            print(f"  Configuration: {config}")
             print(f"  Duration: {result['duration']:.1f}s")
             
             if 'power' in result:
                 p = result['power']
-                print(f"\n  Power Consumption:")
+                print("\n  Power Consumption:")
                 print(f"    Mean:   {p['mean_watts']:>8.2f} W")
                 print(f"    Median: {p['median_watts']:>8.2f} W")
                 print(f"    Min:    {p['min_watts']:>8.2f} W")
                 print(f"    Max:    {p['max_watts']:>8.2f} W")
                 print(f"    StdDev: {p['stdev_watts']:>8.2f} W")
-                if p.get('total_energy_wh') is not None and p.get('total_energy_joules') is not None:
-                    print(
-                        f"    Total Energy: {p['total_energy_wh']:.4f} Wh ({p['total_energy_joules']:.0f} J)"
-                    )
+                if p.get('total_energy_wh') is not None:
+                    if p.get('total_energy_joules') is not None:
+                        wh = p['total_energy_wh']
+                        joules = p['total_energy_joules']
+                        print(f"    Total Energy: {wh:.4f} Wh ({joules:.0f} J)")
                 else:
                     print("    Total Energy: N/A")
 
             if 'net' in result:
                 n = result['net']
                 if n.get('power_w') is not None or n.get('energy_wh') is not None:
-                    print(f"\n  Net vs Baseline:")
+                    print("\n  Net vs Baseline:")
                     if n.get('power_w') is not None:
                         print(f"    Net Power:  {n['power_w']:+.2f} W")
                     if n.get('energy_wh') is not None:
@@ -314,7 +343,7 @@ class ResultsAnalyzer:
             
             if 'dram_power' in result:
                 d = result['dram_power']
-                print(f"\n  DRAM Power:")
+                print("\n  DRAM Power:")
                 print(f"    Mean: {d['mean_watts']:.2f} W")
                 if d.get('total_energy_wh') is not None:
                     print(f"    Total Energy: {d['total_energy_wh']:.4f} Wh")
@@ -323,13 +352,14 @@ class ResultsAnalyzer:
             
             if 'docker_overhead' in result:
                 do = result['docker_overhead']
-                print(f"\n  Docker Engine Overhead:")
+                print("\n  Docker Engine Overhead:")
                 print(f"    CPU Usage: {do['cpu_percent']:.2f}%")
-                print(f"    Power: {do['estimated_watts']:.2f} W ({do['percentage_of_total']:.1f}% of total)")
+                pct_total = do['percentage_of_total']
+                print(f"    Power: {do['estimated_watts']:.2f} W ({pct_total:.1f}% of total)")
             
             if 'container_usage' in result:
                 cu = result['container_usage']
-                print(f"\n  Container Usage:")
+                print("\n  Container Usage:")
                 print(f"    CPU: {cu['cpu_percent']:.2f}%")
                 print(f"    Estimated Power: {cu['estimated_watts']:.2f} W")
         
@@ -342,11 +372,18 @@ class ResultsAnalyzer:
         power_results = [r for r in results if 'power' in r]
         
         if power_results:
-            print(f"\n{'Scenario':<30} {'Bitrate':<12} {'Mean Power':<12} {'Energy (Wh)':<14} {'Docker OH':<12}")
+            header = (
+                f"\n{'Scenario':<30} {'Bitrate':<12} "
+                f"{'Mean Power':<12} {'Energy (Wh)':<14} {'Docker OH':<12}"
+            )
+            print(header)
             print("─" * 100)
             
             for r in power_results:
-                docker_oh = f"{r['docker_overhead']['percentage_of_total']:.1f}%" if 'docker_overhead' in r else "N/A"
+                if 'docker_overhead' in r:
+                    docker_oh = f"{r['docker_overhead']['percentage_of_total']:.1f}%"
+                else:
+                    docker_oh = "N/A"
                 energy_wh = r['power'].get('total_energy_wh')
                 if energy_wh is None:
                     energy_str = "N/A"
@@ -358,7 +395,9 @@ class ResultsAnalyzer:
                       f"{docker_oh:>10}")
             
             # Calculate relative differences from baseline
-            baseline = next((r for r in power_results if 'baseline' in r['name'].lower()), None)
+            baseline = next(
+                (r for r in power_results if 'baseline' in r['name'].lower()), None
+            )
             
             if baseline and len(power_results) > 1:
                 print(f"\n{'─' * 100}")
@@ -374,10 +413,16 @@ class ResultsAnalyzer:
                     power_diff = r['power']['mean_watts'] - baseline['power']['mean_watts']
 
                     energy_diff = None
-                    if r['power'].get('total_energy_wh') is not None and baseline['power'].get('total_energy_wh') is not None:
-                        energy_diff = r['power']['total_energy_wh'] - baseline['power']['total_energy_wh']
+                    r_energy = r['power'].get('total_energy_wh')
+                    baseline_energy = baseline['power'].get('total_energy_wh')
+                    if r_energy is not None and baseline_energy is not None:
+                        energy_diff = r_energy - baseline_energy
 
-                    pct_increase = (power_diff / baseline['power']['mean_watts']) * 100 if baseline['power']['mean_watts'] else 0.0
+                    baseline_watts = baseline['power']['mean_watts']
+                    if baseline_watts:
+                        pct_increase = (power_diff / baseline_watts) * 100
+                    else:
+                        pct_increase = 0.0
 
                     if energy_diff is None:
                         energy_str = "N/A"
@@ -389,6 +434,50 @@ class ResultsAnalyzer:
                         f"{energy_str} "
                         f"{pct_increase:>+10.1f}%"
                     )
+
+        # Print energy efficiency rankings
+        scored_results = [r for r in results if r.get('efficiency_score') is not None]
+        if scored_results:
+            print(f"\n{'─' * 100}")
+            print("ENERGY EFFICIENCY RANKINGS")
+            print("─" * 100)
+            header = (
+                f"{'Rank':<6} {'Scenario':<35} "
+                f"{'Efficiency':<18} {'Power':<12} {'Bitrate':<12}"
+            )
+            print(header)
+            print("─" * 100)
+            
+            for r in scored_results:
+                rank = r.get('efficiency_rank', '-')
+                score = r.get('efficiency_score', 0)
+                power_w = r.get('power', {}).get('mean_watts', 0)
+                bitrate = r.get('bitrate', 'N/A')
+                
+                row = (
+                    f"{rank:<6} {r['name']:<35} "
+                    f"{score:>10.4f} Mbps/W   {power_w:>10.2f} W  {bitrate:<12}"
+                )
+                print(row)
+            
+            # Print recommendation
+            best = scored_results[0]
+            print(f"\n{'─' * 100}")
+            print("RECOMMENDATION")
+            print("─" * 100)
+            print(f"Most energy-efficient configuration: {best['name']}")
+            print(f"  Efficiency Score: {best['efficiency_score']:.4f} Mbps/W")
+            print(f"  Mean Power: {best['power']['mean_watts']:.2f} W")
+            print(f"  Bitrate: {best['bitrate']}")
+            if best.get('resolution') != 'N/A':
+                print(f"  Resolution: {best['resolution']}")
+            if best.get('fps') != 'N/A':
+                print(f"  FPS: {best['fps']}")
+            msg = (
+                "\nThis configuration delivers the most video throughput "
+                "per watt of energy consumed."
+            )
+            print(msg)
 
         print("\n" + "=" * 100 + "\n")
 
@@ -409,7 +498,8 @@ class ResultsAnalyzer:
                 'mean_power_w', 'median_power_w', 'total_energy_wh',
                 'net_power_w', 'net_energy_wh', 'net_container_cpu_pct',
                 'docker_overhead_w', 'docker_overhead_pct',
-                'container_cpu_pct', 'container_power_w'
+                'container_cpu_pct', 'container_power_w',
+                'efficiency_score', 'efficiency_rank'
             ])
 
             writer.writeheader()
@@ -440,6 +530,10 @@ class ResultsAnalyzer:
                 if 'container_usage' in r:
                     row['container_cpu_pct'] = r['container_usage']['cpu_percent']
                     row['container_power_w'] = r['container_usage']['estimated_watts']
+
+                # Add efficiency score and rank
+                row['efficiency_score'] = r.get('efficiency_score')
+                row['efficiency_rank'] = r.get('efficiency_rank')
 
                 writer.writerow(row)
 

@@ -1,6 +1,6 @@
 # Power Monitoring (FFmpeg + Nginx-RTMP) – Energy, Performance, Observability
 
-This project is a self-contained **streaming test + power monitoring stack**.
+This project is a self-contained **streaming test + power monitoring stack** with **energy-aware transcoding recommendations**.
 
 You can:
 
@@ -11,6 +11,7 @@ You can:
 - Optionally collect **NVIDIA GPU power/utilization** via DCGM exporter.
 - Automatically generate **baseline vs test comparisons** and visualize them in Grafana.
 - Trigger **alerting** for power thresholds via Prometheus rules + Alertmanager.
+- **Get energy efficiency scores and recommendations** for optimal transcoding configurations.
 
 ---
 
@@ -44,6 +45,12 @@ You can:
   - Reads the latest `test_results/test_results_*.json`.
   - Queries Prometheus **per scenario time-window** and emits "scenario summary" metrics.
   - Enables Grafana dashboards to show **baseline vs test diffs** automatically.
+
+- **Energy Advisor** (`advisor/`)
+  - Scores transcoding configurations by energy efficiency.
+  - Ranks scenarios by throughput-per-watt metric.
+  - Recommends optimal pipeline for the hardware.
+  - Extensible for future quality metrics (VMAF/PSNR).
 
 - **Prometheus** (`prometheus`)
   - Scrapes all exporters.
@@ -170,13 +177,64 @@ Or via Make:
 
 ## Analysis and reports
 
-### Console + CSV
+### Console + CSV with Energy Efficiency Recommendations
 
 Analyze the latest run:
 
 - `python3 analyze_results.py`
 
-This prints a summary and exports a CSV next to the results file.
+This command:
+- Prints a comprehensive summary of all scenarios
+- **Computes energy efficiency scores** for each configuration
+- **Ranks scenarios** by efficiency (Mbps per watt)
+- **Recommends the optimal configuration** for your hardware
+- Exports results to CSV (including efficiency scores and ranks)
+
+The analysis report now includes:
+
+1. **Traditional power metrics**: Mean power, energy consumption, Docker overhead
+2. **Energy efficiency rankings**: Shows which configurations deliver the most throughput per watt
+3. **Recommendation**: Identifies the best configuration for energy-efficient transcoding
+
+Example output:
+```
+ENERGY EFFICIENCY RANKINGS
+─────────────────────────────────────────────────────────────────────
+Rank   Scenario                             Efficiency          Power        Bitrate     
+─────────────────────────────────────────────────────────────────────
+1      4 streams @ 2500k                      0.0667 Mbps/W     150.00 W    2500k       
+2      5 Mbps Stream                          0.0625 Mbps/W      80.00 W    5M          
+3      2.5 Mbps Stream                        0.0417 Mbps/W      60.00 W    2500k       
+
+RECOMMENDATION
+─────────────────────────────────────────────────────────────────────
+Most energy-efficient configuration: 4 streams @ 2500k
+  Efficiency Score: 0.0667 Mbps/W
+  Mean Power: 150.00 W
+  Bitrate: 2500k
+```
+
+### Python API
+
+You can also use the advisor module programmatically:
+
+```python
+from advisor import TranscodingRecommender
+
+# After analyzing scenarios
+recommender = TranscodingRecommender()
+ranked = recommender.analyze_and_rank(scenarios)
+
+# Get best configuration
+best = recommender.get_best_configuration(scenarios)
+print(f"Best: {best['name']} - {best['efficiency_score']:.4f} Mbps/W")
+
+# Get top 5
+top_5 = recommender.get_top_n(scenarios, n=5)
+
+# Get comprehensive summary
+summary = recommender.get_recommendation_summary(scenarios)
+```
 
 ### Baseline vs test dashboards (Grafana)
 
@@ -195,6 +253,52 @@ In Grafana:
 
 - Open **Baseline vs Test**
 - Select a `run_id` (derived from the `test_results_*.json` filename)
+
+---
+
+## Energy-Aware Transcoding Advisor
+
+### Overview
+
+The advisor module (`advisor/`) transforms raw power measurements into actionable recommendations. It answers the question:
+
+**"Which FFmpeg configuration delivers the most video quality per watt on this machine?"**
+
+### Current Features (v0.1)
+
+- **Energy Efficiency Scoring**: Computes `throughput / power` for each scenario
+  - Throughput = bitrate (Mbps) × number of streams
+  - Power = CPU watts + GPU watts (if available)
+- **Automatic Ranking**: Sorts all configurations by efficiency
+- **Best Configuration Selection**: Identifies optimal pipeline
+- **CSV Export**: Saves efficiency scores alongside traditional metrics
+- **Production-Grade**: Handles missing data, edge cases, uses measured metrics only
+
+### Design Principles
+
+1. **Measured metrics only**: No synthetic or estimated power values
+2. **Pluggable scoring**: Easy to extend with new algorithms
+3. **Hardware-agnostic**: Works on single developer machine or cloud infrastructure
+4. **Future-ready**: Placeholder hooks for VMAF, multi-objective scoring, cost analysis
+
+### Future Enhancements
+
+The advisor is designed to be extended with:
+
+- **Video quality integration** (VMAF/PSNR): Quality-adjusted efficiency scores
+- **Multi-objective optimization**: Balance quality, energy, and cost
+- **Hardware normalization**: Compare efficiency across different CPU/GPU models
+- **Cost-aware scoring**: Include cloud pricing and TCO calculations
+- **CLI interface**: Dedicated command for recommendations
+
+### Module Structure
+
+```
+advisor/
+├── __init__.py          # Public API
+├── scoring.py           # Energy efficiency scoring algorithms
+└── recommender.py       # Ranking and recommendation logic
+```
 
 ---
 
@@ -232,9 +336,14 @@ Extend receivers to Slack/email/webhook as needed.
 
 ### Lint / format / tests
 
-- `make lint`
-- `make format`
-- `make test`
+- `make lint` - Run ruff linter
+- `make format` - Auto-format code with ruff
+- `make test` - Run pytest test suite (includes advisor module tests)
+
+The test suite includes comprehensive tests for:
+- Energy efficiency scoring algorithms
+- Recommendation logic
+- Integration with analysis pipeline
 
 ### Pre-commit
 
@@ -288,16 +397,24 @@ The legacy helper script `setup.sh` exists and performs basic checks and starts 
 - `prometheus-alerts.yml` – alert rules
 - `grafana/provisioning/` – dashboards and datasource provisioning
 - `run_tests.py` – test runner / scenario CLI
-- `analyze_results.py` – analysis and CSV export
+- `analyze_results.py` – analysis, CSV export, and energy efficiency recommendations
+- `advisor/` – energy-aware transcoding advisor module
+  - `scoring.py` – efficiency scoring algorithms
+  - `recommender.py` – ranking and recommendation logic
 - `results-exporter/` – Prometheus exporter producing baseline-vs-test summary metrics
 - `rapl-exporter/` – Intel RAPL exporter
 - `docker-stats-exporter/` – Docker overhead exporter
 - `test_results/` – output directory for test runs
+- `tests/` – pytest test suite for advisor module
 
 ---
 
 ## Next improvements
 
+- Integrate VMAF/PSNR quality metrics into energy efficiency scoring
+- Add multi-objective optimization (quality vs energy vs cost)
+- Hardware capability profiling and normalization
+- Dedicated CLI command for energy recommendations
 - Add a smaller "quick" batch for CI.
 - Add Parquet/JSON exports for analysis workflows.
 - Add statistical tests (t-test) across scenario groups.

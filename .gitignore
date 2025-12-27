@@ -6,8 +6,9 @@ __pycache__
 #Ignore RTMP stuff
 streams/*
 
-#Ignore testing stuff
-test_*
+#Ignore testing stuff - results and generated files
+test_results/
+.pytest_cache/
 
 #Ignore results from tests/jobs.
 results/*
