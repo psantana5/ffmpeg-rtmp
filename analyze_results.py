@@ -586,32 +586,9 @@ class ResultsAnalyzer:
                 # Add output ladder information
                 row['output_ladder'] = r.get('output_ladder')
                 
-                # Compute total pixels if possible (for reference)
-                if r.get('outputs'):
-                    total_pixels = 0
-                    for output in r['outputs']:
-                        res = output.get('resolution', '')
-                        fps = output.get('fps', 0)
-                        if res and 'x' in res:
-                            try:
-                                w, h = res.split('x')
-                                total_pixels += int(w) * int(h) * fps * r.get('duration', 0)
-                            except (ValueError, AttributeError):
-                                pass
-                    row['total_pixels'] = total_pixels if total_pixels > 0 else None
-                else:
-                    # Single resolution case
-                    res = r.get('resolution', '')
-                    fps = r.get('fps')
-                    duration = r.get('duration', 0)
-                    if res and res != 'N/A' and fps and fps != 'N/A' and 'x' in str(res):
-                        try:
-                            w, h = str(res).split('x')
-                            row['total_pixels'] = int(w) * int(h) * int(fps) * duration
-                        except (ValueError, AttributeError):
-                            row['total_pixels'] = None
-                    else:
-                        row['total_pixels'] = None
+                # Compute total pixels using scorer's method
+                total_pixels = self.recommender.scorer._compute_total_pixels(r)
+                row['total_pixels'] = total_pixels
 
                 writer.writerow(row)
 

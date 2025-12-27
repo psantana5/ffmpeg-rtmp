@@ -51,9 +51,8 @@ class TestScenario:
             "duration": self.duration,
             "start_time": self.start_time,
             "end_time": self.end_time,
+            "outputs": self.outputs,  # Always include, even if None
         }
-        if self.outputs:
-            result["outputs"] = self.outputs
         return result
 
 

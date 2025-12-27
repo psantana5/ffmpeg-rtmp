@@ -16,7 +16,7 @@ Design principles:
 
 import logging
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +246,7 @@ class EnergyEfficiencyScorer:
         total_pixels = width * height * fps * duration
         return total_pixels
     
-    def _parse_resolution(self, resolution: str) -> tuple[Optional[int], Optional[int]]:
+    def _parse_resolution(self, resolution: str) -> Tuple[Optional[int], Optional[int]]:
         """
         Parse resolution string to width and height.
         
