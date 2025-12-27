@@ -57,7 +57,7 @@
               },
               {
                 "id": "unit",
-                "value": "short"
+                "value": "none"
               },
               {
                 "id": "decimals",
@@ -113,7 +113,9 @@
       "options": {
         "footer": {
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true,
@@ -132,7 +134,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_efficiency_score",
+          "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -146,7 +148,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_mean_power_watts",
+          "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_mean_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -160,7 +162,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_total_energy_joules",
+          "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -225,7 +227,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Total pixels delivered per joule of energy consumed. Higher values indicate better efficiency. Grouped by scenario and output ladder for fair comparison.",
+      "description": "Energy efficiency score (pixels per joule). Higher is better. Excludes baseline scenarios.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -259,7 +261,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -275,7 +277,10 @@
         "barWidth": 0.97,
         "groupWidth": 0.7,
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -298,7 +303,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Pixels delivered per joule (already computed)\nresults_scenario_efficiency_score",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "hide": false,
           "instant": true,
           "legendFormat": "{{scenario}} ({{output_ladder}})",
@@ -315,7 +320,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Shows the extra energy consumed by each scenario compared to the most efficient configuration within the same output ladder. Negative values mean the scenario is the most efficient.",
+      "description": "Energy wasted compared to the most efficient scenario within the same output ladder. Grouped strictly by output_ladder to prevent comparing different resolutions.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -377,7 +382,10 @@
         "barWidth": 0.97,
         "groupWidth": 0.7,
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -400,7 +408,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Energy wasted vs optimal within same output ladder\n# For each output_ladder, find the minimum energy consumption\n# Then calculate the difference for each scenario\nresults_scenario_total_energy_joules\n- on(output_ladder) group_left()\nmin by(output_ladder) (results_scenario_total_energy_joules)",
+          "expr": "# Energy wasted vs optimal within same output_ladder\n# For each output_ladder, find the minimum energy consumption\n# Then calculate the difference for each scenario\nmax by(scenario, output_ladder) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})\n- on(output_ladder) group_left()\nmin by(output_ladder) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "hide": false,
           "instant": true,
           "legendFormat": "{{scenario}} vs optimal ({{output_ladder}})",
@@ -417,7 +425,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "CPU vs GPU scaling comparison. Shows mean power consumption as the number of concurrent streams increases. Helps identify the tipping point where GPU transcoding becomes more efficient.",
+      "description": "Average power consumption by encoder type (CPU vs GPU) across different stream counts.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -510,7 +518,11 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull", "max"],
+          "calcs": [
+            "mean",
+            "lastNotNull",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -528,7 +540,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# CPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"cpu\"}\n)",
+          "expr": "# CPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"cpu\", scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\"}\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "CPU: {{streams}} streams",
@@ -541,7 +553,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# GPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"gpu\"}\n)",
+          "expr": "# GPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"gpu\", scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\"}\n)",
           "hide": false,
           "instant": true,
           "legendFormat": "GPU: {{streams}} streams",
@@ -570,7 +582,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Standard deviation of efficiency scores over time. Lower values indicate more stable and predictable configurations. High variance suggests unstable or noisy performance.",
+      "description": "Distribution of efficiency scores across scenarios. Note: Stability metrics (coefficient of variation) require time-series data which may not be available for summary-based gauge metrics.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -616,7 +628,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -632,7 +644,10 @@
         "barWidth": 0.97,
         "groupWidth": 0.7,
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -655,7 +670,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Efficiency stability: coefficient of variation\n# Measures variability in efficiency score over time\nstddev_over_time(results_scenario_efficiency_score[5m]) \n/ avg_over_time(results_scenario_efficiency_score[5m])",
+          "expr": "# Efficiency stability: show actual efficiency scores with deduplication\n# Note: Stability metrics require time-series data, which may not be available for gauge metrics\nmax by(scenario, output_ladder) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "hide": false,
           "instant": true,
           "legendFormat": "{{scenario}} ({{output_ladder}})",
@@ -663,7 +678,7 @@
           "refId": "EfficiencyStability"
         }
       ],
-      "title": "Efficiency Stability (Coefficient of Variation)",
+      "title": "Efficiency Score Distribution",
       "transformations": [],
       "type": "barchart"
     },
@@ -672,7 +687,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Energy efficiency comparison across different bitrates. Shows which bitrate configurations deliver the best energy-per-Mbps ratio.",
+      "description": "Energy consumption per Mbps of throughput (Wh/Mbps). Lower is better.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -718,7 +733,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "watth"
         },
         "overrides": []
       },
@@ -731,7 +746,11 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull", "min"],
+          "calcs": [
+            "mean",
+            "lastNotNull",
+            "min"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -749,7 +768,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Energy efficiency: Wh per Mbps of throughput\nresults_scenario_energy_wh_per_mbps",
+          "expr": "# Energy efficiency: Wh per Mbps of throughput\nmax by(scenario, output_ladder, encoder_type) (results_scenario_energy_wh_per_mbps{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "{{scenario}} @ {{bitrate}}",
@@ -765,7 +784,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Energy consumption per video frame. Lower values indicate more efficient encoding. Useful for comparing different resolution/fps combinations.",
+      "description": "Energy consumption per frame in joules (reported as mJ, divide by 1000 for J). Lower is better.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -800,7 +819,7 @@
               "mode": "off"
             }
           },
-          "decimals": 2,
+          "decimals": 4,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -811,7 +830,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "joule"
         },
         "overrides": []
       },
@@ -824,7 +843,11 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull", "min"],
+          "calcs": [
+            "mean",
+            "lastNotNull",
+            "min"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -842,7 +865,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Energy per frame in millijoules\nresults_scenario_energy_mj_per_frame",
+          "expr": "# Energy per frame in millijoules\nmax by(scenario, output_ladder, encoder_type) (results_scenario_energy_mj_per_frame{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "hide": false,
           "instant": false,
           "legendFormat": "{{scenario}} ({{resolution}}@{{fps}}fps)",
@@ -947,7 +970,9 @@
       "options": {
         "footer": {
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true,
@@ -966,7 +991,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_power_pct_increase",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_power_pct_increase{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -980,7 +1005,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_mean_power_watts",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_mean_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -994,7 +1019,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_delta_power_watts",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_delta_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -1066,7 +1091,92 @@
     "optimization"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, run_id)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Run ID",
+        "multi": true,
+        "name": "run_id",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, run_id)",
+          "refId": "run_id"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, output_ladder)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Output Ladder",
+        "multi": true,
+        "name": "output_ladder",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, output_ladder)",
+          "refId": "output_ladder"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, encoder_type)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Encoder Type",
+        "multi": true,
+        "name": "encoder_type",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, encoder_type)",
+          "refId": "encoder_type"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
+      }
+    ]
   },
   "time": {
     "from": "now-1h",

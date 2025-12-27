@@ -668,7 +668,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "watth"
         },
         "overrides": []
       },
@@ -702,7 +702,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_energy_wh_per_min",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_energy_wh_per_min{run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "legendFormat": "{{scenario}}",
           "range": true,
           "refId": "A"
@@ -763,7 +763,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "watth"
         },
         "overrides": []
       },
@@ -797,7 +797,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_energy_wh_per_mbps",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_energy_wh_per_mbps{run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "legendFormat": "{{scenario}}",
           "range": true,
           "refId": "A"
@@ -858,7 +858,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "joule",
+          "decimals": 4
         },
         "overrides": []
       },
@@ -892,7 +893,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_energy_mj_per_frame",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_energy_mj_per_frame{run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "legendFormat": "{{scenario}}",
           "range": true,
           "refId": "A"
@@ -953,7 +954,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "watt"
         },
         "overrides": []
       },
@@ -987,7 +988,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_measured_power_watts",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_measured_power_watts{run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "legendFormat": "{{scenario}}",
           "range": true,
           "refId": "A"
@@ -998,7 +999,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "results_scenario_estimated_docker_overhead_watts",
+          "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_estimated_docker_overhead_watts{run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
           "legendFormat": "{{scenario}} (Docker)",
           "range": true,
           "refId": "B"
@@ -1037,6 +1038,72 @@
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, run_id)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Run ID",
+        "multi": true,
+        "name": "run_id",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, run_id)",
+          "refId": "run_id"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, output_ladder)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Output Ladder",
+        "multi": true,
+        "name": "output_ladder",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, output_ladder)",
+          "refId": "output_ladder"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(results_scenario_mean_power_watts, encoder_type)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Encoder Type",
+        "multi": true,
+        "name": "encoder_type",
+        "options": [],
+        "query": {
+          "query": "label_values(results_scenario_mean_power_watts, encoder_type)",
+          "refId": "encoder_type"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query",
+        "allValue": ".*"
       }
     ]
   },
