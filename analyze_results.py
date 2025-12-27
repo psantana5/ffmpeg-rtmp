@@ -2,6 +2,7 @@
 """
 Automated analysis of test results
 Queries Prometheus and generates comprehensive reports
+Includes energy-aware transcoding recommendations
 """
 
 import requests
@@ -12,6 +13,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 import csv
+
+from advisor import TranscodingRecommender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,6 +69,7 @@ class ResultsAnalyzer:
     def __init__(self, results_file: Path, prometheus_url: str = 'http://localhost:9090'):
         self.results_file = results_file
         self.client = PrometheusClient(prometheus_url)
+        self.recommender = TranscodingRecommender()
         
         with open(results_file) as f:
             self.data = json.load(f)
@@ -267,6 +271,10 @@ class ResultsAnalyzer:
                     if r['net']['container_cpu_pct'] is not None:
                         r['net']['container_cpu_pct'] = 0.0
 
+        # Compute efficiency scores and rank scenarios
+        logger.info("Computing energy efficiency scores...")
+        results = self.recommender.analyze_and_rank(results)
+
         return results
     
     def print_summary(self, results: List[Dict]):
@@ -390,6 +398,38 @@ class ResultsAnalyzer:
                         f"{pct_increase:>+10.1f}%"
                     )
 
+        # Print energy efficiency rankings
+        scored_results = [r for r in results if r.get('efficiency_score') is not None]
+        if scored_results:
+            print(f"\n{'─' * 100}")
+            print("ENERGY EFFICIENCY RANKINGS")
+            print("─" * 100)
+            print(f"{'Rank':<6} {'Scenario':<35} {'Efficiency':<18} {'Power':<12} {'Bitrate':<12}")
+            print("─" * 100)
+            
+            for r in scored_results:
+                rank = r.get('efficiency_rank', '-')
+                score = r.get('efficiency_score', 0)
+                power_w = r.get('power', {}).get('mean_watts', 0)
+                bitrate = r.get('bitrate', 'N/A')
+                
+                print(f"{rank:<6} {r['name']:<35} {score:>10.4f} Mbps/W   {power_w:>10.2f} W  {bitrate:<12}")
+            
+            # Print recommendation
+            best = scored_results[0]
+            print(f"\n{'─' * 100}")
+            print("RECOMMENDATION")
+            print("─" * 100)
+            print(f"Most energy-efficient configuration: {best['name']}")
+            print(f"  Efficiency Score: {best['efficiency_score']:.4f} Mbps/W")
+            print(f"  Mean Power: {best['power']['mean_watts']:.2f} W")
+            print(f"  Bitrate: {best['bitrate']}")
+            if best.get('resolution') != 'N/A':
+                print(f"  Resolution: {best['resolution']}")
+            if best.get('fps') != 'N/A':
+                print(f"  FPS: {best['fps']}")
+            print(f"\nThis configuration delivers the most video throughput per watt of energy consumed.")
+
         print("\n" + "=" * 100 + "\n")
 
     def export_csv(self, output_file: str = None):
@@ -409,7 +449,8 @@ class ResultsAnalyzer:
                 'mean_power_w', 'median_power_w', 'total_energy_wh',
                 'net_power_w', 'net_energy_wh', 'net_container_cpu_pct',
                 'docker_overhead_w', 'docker_overhead_pct',
-                'container_cpu_pct', 'container_power_w'
+                'container_cpu_pct', 'container_power_w',
+                'efficiency_score', 'efficiency_rank'
             ])
 
             writer.writeheader()
@@ -440,6 +481,10 @@ class ResultsAnalyzer:
                 if 'container_usage' in r:
                     row['container_cpu_pct'] = r['container_usage']['cpu_percent']
                     row['container_power_w'] = r['container_usage']['estimated_watts']
+
+                # Add efficiency score and rank
+                row['efficiency_score'] = r.get('efficiency_score')
+                row['efficiency_rank'] = r.get('efficiency_rank')
 
                 writer.writerow(row)
 
