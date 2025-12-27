@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -135,12 +136,142 @@ class ResultsExporter:
         return None
 
     def _scenario_labels(self, scenario: dict) -> dict:
+        """Extract labels for a scenario including derived metadata."""
+        # Extract stream count from scenario name
+        streams = self._extract_stream_count(scenario)
+        
+        # Determine output ladder identifier
+        output_ladder = self._get_output_ladder_id(scenario)
+        
+        # Detect encoder type (cpu/gpu) from scenario metadata or name
+        encoder_type = scenario.get("encoder_type", self._detect_encoder_type(scenario))
+        
         return {
             "scenario": str(scenario.get("name", "")),
             "bitrate": str(scenario.get("bitrate", "")),
             "resolution": str(scenario.get("resolution", "")),
             "fps": str(scenario.get("fps", "")),
+            "streams": str(streams),
+            "output_ladder": output_ladder,
+            "encoder_type": encoder_type,
         }
+    
+    def _extract_stream_count(self, scenario: dict) -> int:
+        """Extract number of concurrent streams from scenario name."""
+        name = scenario.get("name", "").lower()
+        # Look for patterns like "2 streams", "4 Streams", etc.
+        match = re.search(r'(\d+)\s+streams?', name)
+        if match:
+            return int(match.group(1))
+        return 1
+    
+    def _get_output_ladder_id(self, scenario: dict) -> str:
+        """Get output ladder identifier for grouping scenarios."""
+        outputs = scenario.get("outputs")
+        
+        if outputs and isinstance(outputs, list) and len(outputs) > 0:
+            # Multi-resolution ladder
+            ladder_parts = []
+            for output in outputs:
+                resolution = output.get("resolution", "")
+                fps = output.get("fps", "")
+                if resolution and fps:
+                    # Parse resolution for proper sorting
+                    width, height = self._parse_resolution(resolution)
+                    if width and height:
+                        ladder_parts.append((width, height, fps, resolution))
+            
+            if ladder_parts:
+                # Sort by width (descending), then height (descending)
+                ladder_parts.sort(key=lambda x: (x[0], x[1]), reverse=True)
+                # Build ladder string
+                formatted = [f"{res}@{fps}" for _, _, fps, res in ladder_parts]
+                return ",".join(formatted)
+        
+        # Single resolution
+        resolution = scenario.get("resolution", "N/A")
+        fps = scenario.get("fps", "N/A")
+        if resolution != "N/A" and fps != "N/A":
+            return f"{resolution}@{fps}"
+        
+        return "unknown"
+    
+    def _detect_encoder_type(self, scenario: dict) -> str:
+        """Detect encoder type (cpu/gpu) from scenario name or metadata."""
+        name = scenario.get("name", "").lower()
+        
+        # Check for explicit mentions
+        if "gpu" in name or "nvenc" in name or "qsv" in name or "vaapi" in name:
+            return "gpu"
+        if "cpu" in name or "x264" in name or "libx264" in name:
+            return "cpu"
+        
+        # Default to CPU for most scenarios
+        return "cpu"
+    
+    def _compute_efficiency_score(self, scenario: dict, stats: dict) -> float | None:
+        """
+        Compute energy efficiency score.
+        
+        Formula: (throughput_mbps * streams) / mean_power_watts
+        Returns pixels per joule if resolution data is available.
+        """
+        mean_watts = stats.get("mean_power_w", 0)
+        total_energy_j = stats.get("total_energy_j", 0)
+        duration = stats.get("duration_s", 0)
+        
+        if mean_watts <= 0 or total_energy_j <= 0 or duration <= 0:
+            return None
+        
+        # Try to compute pixels per joule (preferred for output ladders)
+        outputs = scenario.get("outputs")
+        total_pixels = 0
+        
+        if outputs and isinstance(outputs, list):
+            # Multi-resolution ladder
+            for output in outputs:
+                resolution = output.get("resolution", "")
+                fps = output.get("fps", 0)
+                width, height = self._parse_resolution(resolution)
+                if width and height and fps:
+                    total_pixels += width * height * fps * duration
+        else:
+            # Single resolution
+            resolution = scenario.get("resolution", "")
+            fps = scenario.get("fps", 0)
+            width, height = self._parse_resolution(resolution)
+            if width and height and fps:
+                total_pixels = width * height * fps * duration
+        
+        if total_pixels > 0:
+            # Pixels per joule
+            return total_pixels / total_energy_j
+        
+        # Fallback: throughput per watt
+        bitrate_mbps = _parse_bitrate_to_mbps(scenario.get("bitrate", ""))
+        streams = self._extract_stream_count(scenario)
+        throughput_mbps = bitrate_mbps * streams
+        
+        if throughput_mbps > 0:
+            return throughput_mbps / mean_watts
+        
+        return None
+    
+    def _parse_resolution(self, resolution: str) -> tuple[int | None, int | None]:
+        """Parse resolution string to (width, height)."""
+        if not resolution or resolution == "N/A":
+            return (None, None)
+        
+        try:
+            parts = resolution.lower().split('x')
+            if len(parts) == 2:
+                width = int(parts[0].strip())
+                height = int(parts[1].strip())
+                return (width, height)
+        except (ValueError, AttributeError):
+            pass
+        
+        return (None, None)
 
     def _labels_str(self, labels: dict) -> str:
         parts = [f'{k}="{_escape_label_value(str(v))}"' for k, v in labels.items()]
@@ -262,6 +393,10 @@ class ResultsExporter:
         output.append("# TYPE results_scenario_delta_energy_wh gauge")
         output.append("# HELP results_scenario_power_pct_increase Power percent increase vs baseline")
         output.append("# TYPE results_scenario_power_pct_increase gauge")
+        output.append("# HELP results_scenario_efficiency_score Energy efficiency score (pixels/J or Mbps/W)")
+        output.append("# TYPE results_scenario_efficiency_score gauge")
+        output.append("# HELP results_scenario_total_pixels Total pixels delivered across all outputs")
+        output.append("# TYPE results_scenario_total_pixels gauge")
 
         baseline = self._find_baseline(scenarios)
         baseline_stats = None
@@ -294,6 +429,33 @@ class ResultsExporter:
                 output.append(f"results_scenario_energy_wh_per_mbps{lbl} {stats['energy_wh_per_mbps']:.6f}")
             if stats["energy_mj_per_frame"] is not None:
                 output.append(f"results_scenario_energy_mj_per_frame{lbl} {stats['energy_mj_per_frame']:.4f}")
+            
+            # Compute and export efficiency score
+            efficiency_score = self._compute_efficiency_score(scenario, stats)
+            if efficiency_score is not None:
+                output.append(f"results_scenario_efficiency_score{lbl} {efficiency_score:.4e}")
+            
+            # Compute and export total pixels
+            outputs = scenario.get("outputs")
+            total_pixels = 0
+            duration = stats.get("duration_s", 0)
+            
+            if outputs and isinstance(outputs, list):
+                for output_item in outputs:
+                    resolution = output_item.get("resolution", "")
+                    fps = output_item.get("fps", 0)
+                    width, height = self._parse_resolution(resolution)
+                    if width and height and fps and duration:
+                        total_pixels += width * height * fps * duration
+            else:
+                resolution = scenario.get("resolution", "")
+                fps = scenario.get("fps", 0)
+                width, height = self._parse_resolution(resolution)
+                if width and height and fps and duration:
+                    total_pixels = width * height * fps * duration
+            
+            if total_pixels > 0:
+                output.append(f"results_scenario_total_pixels{lbl} {total_pixels:.0f}")
 
             if baseline_stats and scenario is not baseline:
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]

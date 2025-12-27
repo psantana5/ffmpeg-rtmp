@@ -132,7 +132,21 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sort_desc(\n  (\n    # Calculate bitrate in Mbps from scenario name/bitrate label\n    # Extract number of streams from scenario name\n    # Efficiency = (bitrate_mbps * streams) / mean_power_watts\n    label_replace(\n      results_scenario_mean_power_watts,\n      \"streams\", \"$1\", \"scenario\", \".*?(\\\\d+) streams.*\"\n    )\n  ) * 0 + 1\n)",
+          "expr": "results_scenario_efficiency_score",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "Efficiency"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "results_scenario_mean_power_watts",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -153,20 +167,6 @@
           "legendFormat": "__auto",
           "range": false,
           "refId": "Energy"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "# Efficiency Score: Pixels per Joule or Throughput per Watt\n# Using simplified formula based on resolution and energy\nlabel_replace(\n  label_replace(\n    results_scenario_total_energy_joules > 0,\n    \"width\", \"$1\", \"resolution\", \"(\\\\d+)x.*\"\n  ),\n  \"height\", \"$1\", \"resolution\", \".*x(\\\\d+)\"\n) \n* on(scenario, run_id) group_left(fps, resolution)\nlabel_replace(\n  results_scenario_duration_seconds,\n  \"_\", \"$0\", \"fps\", \".*\"\n)",
-          "format": "table",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "Efficiency"
         }
       ],
       "title": "Energy Efficiency Leaderboard",
@@ -180,21 +180,16 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "Value #Energy": false,
-              "Value #Power": true,
               "__name__": true,
-              "height": true,
               "instance": true,
               "job": true,
-              "run_id": true,
-              "width": true,
-              "_": true
+              "run_id": true
             },
             "indexByName": {
               "scenario": 0,
-              "resolution": 1,
-              "bitrate": 2,
-              "fps": 3,
+              "output_ladder": 1,
+              "encoder_type": 2,
+              "streams": 3,
               "Value #Power": 4,
               "Value #Energy": 5,
               "Value #Efficiency": 6
@@ -203,10 +198,10 @@
               "Value #Efficiency": "efficiency_score",
               "Value #Energy": "total_energy_joules",
               "Value #Power": "mean_power_watts",
-              "bitrate": "bitrate",
-              "fps": "fps",
-              "resolution": "output_ladder",
-              "scenario": "scenario"
+              "encoder_type": "encoder",
+              "output_ladder": "output_ladder",
+              "scenario": "scenario",
+              "streams": "streams"
             }
           }
         },
@@ -303,10 +298,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Calculate total pixels delivered per joule\n# Formula: (width * height * fps * duration) / total_energy_joules\n(\n  label_replace(\n    label_replace(\n      results_scenario_duration_seconds,\n      \"width\", \"$1\", \"resolution\", \"(\\\\d+)x.*\"\n    ),\n    \"height\", \"$1\", \"resolution\", \".*x(\\\\d+)\"\n  )\n  * on(scenario, run_id, resolution, bitrate, fps) group_left()\n  results_scenario_total_energy_joules > 0\n) \n/ on(scenario, run_id, resolution, bitrate, fps) group_left()\nresults_scenario_total_energy_joules",
+          "expr": "# Pixels delivered per joule (already computed)\nresults_scenario_efficiency_score",
           "hide": false,
           "instant": true,
-          "legendFormat": "{{scenario}} ({{resolution}}@{{fps}}fps)",
+          "legendFormat": "{{scenario}} ({{output_ladder}})",
           "range": false,
           "refId": "PixelsPerJoule"
         }
@@ -405,10 +400,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Energy wasted vs optimal within same resolution group\n# For each resolution, find the minimum energy consumption\n# Then calculate the difference for each scenario\nresults_scenario_total_energy_joules\n- on(resolution, fps) group_left()\nmin by(resolution, fps) (results_scenario_total_energy_joules)",
+          "expr": "# Energy wasted vs optimal within same output ladder\n# For each output_ladder, find the minimum energy consumption\n# Then calculate the difference for each scenario\nresults_scenario_total_energy_joules\n- on(output_ladder) group_left()\nmin by(output_ladder) (results_scenario_total_energy_joules)",
           "hide": false,
           "instant": true,
-          "legendFormat": "{{scenario}} vs optimal ({{resolution}}@{{fps}}fps)",
+          "legendFormat": "{{scenario}} vs optimal ({{output_ladder}})",
           "range": false,
           "refId": "WastedEnergy"
         }
@@ -533,12 +528,25 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# CPU encoder power vs stream count\n# Extract stream count from scenario name\navg by(streams, bitrate, resolution) (\n  label_replace(\n    results_scenario_mean_power_watts{scenario=~\".*stream.*\"},\n    \"streams\", \"$1\", \"scenario\", \".*(\\\\d+) stream.*\"\n  )\n) and on() vector(0) or \nlabel_replace(\n  results_scenario_mean_power_watts{scenario=~\".*stream.*\"},\n  \"streams\", \"$1\", \"scenario\", \".*(\\\\d+) stream.*\"\n)",
+          "expr": "# CPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"cpu\"}\n)",
           "hide": false,
           "instant": true,
-          "legendFormat": "CPU encoder: {{streams}} streams @ {{bitrate}} ({{resolution}})",
+          "legendFormat": "CPU: {{streams}} streams",
           "range": false,
           "refId": "CPU_Power"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "# GPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"gpu\"}\n)",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "GPU: {{streams}} streams",
+          "range": false,
+          "refId": "GPU_Power"
         }
       ],
       "title": "CPU vs GPU Scaling (Power by Stream Count)",
@@ -647,10 +655,10 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "# Efficiency stability: variance in power consumption over time\n# Lower variance = more stable configuration\nstddev_over_time(results_scenario_mean_power_watts[5m]) \n/ avg_over_time(results_scenario_mean_power_watts[5m])",
+          "expr": "# Efficiency stability: coefficient of variation\n# Measures variability in efficiency score over time\nstddev_over_time(results_scenario_efficiency_score[5m]) \n/ avg_over_time(results_scenario_efficiency_score[5m])",
           "hide": false,
           "instant": true,
-          "legendFormat": "{{scenario}} ({{resolution}}@{{fps}}fps)",
+          "legendFormat": "{{scenario}} ({{output_ladder}})",
           "range": false,
           "refId": "EfficiencyStability"
         }
