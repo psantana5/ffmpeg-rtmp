@@ -139,6 +139,36 @@
       "stabilization": 20,
       "duration": 120,
       "cooldown": 45
+    },
+    {
+      "type": "single",
+      "name": "Multi-resolution ladder test 1080p+720p+480p @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 15,
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
+    },
+    {
+      "type": "single",
+      "name": "Multi-resolution ladder test 1080p+720p+480p @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 15,
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
     }
   ]
 }

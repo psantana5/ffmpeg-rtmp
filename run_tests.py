@@ -31,17 +31,19 @@ class TestScenario:
         resolution: str = "1280x720",
         fps: int = 30,
         duration: int = 300,
+        outputs: Optional[List[Dict]] = None,
     ):
         self.name = name
         self.bitrate = bitrate
         self.resolution = resolution
         self.fps = fps
         self.duration = duration
+        self.outputs = outputs  # List of output ladder configs
         self.start_time: Optional[float] = None
         self.end_time: Optional[float] = None
 
     def to_dict(self) -> Dict:
-        return {
+        result = {
             "name": self.name,
             "bitrate": self.bitrate,
             "resolution": self.resolution,
@@ -50,6 +52,9 @@ class TestScenario:
             "start_time": self.start_time,
             "end_time": self.end_time,
         }
+        if self.outputs:
+            result["outputs"] = self.outputs
+        return result
 
 
 class TestRunner:
@@ -531,6 +536,7 @@ def main():
                     resolution=entry.get("resolution", "1280x720"),
                     fps=int(entry.get("fps", 30)),
                     duration=int(entry.get("duration", 300)),
+                    outputs=entry.get("outputs"),  # Pass outputs if present
                 )
                 runner.run_scenario(
                     scenario,
