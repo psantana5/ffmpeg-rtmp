@@ -16,7 +16,7 @@ Design principles:
 
 import logging
 import re
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,10 @@ class EnergyEfficiencyScorer:
         Args:
             algorithm: Scoring algorithm to use. Currently supports:
                 - 'throughput_per_watt': efficiency_score = throughput / power
+                - 'pixels_per_joule': efficiency_score = total_pixels / total_energy_joules
         """
         self.algorithm = algorithm
-        self.supported_algorithms = {'throughput_per_watt'}
+        self.supported_algorithms = {'throughput_per_watt', 'pixels_per_joule'}
         
         if algorithm not in self.supported_algorithms:
             raise ValueError(
@@ -58,6 +59,8 @@ class EnergyEfficiencyScorer:
                 - bitrate: str (e.g., "2500k", "5M")
                 - power: dict with 'mean_watts'
                 - Optional: stream count embedded in scenario name or metadata
+                - Optional: outputs: list of output resolutions/fps for pixel-based scoring
+                - Optional: duration: duration in seconds for pixel calculation
         
         Returns:
             Energy efficiency score (float) or None if insufficient data.
@@ -69,6 +72,13 @@ class EnergyEfficiencyScorer:
                 throughput_mbps = parsed_bitrate_mbps * num_streams
                 mean_watts = CPU power + GPU power (if available)
         
+        Formula (v0.2 - pixels_per_joule):
+            efficiency_score = total_pixels_delivered / total_energy_joules
+            
+            Where:
+                total_pixels_delivered = sum(width * height * fps * duration for each output)
+                total_energy_joules = power['total_energy_joules']
+        
         Design notes:
             - Returns None for baseline/idle scenarios (bitrate = "0k")
             - Returns None if power data is missing or invalid
@@ -77,6 +87,8 @@ class EnergyEfficiencyScorer:
         """
         if self.algorithm == 'throughput_per_watt':
             return self._compute_throughput_per_watt(scenario)
+        elif self.algorithm == 'pixels_per_joule':
+            return self._compute_pixels_per_joule(scenario)
         
         return None
     
@@ -126,6 +138,190 @@ class EnergyEfficiencyScorer:
         )
         
         return efficiency_score
+    
+    def _compute_pixels_per_joule(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute pixels-per-joule efficiency score (output ladder aware).
+        
+        This scoring function is designed for scenarios with multiple output resolutions.
+        It calculates the total pixels delivered across all outputs and divides by
+        the total energy consumed.
+        
+        Formula:
+            efficiency_score = total_pixels_delivered / total_energy_joules
+            
+        Where:
+            total_pixels_delivered = sum(width * height * fps * duration for each output)
+            total_energy_joules = scenario['power']['total_energy_joules']
+        """
+        # Extract energy consumption in joules
+        power = scenario.get('power')
+        if not power or power.get('total_energy_joules') is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No energy data available")
+            return None
+        
+        total_energy_joules = power['total_energy_joules']
+        
+        if total_energy_joules <= 0:
+            logger.debug(
+                f"Scenario '{scenario.get('name')}': "
+                f"Invalid energy value {total_energy_joules}"
+            )
+            return None
+        
+        # Calculate total pixels delivered
+        total_pixels = self._compute_total_pixels(scenario)
+        
+        if total_pixels is None or total_pixels <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': No valid pixel data")
+            return None
+        
+        # Compute efficiency: pixels per joule
+        efficiency_score = total_pixels / total_energy_joules
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"total_pixels={total_pixels:.2e}, "
+            f"energy={total_energy_joules:.2f} J, "
+            f"score={efficiency_score:.4e} pixels/J"
+        )
+        
+        return efficiency_score
+    
+    def _compute_total_pixels(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute total pixels delivered for a scenario.
+        
+        Supports two modes:
+        1. Output ladder mode: If 'outputs' is present, sum pixels across all outputs
+        2. Legacy mode: Use single resolution/fps from scenario metadata
+        
+        Args:
+            scenario: Scenario dict
+            
+        Returns:
+            Total pixels delivered (float) or None if insufficient data
+        """
+        duration = scenario.get('duration')
+        if not duration or duration <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': No valid duration")
+            return None
+        
+        # Check for output ladder mode
+        outputs = scenario.get('outputs')
+        if outputs and isinstance(outputs, list) and len(outputs) > 0:
+            # Output ladder mode: sum pixels across all outputs
+            total_pixels = 0.0
+            for output in outputs:
+                resolution = output.get('resolution')
+                fps = output.get('fps')
+                
+                if not resolution or not fps:
+                    logger.warning(f"Output missing resolution or fps: {output}")
+                    continue
+                
+                width, height = self._parse_resolution(resolution)
+                if width is None or height is None:
+                    logger.warning(f"Failed to parse resolution: {resolution}")
+                    continue
+                
+                # pixels = width * height * fps * duration
+                pixels = width * height * fps * duration
+                total_pixels += pixels
+            
+            return total_pixels if total_pixels > 0 else None
+        
+        # Legacy mode: single resolution/fps
+        resolution = scenario.get('resolution')
+        fps = scenario.get('fps')
+        
+        if not resolution or resolution == 'N/A' or not fps or fps == 'N/A':
+            logger.debug(f"Scenario '{scenario.get('name')}': No resolution/fps data")
+            return None
+        
+        width, height = self._parse_resolution(resolution)
+        if width is None or height is None:
+            return None
+        
+        total_pixels = width * height * fps * duration
+        return total_pixels
+    
+    def _parse_resolution(self, resolution: str) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Parse resolution string to width and height.
+        
+        Supports formats:
+            - "1920x1080" -> (1920, 1080)
+            - "1280x720" -> (1280, 720)
+            - "854x480" -> (854, 480)
+        
+        Args:
+            resolution: Resolution string (e.g., "1920x1080")
+            
+        Returns:
+            Tuple of (width, height) or (None, None) if parsing fails
+        """
+        if not resolution or resolution == 'N/A':
+            return (None, None)
+        
+        try:
+            parts = resolution.lower().split('x')
+            if len(parts) == 2:
+                width = int(parts[0].strip())
+                height = int(parts[1].strip())
+                return (width, height)
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Failed to parse resolution '{resolution}': {e}")
+        
+        return (None, None)
+    
+    def get_output_ladder(self, scenario: Dict) -> Optional[str]:
+        """
+        Get a normalized output ladder identifier for grouping scenarios.
+        
+        Scenarios with identical output ladders should be compared against each other.
+        The ladder is a string representation of the list of (resolution, fps) tuples.
+        
+        Args:
+            scenario: Scenario dict
+            
+        Returns:
+            Ladder identifier string (e.g., "1920x1080@30,1280x720@30,854x480@30")
+            or None if no valid output ladder is found
+        """
+        outputs = scenario.get('outputs')
+        
+        if outputs and isinstance(outputs, list) and len(outputs) > 0:
+            # Sort outputs by resolution (descending) for consistent ordering
+            sorted_outputs = []
+            for output in outputs:
+                resolution = output.get('resolution')
+                fps = output.get('fps')
+                
+                if not resolution or not fps:
+                    continue
+                
+                width, height = self._parse_resolution(resolution)
+                if width is None or height is None:
+                    continue
+                
+                sorted_outputs.append((width, height, fps, resolution))
+            
+            # Sort by width (descending), then height (descending)
+            sorted_outputs.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            
+            # Build ladder string
+            ladder_parts = [f"{res}@{fps}" for _, _, fps, res in sorted_outputs]
+            return ','.join(ladder_parts) if ladder_parts else None
+        
+        # Legacy mode: single resolution/fps
+        resolution = scenario.get('resolution')
+        fps = scenario.get('fps')
+        
+        if resolution and resolution != 'N/A' and fps and fps != 'N/A':
+            return f"{resolution}@{fps}"
+        
+        return None
     
     def _extract_stream_count(self, scenario: Dict) -> int:
         """

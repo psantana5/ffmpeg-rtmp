@@ -9,6 +9,7 @@ This module bridges measurement and decision-making:
 - Applies scoring algorithms
 - Ranks configurations
 - Returns best options with justification
+- Supports output ladder grouping for fair comparison
 
 Designed for:
 - Single-machine optimization (developer workstation)
@@ -17,6 +18,7 @@ Designed for:
 """
 
 import logging
+from collections import defaultdict
 from typing import Dict, List, Optional
 
 from .scoring import EnergyEfficiencyScorer
@@ -90,6 +92,96 @@ class TranscodingRecommender:
         
         # Combine: ranked scenarios first, then unscored ones
         return with_scores + without_scores
+    
+    def analyze_and_rank_by_ladder(self, scenarios: List[Dict]) -> Dict[str, List[Dict]]:
+        """
+        Compute efficiency scores and rank scenarios, grouped by output ladder.
+        
+        This method groups scenarios by their output ladder configuration and ranks
+        within each group. Only scenarios with identical output ladders are compared.
+        
+        Args:
+            scenarios: List of scenario dicts
+            
+        Returns:
+            Dict mapping ladder identifier to list of ranked scenarios.
+            Each scenario dict is augmented with:
+                - 'efficiency_score': float or None
+                - 'efficiency_rank': int (1 = best within ladder)
+                - 'output_ladder': str (ladder identifier)
+        
+        Example:
+            >>> recommender = TranscodingRecommender()
+            >>> by_ladder = recommender.analyze_and_rank_by_ladder(scenarios)
+            >>> for ladder, ranked_scenarios in by_ladder.items():
+            >>>     print(f"Ladder: {ladder}")
+            >>>     print(f"  Best: {ranked_scenarios[0]['name']}")
+        """
+        # Group scenarios by output ladder
+        ladder_groups = defaultdict(list)
+        
+        for scenario in scenarios:
+            # Create a copy to avoid mutating input
+            scenario_copy = scenario.copy()
+            
+            # Get output ladder
+            ladder = self.scorer.get_output_ladder(scenario_copy)
+            scenario_copy['output_ladder'] = ladder
+            
+            # Compute efficiency score
+            score = self.scorer.compute_score(scenario_copy)
+            scenario_copy['efficiency_score'] = score
+            
+            # Group by ladder (None for scenarios without ladder)
+            ladder_key = ladder if ladder else '_no_ladder_'
+            ladder_groups[ladder_key].append(scenario_copy)
+        
+        # Rank within each ladder group
+        ranked_by_ladder = {}
+        for ladder_key, group_scenarios in ladder_groups.items():
+            # Separate scenarios with valid scores
+            with_scores = [s for s in group_scenarios if s['efficiency_score'] is not None]
+            without_scores = [s for s in group_scenarios if s['efficiency_score'] is None]
+            
+            # Sort by score (descending: higher efficiency is better)
+            with_scores.sort(key=lambda s: s['efficiency_score'], reverse=True)
+            
+            # Assign ranks within this ladder
+            for rank, scenario in enumerate(with_scores, start=1):
+                scenario['efficiency_rank'] = rank
+            
+            # Combine: ranked scenarios first, then unscored ones
+            ranked_by_ladder[ladder_key] = with_scores + without_scores
+        
+        return ranked_by_ladder
+    
+    def get_best_per_ladder(self, scenarios: List[Dict]) -> Dict[str, Optional[Dict]]:
+        """
+        Get the best configuration for each output ladder.
+        
+        Args:
+            scenarios: List of scenario dicts
+            
+        Returns:
+            Dict mapping ladder identifier to best scenario for that ladder.
+        
+        Example:
+            >>> recommender = TranscodingRecommender()
+            >>> best_per_ladder = recommender.get_best_per_ladder(scenarios)
+            >>> for ladder, best in best_per_ladder.items():
+            >>>     if best:
+            >>>         print(f"{ladder}: {best['name']} - {best['efficiency_score']:.4f}")
+        """
+        by_ladder = self.analyze_and_rank_by_ladder(scenarios)
+        
+        best_per_ladder = {}
+        for ladder_key, ranked_scenarios in by_ladder.items():
+            if ranked_scenarios and ranked_scenarios[0].get('efficiency_score') is not None:
+                best_per_ladder[ladder_key] = ranked_scenarios[0]
+            else:
+                best_per_ladder[ladder_key] = None
+        
+        return best_per_ladder
     
     def get_best_configuration(self, scenarios: List[Dict]) -> Optional[Dict]:
         """

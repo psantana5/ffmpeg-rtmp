@@ -4,16 +4,16 @@ Automated Streaming Energy Test Runner
 Runs predefined test scenarios and collects data automatically
 """
 
-import subprocess
-import time
+import argparse
 import json
 import logging
-import argparse
+import signal
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-import signal
-import sys
+from typing import Dict, List, Optional
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -31,17 +31,19 @@ class TestScenario:
         resolution: str = "1280x720",
         fps: int = 30,
         duration: int = 300,
+        outputs: Optional[List[Dict]] = None,
     ):
         self.name = name
         self.bitrate = bitrate
         self.resolution = resolution
         self.fps = fps
         self.duration = duration
+        self.outputs = outputs  # List of output ladder configs
         self.start_time: Optional[float] = None
         self.end_time: Optional[float] = None
 
     def to_dict(self) -> Dict:
-        return {
+        result = {
             "name": self.name,
             "bitrate": self.bitrate,
             "resolution": self.resolution,
@@ -49,7 +51,9 @@ class TestScenario:
             "duration": self.duration,
             "start_time": self.start_time,
             "end_time": self.end_time,
+            "outputs": self.outputs,  # Always include, even if None
         }
+        return result
 
 
 class TestRunner:
@@ -214,7 +218,9 @@ class TestRunner:
         cooldown_time: int = 30,
         name: str = "Mixed Streams",
     ) -> Dict:
-        scenario = TestScenario(f"{len(bitrates)} Streams (Mixed)", ",".join(bitrates), duration=duration)
+        scenario = TestScenario(
+            f"{len(bitrates)} Streams (Mixed)", ",".join(bitrates), duration=duration
+        )
         processes = []
 
         try:
@@ -320,7 +326,7 @@ class TestRunner:
                 except subprocess.TimeoutExpired:
                     proc.kill()
 
-            logger.info(f"Multiple stream test complete")
+            logger.info("Multiple stream test complete")
 
             # Cooling down
             logger.info(f"Cooling down for {cooldown_time}s...")
@@ -531,6 +537,7 @@ def main():
                     resolution=entry.get("resolution", "1280x720"),
                     fps=int(entry.get("fps", 30)),
                     duration=int(entry.get("duration", 300)),
+                    outputs=entry.get("outputs"),  # Pass outputs if present
                 )
                 runner.run_scenario(
                     scenario,
