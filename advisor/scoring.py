@@ -14,8 +14,8 @@ Design principles:
 - Clear documentation of formulas and assumptions
 """
 
-from typing import Dict, Optional
 import logging
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 

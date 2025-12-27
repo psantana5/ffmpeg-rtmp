@@ -16,8 +16,8 @@ Designed for:
 - Sustainable streaming infrastructure
 """
 
-from typing import Dict, List, Optional, Tuple
 import logging
+from typing import Dict, List, Optional
 
 from .scoring import EnergyEfficiencyScorer
 
@@ -245,9 +245,10 @@ class TranscodingRecommender:
         else:
             winner_name = config_a['name'] if winner == 'config_a' else config_b['name']
             winner_score = score_a if winner == 'config_a' else score_b
+            loser_score = score_a if winner == 'config_b' else score_b
             justification = (
                 f"{winner_name} is {abs(efficiency_pct_diff):.1f}% more efficient "
-                f"({winner_score:.4f} Mbps/W vs {score_a if winner == 'config_b' else score_b:.4f} Mbps/W)"
+                f"({winner_score:.4f} Mbps/W vs {loser_score:.4f} Mbps/W)"
             )
         
         return {
