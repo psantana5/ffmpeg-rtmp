@@ -149,13 +149,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum by (zone) (rapl_power_watts{zone=~\".*dram.*\"})",
+          "expr": "sum by (zone) (rapl_power_watts{zone=~\"psys|core\"})",
           "legendFormat": "{{zone}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "DRAM Power (RAPL)",
+      "title": "System & Core Power (RAPL)",
       "type": "timeseries"
     },
     {
@@ -269,7 +269,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg_over_time(1 - rate(node_cpu_seconds_total{mode=\"idle\"}[1m])[5m:1m])",
+          "expr": "1 - avg_over_time(rate(node_cpu_seconds_total{mode=\"idle\"}[1m])[5m:1m])",
           "legendFormat": "CPU utilization",
           "range": true,
           "refId": "A"
@@ -546,7 +546,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(container_memory_usage_bytes{container!=\"\"})",
+          "expr": "sum(container_memory_usage_bytes{image!=\"\"})",
           "legendFormat": "Total container memory",
           "range": true,
           "refId": "A"
