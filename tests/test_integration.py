@@ -4,14 +4,9 @@ Creates sample test data and verifies the integration.
 """
 
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import Mock, patch
-import pytest
 
-# Add project root to path
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import pytest
 
 from analyze_results import ResultsAnalyzer
 

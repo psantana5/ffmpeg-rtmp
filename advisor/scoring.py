@@ -15,6 +15,7 @@ Design principles:
 """
 
 import logging
+import re
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,6 @@ class EnergyEfficiencyScorer:
         name = scenario.get('name', '').lower()
         
         # Look for patterns like "2 streams", "4 Streams", etc.
-        import re
         match = re.search(r'(\d+)\s+streams?', name)
         if match:
             return int(match.group(1))
@@ -177,12 +177,11 @@ class EnergyEfficiencyScorer:
                 return float(value[:-1])
             elif value.endswith('K'):
                 return float(value[:-1]) / 1000.0
-            elif value.isdigit():
-                # Assume kbps if no unit
-                return float(value) / 1000.0
             else:
-                logger.warning(f"Unknown bitrate format: {bitrate}, returning 0")
-                return 0.0
+                # Try to parse as numeric value (assumes kbps if no unit)
+                # This handles both integers and decimals
+                numeric_value = float(value)
+                return numeric_value / 1000.0
         except ValueError:
             logger.warning(f"Failed to parse bitrate: {bitrate}, returning 0")
             return 0.0

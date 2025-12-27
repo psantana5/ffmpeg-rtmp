@@ -1,6 +1,7 @@
 """Tests for the advisor.recommender module."""
 
 import pytest
+
 from advisor.recommender import TranscodingRecommender
 from advisor.scoring import EnergyEfficiencyScorer
 
@@ -97,7 +98,8 @@ class TestTranscodingRecommender:
         original_count = len(sample_scenarios)
         original_names = [s['name'] for s in sample_scenarios]
         
-        ranked = recommender.analyze_and_rank(sample_scenarios)
+        # Call analyze_and_rank (return value not needed for this test)
+        _ = recommender.analyze_and_rank(sample_scenarios)
         
         # Original list should be unchanged
         assert len(sample_scenarios) == original_count

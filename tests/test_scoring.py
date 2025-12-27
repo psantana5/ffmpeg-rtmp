@@ -1,6 +1,7 @@
 """Tests for the advisor.scoring module."""
 
 import pytest
+
 from advisor.scoring import EnergyEfficiencyScorer
 
 
@@ -121,6 +122,10 @@ class TestEnergyEfficiencyScorer:
         
         # Test numeric-only (assumes kbps)
         assert scorer._parse_bitrate_to_mbps('3000') == 3.0
+        
+        # Test decimal values
+        assert scorer._parse_bitrate_to_mbps('1500.5') == 1.5005
+        assert scorer._parse_bitrate_to_mbps('2500.0') == 2.5
         
         # Test invalid/edge cases
         assert scorer._parse_bitrate_to_mbps('0k') == 0.0
