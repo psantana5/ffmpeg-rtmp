@@ -163,7 +163,10 @@ class EnergyEfficiencyScorer:
         total_energy_joules = power['total_energy_joules']
         
         if total_energy_joules <= 0:
-            logger.debug(f"Scenario '{scenario.get('name')}': Invalid energy value {total_energy_joules}")
+            logger.debug(
+                f"Scenario '{scenario.get('name')}': "
+                f"Invalid energy value {total_energy_joules}"
+            )
             return None
         
         # Calculate total pixels delivered

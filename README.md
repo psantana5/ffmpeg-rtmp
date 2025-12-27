@@ -157,6 +157,87 @@ python3 run_tests.py --output-dir ./test_results multi \
 
 ---
 
+## Output Ladders (Multi-Resolution Support)
+
+The system supports **output ladders** for scenarios where you transcode to multiple resolutions simultaneously (e.g., 1080p, 720p, 480p). This is critical for adaptive bitrate streaming where clients dynamically select the best resolution for their connection.
+
+### Defining Output Ladders
+
+Add an `outputs` array to your scenario in the batch JSON:
+
+```json
+{
+  "type": "single",
+  "name": "Multi-resolution ladder test 1080p+720p+480p @ 2500k",
+  "bitrate": "2500k",
+  "resolution": "1920x1080",
+  "fps": 30,
+  "stabilization": 10,
+  "duration": 120,
+  "cooldown": 15,
+  "outputs": [
+    {"resolution": "1920x1080", "fps": 30},
+    {"resolution": "1280x720", "fps": 30},
+    {"resolution": "854x480", "fps": 30}
+  ]
+}
+```
+
+### Energy Efficiency Scoring with Output Ladders
+
+When output ladders are present, the system uses a **pixel-based scoring algorithm**:
+
+```
+efficiency_score = total_pixels_delivered / total_energy_joules
+```
+
+Where:
+- `total_pixels_delivered` = sum of (width × height × fps × duration) for each output
+- `total_energy_joules` = measured energy consumption during the test
+
+### Ladder-Aware Comparison
+
+Scenarios are automatically **grouped by output ladder** for fair comparison:
+- Only scenarios with identical output ladders are ranked against each other
+- Prevents comparing single-resolution scenarios against multi-resolution ones
+- Each ladder group gets its own ranking and best configuration recommendation
+
+### Example: Comparing Codecs Across Ladders
+
+```json
+{
+  "scenarios": [
+    {
+      "name": "H.264 - 1080p+720p+480p @ 2500k",
+      "bitrate": "2500k",
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
+    },
+    {
+      "name": "H.264 - 1080p+720p+480p @ 5000k",
+      "bitrate": "5000k",
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
+    }
+  ]
+}
+```
+
+The analysis will:
+1. Group these scenarios together (same ladder: `1920x1080@30,1280x720@30,854x480@30`)
+2. Rank them by pixels-per-joule efficiency
+3. Recommend the most energy-efficient bitrate for this specific ladder
+
+This enables answering: **"For a given set of output resolutions, what encoding settings save the most energy?"**
+
+---
+
 ## Batch runs (stress matrix)
 
 A ready-to-run batch template is included:
@@ -264,14 +345,19 @@ The advisor module (`advisor/`) transforms raw power measurements into actionabl
 
 **"Which FFmpeg configuration delivers the most video quality per watt on this machine?"**
 
-### Current Features (v0.1)
+### Current Features (v0.2)
 
-- **Energy Efficiency Scoring**: Computes `throughput / power` for each scenario
+- **Energy Efficiency Scoring**: Multiple scoring algorithms
+  - `throughput_per_watt`: Computes `throughput / power` for each scenario (default for single-resolution)
+  - `pixels_per_joule`: Computes `total_pixels / energy_joules` (automatically used for multi-resolution ladders)
+- **Output Ladder Support**: Groups and ranks scenarios by output resolution combinations
   - Throughput = bitrate (Mbps) × number of streams
+  - Total pixels = sum of (width × height × fps × duration) across all outputs
   - Power = CPU watts + GPU watts (if available)
 - **Automatic Ranking**: Sorts all configurations by efficiency
-- **Best Configuration Selection**: Identifies optimal pipeline
-- **CSV Export**: Saves efficiency scores alongside traditional metrics
+- **Ladder-Aware Comparison**: Only compares scenarios with identical output ladders
+- **Best Configuration Selection**: Identifies optimal pipeline per ladder and overall
+- **CSV Export**: Saves efficiency scores, ladder information, and pixel metrics alongside traditional metrics
 - **Production-Grade**: Handles missing data, edge cases, uses measured metrics only
 
 ### Design Principles

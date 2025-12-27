@@ -293,6 +293,13 @@ class ResultsAnalyzer:
         # Compute efficiency scores and rank scenarios
         logger.info("Computing energy efficiency scores...")
         results = self.recommender.analyze_and_rank(results)
+        
+        # Also compute ladder-aware rankings if applicable
+        by_ladder = self.recommender.analyze_and_rank_by_ladder(results)
+        
+        # Store both in the results for reporting
+        for result in results:
+            result['_by_ladder'] = by_ladder
 
         return results
     
@@ -478,6 +485,46 @@ class ResultsAnalyzer:
                 "per watt of energy consumed."
             )
             print(msg)
+        
+        # Print per-ladder rankings if available
+        if results and results[0].get('_by_ladder'):
+            by_ladder = results[0]['_by_ladder']
+            
+            # Filter out internal keys and scenarios without scores
+            valid_ladders = {
+                k: v for k, v in by_ladder.items()
+                if k != '_no_ladder_' and v and v[0].get('efficiency_score') is not None
+            }
+            
+            if len(valid_ladders) > 1:
+                print(f"\n{'─' * 100}")
+                print("PER-LADDER RANKINGS")
+                print("─" * 100)
+                print(
+                    "\nScenarios grouped by output ladder "
+                    "(identical resolution/fps combinations)"
+                )
+                print("are ranked separately to ensure fair comparison.\n")
+                
+                for ladder_key, ladder_scenarios in sorted(valid_ladders.items()):
+                    print(f"\n{'─' * 100}")
+                    print(f"Output Ladder: {ladder_key}")
+                    print("─" * 100)
+                    
+                    # Show top 3 for this ladder
+                    top_n = min(3, len(ladder_scenarios))
+                    for i, scenario in enumerate(ladder_scenarios[:top_n], start=1):
+                        score = scenario.get('efficiency_score', 0)
+                        power_w = scenario.get('power', {}).get('mean_watts', 0)
+                        bitrate = scenario.get('bitrate', 'N/A')
+                        
+                        print(f"{i}. {scenario['name']}")
+                        if score > 1000:
+                            print(f"   Efficiency: {score:.4e} pixels/J")
+                        else:
+                            print(f"   Efficiency: {score:.4f} Mbps/W")
+                        print(f"   Power: {power_w:.2f} W")
+                        print(f"   Bitrate: {bitrate}")
 
         print("\n" + "=" * 100 + "\n")
 
@@ -499,7 +546,8 @@ class ResultsAnalyzer:
                 'net_power_w', 'net_energy_wh', 'net_container_cpu_pct',
                 'docker_overhead_w', 'docker_overhead_pct',
                 'container_cpu_pct', 'container_power_w',
-                'efficiency_score', 'efficiency_rank'
+                'efficiency_score', 'efficiency_rank',
+                'output_ladder', 'total_pixels'
             ])
 
             writer.writeheader()
@@ -534,6 +582,36 @@ class ResultsAnalyzer:
                 # Add efficiency score and rank
                 row['efficiency_score'] = r.get('efficiency_score')
                 row['efficiency_rank'] = r.get('efficiency_rank')
+                
+                # Add output ladder information
+                row['output_ladder'] = r.get('output_ladder')
+                
+                # Compute total pixels if possible (for reference)
+                if r.get('outputs'):
+                    total_pixels = 0
+                    for output in r['outputs']:
+                        res = output.get('resolution', '')
+                        fps = output.get('fps', 0)
+                        if res and 'x' in res:
+                            try:
+                                w, h = res.split('x')
+                                total_pixels += int(w) * int(h) * fps * r.get('duration', 0)
+                            except (ValueError, AttributeError):
+                                pass
+                    row['total_pixels'] = total_pixels if total_pixels > 0 else None
+                else:
+                    # Single resolution case
+                    res = r.get('resolution', '')
+                    fps = r.get('fps')
+                    duration = r.get('duration', 0)
+                    if res and res != 'N/A' and fps and fps != 'N/A' and 'x' in str(res):
+                        try:
+                            w, h = str(res).split('x')
+                            row['total_pixels'] = int(w) * int(h) * int(fps) * duration
+                        except (ValueError, AttributeError):
+                            row['total_pixels'] = None
+                    else:
+                        row['total_pixels'] = None
 
                 writer.writerow(row)
 

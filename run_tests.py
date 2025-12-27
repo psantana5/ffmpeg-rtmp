@@ -4,16 +4,16 @@ Automated Streaming Energy Test Runner
 Runs predefined test scenarios and collects data automatically
 """
 
-import subprocess
-import time
+import argparse
 import json
 import logging
-import argparse
+import signal
+import subprocess
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-import signal
-import sys
+from typing import Dict, List, Optional
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -219,7 +219,9 @@ class TestRunner:
         cooldown_time: int = 30,
         name: str = "Mixed Streams",
     ) -> Dict:
-        scenario = TestScenario(f"{len(bitrates)} Streams (Mixed)", ",".join(bitrates), duration=duration)
+        scenario = TestScenario(
+            f"{len(bitrates)} Streams (Mixed)", ",".join(bitrates), duration=duration
+        )
         processes = []
 
         try:
@@ -325,7 +327,7 @@ class TestRunner:
                 except subprocess.TimeoutExpired:
                     proc.kill()
 
-            logger.info(f"Multiple stream test complete")
+            logger.info("Multiple stream test complete")
 
             # Cooling down
             logger.info(f"Cooling down for {cooldown_time}s...")
