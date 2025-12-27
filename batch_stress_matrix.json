@@ -1,0 +1,144 @@
+{
+  "scenarios": [
+    {
+      "type": "baseline",
+      "name": "Baseline (Idle)",
+      "duration": 60
+    },
+    {
+      "type": "multi",
+      "name": "1 stream @ 1000k",
+      "count": 1,
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 15
+    },
+    {
+      "type": "multi",
+      "name": "1 stream @ 2500k",
+      "count": 1,
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 15
+    },
+    {
+      "type": "multi",
+      "name": "1 stream @ 5000k",
+      "count": 1,
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 15
+    },
+
+    {
+      "type": "multi",
+      "name": "2 streams @ 1000k",
+      "count": 2,
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 20
+    },
+    {
+      "type": "multi",
+      "name": "2 streams @ 2500k",
+      "count": 2,
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 20
+    },
+    {
+      "type": "multi",
+      "name": "2 streams @ 5000k",
+      "count": 2,
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 10,
+      "duration": 120,
+      "cooldown": 20
+    },
+
+    {
+      "type": "multi",
+      "name": "4 streams @ 1000k",
+      "count": 4,
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 15,
+      "duration": 120,
+      "cooldown": 30
+    },
+    {
+      "type": "multi",
+      "name": "4 streams @ 2500k",
+      "count": 4,
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 15,
+      "duration": 120,
+      "cooldown": 30
+    },
+    {
+      "type": "multi",
+      "name": "4 streams @ 5000k",
+      "count": 4,
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 15,
+      "duration": 120,
+      "cooldown": 30
+    },
+
+    {
+      "type": "multi",
+      "name": "8 streams @ 1000k",
+      "count": 8,
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 20,
+      "duration": 120,
+      "cooldown": 45
+    },
+    {
+      "type": "multi",
+      "name": "8 streams @ 2500k",
+      "count": 8,
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 20,
+      "duration": 120,
+      "cooldown": 45
+    },
+    {
+      "type": "multi",
+      "name": "8 streams @ 5000k",
+      "count": 8,
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "stabilization": 20,
+      "duration": 120,
+      "cooldown": 45
+    }
+  ]
+}

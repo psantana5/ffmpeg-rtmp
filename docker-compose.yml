@@ -1,0 +1,190 @@
+services:
+  nginx-rtmp:
+    image: tiangolo/nginx-rtmp:latest
+    container_name: nginx-rtmp
+    ports:
+      - "1935:1935"
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./streams:/tmp/hls
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/hls/stream.m3u8"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9093/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  nginx-exporter:
+    image:  mauricioabreu/nginx-rtmp-exporter
+    container_name: nginx-exporter
+    environment:
+      - NGINX_RTMP_URL=http://nginx-rtmp/stat
+    ports:
+      - "9728:9728"
+    depends_on:
+      nginx-rtmp:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    user: root
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    user: root
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  rapl-exporter:
+    build: ./rapl-exporter
+    container_name: rapl-exporter
+    privileged: true
+    volumes:
+      - /sys/class/powercap:/sys/class/powercap:ro
+      - /sys/devices:/sys/devices:ro
+    ports:
+      - "9500:9500"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - RAPL_EXPORTER_PORT=9500
+
+  docker-stats-exporter:
+    build: ./docker-stats-exporter
+    container_name: docker-stats-exporter
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+    ports:
+      - "9501:9501"
+    restart: unless-stopped
+    environment:
+      - DOCKER_STATS_PORT=9501
+    networks:
+      - streaming-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.1-4.6.0-ubuntu22.04
+    container_name: dcgm-exporter
+    profiles:
+      - nvidia
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9400:9400"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - DCGM_EXPORTER_LISTEN=:9400
+
+  results-exporter:
+    build: ./results-exporter
+    container_name: results-exporter
+    volumes:
+      - ./test_results:/results
+    ports:
+      - "9502:9502"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - RESULTS_EXPORTER_PORT=9502
+      - RESULTS_DIR=/results
+      - PROMETHEUS_URL=http://prometheus:9090
+
+networks:
+  streaming-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

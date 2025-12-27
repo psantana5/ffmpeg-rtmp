@@ -1,0 +1,14 @@
+#Ignore python stuff
+.venv
+venv
+__pycache__
+
+#Ignore RTMP stuff
+streams/*
+
+#Ignore testing stuff
+test_*
+
+#Ignore results from tests/jobs.
+results/*
+plots/*
