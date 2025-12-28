@@ -229,6 +229,7 @@ services:
       - ENERGY_COST_PER_KWH=0.12
       - CPU_COST_PER_HOUR=0.50
       - CURRENCY=USD
+      - PROMETHEUS_URL=http://prometheus:9090
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
       interval: 30s

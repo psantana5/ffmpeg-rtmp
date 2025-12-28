@@ -99,7 +99,6 @@ class ModelRetrainer:
         models_dir: Path,
         hardware_id: Optional[str] = None,
         prometheus_url: str = 'http://localhost:9090'
-        hardware_id: Optional[str] = None
     ):
         """
         Initialize model retrainer.
@@ -561,7 +560,6 @@ def main():
         models_dir=args.models_dir,
         hardware_id=args.hardware_id,
         prometheus_url=args.prometheus_url
-        hardware_id=args.hardware_id
     )
     
     if retrainer.retrain_all():
