@@ -9,23 +9,14 @@ import argparse
 import csv
 import json
 import logging
-import os
 import statistics
-<<<<<<< HEAD
-import subprocess
-=======
->>>>>>> feature/ml-regression
+import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-import numpy as np
 import requests
 
-<<<<<<< HEAD
-from advisor import PowerPredictor, TranscodingRecommender
-=======
 from advisor import MultivariatePredictor, PowerPredictor, TranscodingRecommender
->>>>>>> feature/ml-regression
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,117 +25,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def filter_outliers_iqr(values: List[float], factor: float = 1.5) -> Tuple[List[float], int]:
-    """
-    Filter outliers using IQR (Interquartile Range) method.
-    
-    Args:
-        values: List of numeric values
-        factor: IQR multiplier for outlier threshold (default 1.5 = standard)
-                Higher values are more permissive
-    
-    Returns:
-        Tuple of (filtered_values, num_outliers_removed)
-    """
-    if len(values) < 4:  # Need at least 4 values for meaningful IQR
-        return values, 0
-    
-    arr = np.array(values)
-    q1 = np.percentile(arr, 25)
-    q3 = np.percentile(arr, 75)
-    iqr = q3 - q1
-    
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    
-    filtered = arr[(arr >= lower_bound) & (arr <= upper_bound)]
-    num_outliers = len(values) - len(filtered)
-    
-    if num_outliers > 0:
-        logger.info(f"Filtered {num_outliers} outliers from {len(values)} samples "
-                   f"(bounds: {lower_bound:.2f} - {upper_bound:.2f})")
-    
-    return filtered.tolist(), num_outliers
-
-
-def get_hardware_metadata() -> Dict:
-    """
-    Capture hardware and environment metadata for reproducibility.
-    
-    Returns:
-        Dict with hardware information including:
-        - cpu_model: CPU model name
-        - cpu_count: Number of logical CPUs
-        - cpu_freq_mhz: Current CPU frequency (if available)
-        - ffmpeg_version: FFmpeg version string
-        - kernel_version: Linux kernel version
-    """
-    metadata = {}
-    
-    # CPU model
-    try:
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if 'model name' in line:
-                    metadata['cpu_model'] = line.split(':')[1].strip()
-                    break
-    except Exception as e:
-        logger.debug(f"Could not read CPU model: {e}")
-        metadata['cpu_model'] = 'unknown'
-    
-    # CPU count
-    try:
-        metadata['cpu_count'] = os.cpu_count()
-    except Exception:
-        metadata['cpu_count'] = None
-    
-    # CPU frequency
-    try:
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if 'cpu MHz' in line:
-                    metadata['cpu_freq_mhz'] = float(line.split(':')[1].strip())
-                    break
-    except Exception:
-        metadata['cpu_freq_mhz'] = None
-    
-    # FFmpeg version
-    try:
-        result = subprocess.run(
-            ['ffmpeg', '-version'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            # Extract first line (version info)
-            metadata['ffmpeg_version'] = result.stdout.split('\n')[0]
-    except Exception as e:
-        logger.debug(f"Could not get FFmpeg version: {e}")
-        metadata['ffmpeg_version'] = 'unknown'
-    
-    # Kernel version
-    try:
-        result = subprocess.run(
-            ['uname', '-r'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            metadata['kernel_version'] = result.stdout.strip()
-    except Exception:
-        metadata['kernel_version'] = 'unknown'
-    
-    return metadata
-
-
 class PrometheusClient:
     """Client for querying Prometheus API"""
-
+    
     def __init__(self, base_url: str = 'http://localhost:9090'):
         self.base_url = base_url
-
+        
     def query_range(
         self, query: str, start: float, end: float, step: str = '15s'
     ) -> Optional[Dict]:
@@ -156,7 +42,7 @@ class PrometheusClient:
             'end': int(end),
             'step': step
         }
-
+        
         try:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
@@ -183,81 +69,38 @@ class PrometheusClient:
 
 class ResultsAnalyzer:
     """Analyzes test results and generates reports"""
-
+    
     def __init__(self, results_file: Path, prometheus_url: str = 'http://localhost:9090'):
         self.results_file = results_file
         self.client = PrometheusClient(prometheus_url)
         self.recommender = TranscodingRecommender()
-
+        
         with open(results_file) as f:
             self.data = json.load(f)
-
+        
         self.scenarios = self.data.get('scenarios', [])
-        
-        # Capture hardware metadata for reproducibility
-        self.hardware_metadata = get_hardware_metadata()
-        logger.info(f"Hardware: {self.hardware_metadata.get('cpu_model', 'unknown')}")
-        
         logger.info(f"Loaded {len(self.scenarios)} scenarios from {results_file}")
-<<<<<<< HEAD
     
-    def get_metric_stats(
-        self, data: Optional[Dict], filter_outliers: bool = True
-    ) -> Optional[Dict]:
-        """
-        Calculate statistics from metric data with optional outlier filtering.
-        
-        Args:
-            data: Prometheus query result
-            filter_outliers: If True, applies IQR-based outlier filtering
-        
-        Returns:
-            Dict with statistics including mean, median, stdev, min, max, samples
-            Also includes 'outliers_removed' count if filtering was applied
-        """
-=======
-
     def get_metric_stats(self, data: Optional[Dict]) -> Optional[Dict]:
         """Calculate statistics from metric data"""
->>>>>>> feature/ml-regression
         if not data or 'data' not in data or 'result' not in data['data']:
             return None
-
+        
         results = data['data']['result']
         if not results:
             return None
-
+        
         values = []
         for result in results:
             if 'values' in result:
                 values.extend([float(v[1]) for v in result['values']])
             elif 'value' in result:
                 values.append(float(result['value'][1]))
-
+        
         if not values:
             return None
-<<<<<<< HEAD
         
-        outliers_removed = 0
-        if filter_outliers and len(values) >= 4:
-            values, outliers_removed = filter_outliers_iqr(values)
-            
-            if not values:  # All values were outliers (shouldn't happen with reasonable data)
-                logger.warning("All values filtered as outliers, using original data")
-                # Re-extract values without filtering
-                values = []
-                for result in results:
-                    if 'values' in result:
-                        values.extend([float(v[1]) for v in result['values']])
-                    elif 'value' in result:
-                        values.append(float(result['value'][1]))
-                outliers_removed = 0
-        
-        stats = {
-=======
-
         return {
->>>>>>> feature/ml-regression
             'mean': statistics.mean(values),
             'median': statistics.median(values),
             'stdev': statistics.stdev(values) if len(values) > 1 else 0,
@@ -265,11 +108,6 @@ class ResultsAnalyzer:
             'max': max(values),
             'samples': len(values)
         }
-        
-        if filter_outliers:
-            stats['outliers_removed'] = outliers_removed
-        
-        return stats
 
     def get_instant_value(self, data: Optional[Dict]) -> Optional[float]:
         if not data or 'data' not in data or 'result' not in data['data']:
@@ -293,19 +131,19 @@ class ResultsAnalyzer:
         query = f'sum(increase(rapl_energy_joules_total{{zone=~"{zone_regex}"}}[{window}]))'
         data = self.client.query(query, ts=end)
         return self.get_instant_value(data)
-
+    
     def analyze_scenario(self, scenario: Dict) -> Dict:
         """Analyze a single scenario"""
         name = scenario['name']
         start = scenario['start_time']
         end = scenario['end_time']
-
+        
         if not start or not end:
             logger.warning(f"Scenario '{name}' has no timestamps, skipping")
             return {}
-
+        
         logger.info(f"Analyzing scenario: {name}")
-
+        
         analysis = {
             'name': name,
             'bitrate': scenario.get('bitrate', 'N/A'),
@@ -313,7 +151,7 @@ class ResultsAnalyzer:
             'fps': scenario.get('fps', 'N/A'),
             'duration': end - start
         }
-
+        
         # Query power consumption
         power_query = 'sum(rapl_power_watts{zone=~"package.*"})'
         power_data = self.client.query_range(power_query, start, end, step='5s')
@@ -323,7 +161,7 @@ class ResultsAnalyzer:
         mean_power_from_energy = None
         if package_energy_j is not None and analysis['duration'] > 0:
             mean_power_from_energy = package_energy_j / analysis['duration']
-
+        
         if power_stats:
             total_energy_j = None
             if package_energy_j is not None:
@@ -348,14 +186,14 @@ class ResultsAnalyzer:
                     round((total_energy_j / 3600), 4) if total_energy_j is not None else None
                 ),
             }
-
+        
         # Query DRAM power
         dram_query = 'sum(rapl_power_watts{zone=~".*dram.*"})'
         dram_data = self.client.query_range(dram_query, start, end, step='5s')
         dram_stats = self.get_metric_stats(dram_data)
 
         dram_energy_j = self.get_energy_joules('.*dram.*', start, end)
-
+        
         if dram_stats:
             total_dram_j = None
             if dram_energy_j is not None:
@@ -372,12 +210,12 @@ class ResultsAnalyzer:
                 'mean_watts': round(mean_dram_watts, 2),
                 'total_energy_wh': dram_energy_wh,
             }
-
+        
         # Query Docker overhead
         docker_query = 'docker_engine_cpu_percent'
         docker_data = self.client.query_range(docker_query, start, end, step='5s')
         docker_stats = self.get_metric_stats(docker_data)
-
+        
         if docker_stats and power_stats:
             base_watts = power_stats['mean']
             if mean_power_from_energy is not None:
@@ -389,12 +227,12 @@ class ResultsAnalyzer:
                 'estimated_watts': round(docker_watts, 2),
                 'percentage_of_total': round(docker_pct, 2),
             }
-
+        
         # Query container CPU
         container_query = 'docker_containers_total_cpu_percent'
         container_data = self.client.query_range(container_query, start, end, step='5s')
         container_stats = self.get_metric_stats(container_data)
-
+        
         if container_stats and power_stats:
             base_watts = power_stats['mean']
             if mean_power_from_energy is not None:
@@ -404,15 +242,15 @@ class ResultsAnalyzer:
                 'cpu_percent': round(container_stats['mean'], 2),
                 'estimated_watts': round(container_watts, 2)
             }
-
+        
         return analysis
-
+    
     def generate_report(self) -> List[Dict]:
         """Generate full analysis report"""
         logger.info("Generating analysis report...")
-
+        
         results = []
-
+        
         for scenario in self.scenarios:
             analysis = self.analyze_scenario(scenario)
             if analysis:
@@ -435,7 +273,7 @@ class ResultsAnalyzer:
                     if baseline.get('power'):
                         baseline_watts = baseline['power']['mean_watts']
                         r['net']['power_w'] = round(r['power']['mean_watts'] - baseline_watts, 2)
-
+                        
                         r_energy = r['power'].get('total_energy_wh')
                         baseline_energy = baseline['power'].get('total_energy_wh')
                         if r_energy is not None and baseline_energy is not None:
@@ -456,26 +294,26 @@ class ResultsAnalyzer:
         # Compute efficiency scores and rank scenarios
         logger.info("Computing energy efficiency scores...")
         results = self.recommender.analyze_and_rank(results)
-
+        
         # Also compute ladder-aware rankings if applicable
         by_ladder = self.recommender.analyze_and_rank_by_ladder(results)
-
+        
         # Store both in the results for reporting
         for result in results:
             result['_by_ladder'] = by_ladder
 
         return results
-
+    
     def print_summary(self, results: List[Dict]):
         """Print summary to console"""
         print("\n" + "=" * 100)
         print("STREAMING ENERGY CONSUMPTION ANALYSIS REPORT")
         print("=" * 100)
-
+        
         if not results:
             print("No results to display")
             return
-
+        
         # Print detailed results
         for result in results:
             print(f"\n{'─' * 100}")
@@ -483,7 +321,7 @@ class ResultsAnalyzer:
             config = f"{result['bitrate']} @ {result['resolution']} {result['fps']}fps"
             print(f"  Configuration: {config}")
             print(f"  Duration: {result['duration']:.1f}s")
-
+            
             if 'power' in result:
                 p = result['power']
                 print("\n  Power Consumption:")
@@ -510,7 +348,7 @@ class ResultsAnalyzer:
                         print(f"    Net Energy: {n['energy_wh']:+.4f} Wh")
                     if n.get('container_cpu_pct') is not None:
                         print(f"    Net Container CPU: {n['container_cpu_pct']:+.2f}%")
-
+            
             if 'dram_power' in result:
                 d = result['dram_power']
                 print("\n  DRAM Power:")
@@ -519,28 +357,28 @@ class ResultsAnalyzer:
                     print(f"    Total Energy: {d['total_energy_wh']:.4f} Wh")
                 else:
                     print("    Total Energy: N/A")
-
+            
             if 'docker_overhead' in result:
                 do = result['docker_overhead']
                 print("\n  Docker Engine Overhead:")
                 print(f"    CPU Usage: {do['cpu_percent']:.2f}%")
                 pct_total = do['percentage_of_total']
                 print(f"    Power: {do['estimated_watts']:.2f} W ({pct_total:.1f}% of total)")
-
+            
             if 'container_usage' in result:
                 cu = result['container_usage']
                 print("\n  Container Usage:")
                 print(f"    CPU: {cu['cpu_percent']:.2f}%")
                 print(f"    Estimated Power: {cu['estimated_watts']:.2f} W")
-
+        
         # Comparison table
         print(f"\n{'=' * 100}")
         print("COMPARISON TABLE")
         print("=" * 100)
-
+        
         # Filter scenarios with power data
         power_results = [r for r in results if 'power' in r]
-
+        
         if power_results:
             header = (
                 f"\n{'Scenario':<30} {'Bitrate':<12} "
@@ -548,7 +386,7 @@ class ResultsAnalyzer:
             )
             print(header)
             print("─" * 100)
-
+            
             for r in power_results:
                 if 'docker_overhead' in r:
                     docker_oh = f"{r['docker_overhead']['percentage_of_total']:.1f}%"
@@ -563,12 +401,12 @@ class ResultsAnalyzer:
                       f"{r['power']['mean_watts']:>10.2f} W "
                       f"{energy_str} "
                       f"{docker_oh:>10}")
-
+            
             # Calculate relative differences from baseline
             baseline = next(
                 (r for r in power_results if 'baseline' in r['name'].lower()), None
             )
-
+            
             if baseline and len(power_results) > 1:
                 print(f"\n{'─' * 100}")
                 print(f"RELATIVE TO BASELINE ({baseline['name']})")
@@ -617,19 +455,19 @@ class ResultsAnalyzer:
             )
             print(header)
             print("─" * 100)
-
+            
             for r in scored_results:
                 rank = r.get('efficiency_rank', '-')
                 score = r.get('efficiency_score', 0)
                 power_w = r.get('power', {}).get('mean_watts', 0)
                 bitrate = r.get('bitrate', 'N/A')
-
+                
                 row = (
                     f"{rank:<6} {r['name']:<35} "
                     f"{score:>10.4f} Mbps/W   {power_w:>10.2f} W  {bitrate:<12}"
                 )
                 print(row)
-
+            
             # Print recommendation
             best = scored_results[0]
             print(f"\n{'─' * 100}")
@@ -648,17 +486,17 @@ class ResultsAnalyzer:
                 "per watt of energy consumed."
             )
             print(msg)
-
+        
         # Print per-ladder rankings if available
         if results and results[0].get('_by_ladder'):
             by_ladder = results[0]['_by_ladder']
-
+            
             # Filter out internal keys and scenarios without scores
             valid_ladders = {
                 k: v for k, v in by_ladder.items()
                 if k != '_no_ladder_' and v and v[0].get('efficiency_score') is not None
             }
-
+            
             if len(valid_ladders) > 1:
                 print(f"\n{'─' * 100}")
                 print("PER-LADDER RANKINGS")
@@ -668,19 +506,19 @@ class ResultsAnalyzer:
                     "(identical resolution/fps combinations)"
                 )
                 print("are ranked separately to ensure fair comparison.\n")
-
+                
                 for ladder_key, ladder_scenarios in sorted(valid_ladders.items()):
                     print(f"\n{'─' * 100}")
                     print(f"Output Ladder: {ladder_key}")
                     print("─" * 100)
-
+                    
                     # Show top 3 for this ladder
                     top_n = min(3, len(ladder_scenarios))
                     for i, scenario in enumerate(ladder_scenarios[:top_n], start=1):
                         score = scenario.get('efficiency_score', 0)
                         power_w = scenario.get('power', {}).get('mean_watts', 0)
                         bitrate = scenario.get('bitrate', 'N/A')
-
+                        
                         print(f"{i}. {scenario['name']}")
                         if score > 1000:
                             print(f"   Efficiency: {score:.4e} pixels/J")
@@ -691,129 +529,6 @@ class ResultsAnalyzer:
 
         print("\n" + "=" * 100 + "\n")
     
-    def print_power_predictions(self, results: List[Dict], predictor):
-        """
-        Print power scalability predictions and comparison table.
-        
-        This method displays:
-        1. Model metadata (type, training samples, stream range)
-        2. Model quality metrics (R², RMSE, MAE, cross-validation)
-        3. Predicted power for standard stream counts (1, 2, 4, 8, 12)
-        4. Comparison table showing measured vs predicted for training data
-        
-        The comparison table helps assess model quality by showing how well
-        predictions match actual measurements on training data. Large differences
-        may indicate:
-        - Poor model fit (low R² score)
-        - Non-linear effects not captured by linear model
-        - Inconsistent measurements in training data
-        
-        Args:
-            results: List of analyzed scenario dicts (from generate_report)
-            predictor: Trained PowerPredictor instance
-        """
-        print(f"\n{'=' * 100}")
-        print("POWER SCALABILITY PREDICTIONS")
-        print("=" * 100)
-        
-        # Get model info
-        model_info = predictor.get_model_info()
-        
-        if not model_info['trained']:
-            print("\nPower prediction model could not be trained (insufficient data)")
-            return
-        
-        # Display model metadata
-        print(f"\nModel Type: {model_info['model_type'].upper()}")
-        print(f"Training Samples: {model_info['n_samples']}")
-        if model_info['stream_range']:
-            min_s, max_s = model_info['stream_range']
-            print(f"Stream Range: {min_s} - {max_s} streams")
-        
-        # Display model quality metrics
-        print("\nModel Quality Metrics:")
-        print(f"  R² Score: {model_info['r2_score']:.4f}")
-        if model_info['r2_score'] >= 0.9:
-            quality = "Excellent"
-        elif model_info['r2_score'] >= 0.7:
-            quality = "Good"
-        elif model_info['r2_score'] >= 0.5:
-            quality = "Moderate"
-        else:
-            quality = "Poor"
-        print(f"    (Interpretation: {quality} fit)")
-        print(f"  RMSE: {model_info['rmse']:.2f} W")
-        print(f"  MAE: {model_info['mae']:.2f} W")
-        
-        # Display cross-validation results if available
-        if model_info['cv_scores']:
-            cv = model_info['cv_scores']
-            print(f"\nCross-Validation ({cv['n_folds']}-fold):")
-            print(f"  RMSE: {cv['rmse_mean']:.2f} ± {cv['rmse_std']:.2f} W")
-            print("  (Tests model generalization to unseen data)")
-        
-        # Predict for key stream counts (standard capacity planning points)
-        # These represent typical workload sizes: single stream, small (2-4),
-        # medium (8), and large (12) deployments
-        target_streams = [1, 2, 4, 8, 12]
-        predictions = {}
-        
-        print("\nPredicted Power Consumption:")
-        print("─" * 100)
-        for streams in target_streams:
-            power = predictor.predict(streams)
-            if power is not None:
-                predictions[streams] = power
-                print(f"  {streams:>2} streams: {power:>8.2f} W")
-        
-        # Create comparison table: Streams | Measured (W) | Predicted (W) | Diff (W)
-        # This shows model accuracy on training data (should be close to 0 diff)
-        print(f"\n{'─' * 100}")
-        print("MEASURED vs PREDICTED COMPARISON")
-        print("─" * 100)
-        print("(Shows model fit quality on training data)")
-        
-        # Extract measured data from training
-        # Group by stream count and average if multiple measurements exist
-        measured_data = {}
-        for streams, power in predictor.training_data:
-            if streams not in measured_data:
-                measured_data[streams] = []
-            measured_data[streams].append(power)
-        
-        # Average multiple measurements for same stream count
-        # This handles cases where different scenarios have same stream count
-        # (e.g., "4 Streams @ 2500k" and "4 Streams @ 1080p")
-        measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
-        
-        # Print comparison table header
-        print(
-            f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} "
-            f"{'Diff (W)':<12} {'% Error':<10}"
-        )
-        print("─" * 100)
-        
-        # Show all measured stream counts with predictions
-        for streams in sorted(measured_avg.keys()):
-            measured = measured_avg[streams]
-            predicted = predictor.predict(streams)
-            diff = predicted - measured if predicted is not None else None
-            pct_error = (abs(diff) / measured * 100) if diff is not None and measured > 0 else None
-            
-            measured_str = f"{measured:.2f}"
-            predicted_str = f"{predicted:.2f}" if predicted is not None else "N/A"
-            diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
-            pct_str = f"{pct_error:.1f}%" if pct_error is not None else "N/A"
-            
-            print(
-                f"{streams:<10} {measured_str:<15} {predicted_str:<15} "
-                f"{diff_str:<12} {pct_str:<10}"
-            )
-        
-        print("─" * 100)
-
-<<<<<<< HEAD
-=======
     def print_power_predictions(self, results: List[Dict], predictor):
         """
         Print power scalability predictions and comparison table.
@@ -837,27 +552,27 @@ class ResultsAnalyzer:
         print(f"\n{'=' * 100}")
         print("POWER SCALABILITY PREDICTIONS")
         print("=" * 100)
-
+        
         # Get model info
         model_info = predictor.get_model_info()
-
+        
         if not model_info['trained']:
             print("\nPower prediction model could not be trained (insufficient data)")
             return
-
+        
         # Display model metadata
         print(f"\nModel Type: {model_info['model_type'].upper()}")
         print(f"Training Samples: {model_info['n_samples']}")
         if model_info['stream_range']:
             min_s, max_s = model_info['stream_range']
             print(f"Stream Range: {min_s} - {max_s} streams")
-
+        
         # Predict for key stream counts (standard capacity planning points)
         # These represent typical workload sizes: single stream, small (2-4),
         # medium (8), and large (12) deployments
         target_streams = [1, 2, 4, 8, 12]
         predictions = {}
-
+        
         print("\nPredicted Power Consumption:")
         print("─" * 100)
         for streams in target_streams:
@@ -865,14 +580,14 @@ class ResultsAnalyzer:
             if power is not None:
                 predictions[streams] = power
                 print(f"  {streams:>2} streams: {power:>8.2f} W")
-
+        
         # Create comparison table: Streams | Measured (W) | Predicted (W) | Diff (W)
         # This shows model accuracy on training data (should be close to 0 diff)
         print(f"\n{'─' * 100}")
         print("MEASURED vs PREDICTED COMPARISON")
         print("─" * 100)
         print("(Shows model fit quality on training data)")
-
+        
         # Extract measured data from training
         # Group by stream count and average if multiple measurements exist
         measured_data = {}
@@ -880,31 +595,30 @@ class ResultsAnalyzer:
             if streams not in measured_data:
                 measured_data[streams] = []
             measured_data[streams].append(power)
-
+        
         # Average multiple measurements for same stream count
         # This handles cases where different scenarios have same stream count
         # (e.g., "4 Streams @ 2500k" and "4 Streams @ 1080p")
         measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
-
+        
         # Print comparison table header
         print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12}")
         print("─" * 100)
-
+        
         # Show all measured stream counts with predictions
         for streams in sorted(measured_avg.keys()):
             measured = measured_avg[streams]
             predicted = predictor.predict(streams)
             diff = predicted - measured if predicted is not None else None
-
+            
             measured_str = f"{measured:.2f}"
             predicted_str = f"{predicted:.2f}" if predicted is not None else "N/A"
             diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
-
+            
             print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12}")
-
+        
         print("─" * 100)
 
->>>>>>> feature/ml-regression
     def export_csv(self, output_file: str = None, predictor=None):
         """Export results to CSV"""
         if output_file is None:
@@ -955,17 +669,6 @@ class ResultsAnalyzer:
                 else:
                     row['predicted_mean_power_w'] = None
 
-                # Add predicted power if predictor is available
-                if predictor is not None:
-                    streams = predictor._infer_stream_count(r['name'])
-                    if streams is not None:
-                        predicted_power = predictor.predict(streams)
-                        row['predicted_mean_power_w'] = predicted_power
-                    else:
-                        row['predicted_mean_power_w'] = None
-                else:
-                    row['predicted_mean_power_w'] = None
-
                 if 'net' in r:
                     row['net_power_w'] = r['net'].get('power_w')
                     row['net_energy_wh'] = r['net'].get('energy_wh')
@@ -982,10 +685,10 @@ class ResultsAnalyzer:
                 # Add efficiency score and rank
                 row['efficiency_score'] = r.get('efficiency_score')
                 row['efficiency_rank'] = r.get('efficiency_rank')
-
+                
                 # Add output ladder information
                 row['output_ladder'] = r.get('output_ladder')
-
+                
                 # Compute total pixels using scorer's method
                 total_pixels = self.recommender.scorer._compute_total_pixels(r)
                 row['total_pixels'] = total_pixels
@@ -994,38 +697,6 @@ class ResultsAnalyzer:
 
         logger.info(f"CSV exported to {output_file}")
     
-    def export_model_metadata(self, predictor, output_file: str = None):
-        """
-        Export model metadata to JSON for observability and integration.
-        
-        This file can be used by:
-        - Prometheus exporters to expose model quality metrics
-        - Grafana dashboards to display model performance
-        - CI/CD pipelines to track model drift
-        
-        Args:
-            predictor: Trained PowerPredictor instance
-            output_file: Output path (default: test_results/model_metadata.json)
-        """
-        if output_file is None:
-            output_file = self.results_file.parent / "model_metadata.json"
-        
-        model_info = predictor.get_model_info()
-        
-        # Add additional context
-        metadata = {
-            'model_info': model_info,
-            'hardware': self.hardware_metadata,
-            'timestamp': self.results_file.stem.replace('test_results_', ''),
-            'results_file': str(self.results_file.name),
-            'model_version': '1.0',  # Versioning for model evolution tracking
-        }
-        
-        with open(output_file, 'w') as f:
-            json.dump(metadata, f, indent=2, default=str)
-        
-        logger.info(f"Model metadata exported to {output_file}")
-
     def print_multivariate_predictions(self, results: List[Dict], predictor: MultivariatePredictor, stream_counts: List[int]):
         """
         Print multivariate model predictions for specified stream counts.
@@ -1038,38 +709,38 @@ class ResultsAnalyzer:
         print(f"\n{'=' * 100}")
         print("MULTIVARIATE MODEL PREDICTIONS")
         print("=" * 100)
-
+        
         info = predictor.get_model_info()
-
+        
         if not info['trained']:
             print("\nMultivariate predictor could not be trained (insufficient data)")
             return
-
+        
         print(f"\nModel: {info['best_model'].upper()}")
         print(f"Training Samples: {info['n_samples']}")
         print(f"Features: {', '.join(info['feature_names'])}")
         print(f"R² Score: {info['best_score']['r2']:.4f}")
         print(f"RMSE: {info['best_score']['rmse']:.2f} W")
         print(f"Confidence Level: {info['confidence_level']*100:.0f}%")
-
+        
         # Generate predictions for each stream count
         print(f"\n{'─' * 100}")
         print("Predicted Power Consumption with Confidence Intervals:")
         print("─" * 100)
         print(f"{'Streams':<10} {'Mean Power (W)':<18} {'CI Low (W)':<15} {'CI High (W)':<15} {'CI Width (W)':<15}")
         print("─" * 100)
-
+        
         # Use representative scenario for base features
         if not results:
             print("No results available for feature extraction")
             return
-
+        
         # Find a typical scenario (exclude baseline)
         typical_scenario = next(
             (r for r in results if 'baseline' not in r['name'].lower()),
             results[0]
         )
-
+        
         for stream_count in stream_counts:
             # Create feature dict based on typical scenario scaled to stream count
             features = {
@@ -1081,31 +752,31 @@ class ResultsAnalyzer:
                 'hardware_cpu_model': typical_scenario.get('hardware', {}).get('cpu_model', 'unknown'),
                 'container_cpu_pct': min(10.0, 2.0 + stream_count * 0.5),  # Estimated
             }
-
+            
             prediction = predictor.predict(features, return_confidence=True)
-
+            
             mean_power = prediction.get('mean', 0)
             ci_low = prediction.get('ci_low', 0)
             ci_high = prediction.get('ci_high', 0)
             ci_width = prediction.get('ci_width', 0)
-
+            
             print(
                 f"{stream_count:<10} {mean_power:>16.2f} "
                 f"{ci_low:>13.2f} {ci_high:>13.2f} {ci_width:>13.2f}"
             )
-
+        
         print("─" * 100)
-
+        
         # Model comparison table
         print(f"\n{'─' * 100}")
         print("Model Performance Comparison:")
         print("─" * 100)
         print(f"{'Model':<20} {'R² Score':<15} {'RMSE (W)':<15}")
         print("─" * 100)
-
+        
         for model_name, scores in info['models'].items():
             print(f"{model_name:<20} {scores['r2']:>13.4f} {scores['rmse']:>13.2f}")
-
+        
         print("─" * 100)
         print(f"\nBest Model: {info['best_model']} (highest R²)")
         print("=" * 100 + "\n")
@@ -1113,29 +784,6 @@ class ResultsAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(
-<<<<<<< HEAD
-        description='Analyze FFmpeg RTMP power monitoring test results',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
-Examples:
-  # Analyze most recent results
-  python3 analyze_results.py
-  
-  # Analyze specific file
-  python3 analyze_results.py test_results/test_results_20231215_143022.json
-  
-  # Predict power for custom stream counts
-  python3 analyze_results.py --predict 1,2,4,8,16
-  
-  # Show model details only
-  python3 analyze_results.py --model-only
-  
-  # Export only (no console output)
-  python3 analyze_results.py --quiet --export-csv results.csv
-        '''
-    )
-    
-=======
         description='Analyze FFmpeg power test results and generate predictions',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -1153,89 +801,29 @@ Examples:
   python3 analyze_results.py --multivariate --predict-future 1,2,4,8,12,16
         """
     )
-
->>>>>>> feature/ml-regression
+    
     parser.add_argument(
         'results_file',
         nargs='?',
         type=Path,
-<<<<<<< HEAD
-        help='Path to test results JSON file (default: most recent in test_results/)'
-    )
-    
-    parser.add_argument(
-        '--model',
-        choices=['auto', 'linear', 'polynomial'],
-        default='auto',
-        help='Model type to use (default: auto - selects based on data size)'
-    )
-    
-    parser.add_argument(
-        '--predict',
-        type=str,
-        help='Comma-separated list of stream counts to predict (e.g., "1,2,4,8,16")'
-    )
-    
-    parser.add_argument(
-        '--model-only',
-        action='store_true',
-        help='Show only model information and predictions, skip detailed scenario analysis'
-    )
-    
-    parser.add_argument(
-        '--export-csv',
-        type=Path,
-        metavar='FILE',
-        help='Export results to CSV file (default: auto-generated in same directory as results)'
-    )
-    
-    parser.add_argument(
-        '--export-model-metadata',
-        type=Path,
-        metavar='FILE',
-        help='Export model metadata to JSON file (default: test_results/model_metadata.json)'
-    )
-    
-    parser.add_argument(
-        '--quiet',
-        action='store_true',
-        help='Suppress console output (useful with --export-csv)'
-    )
-    
-    parser.add_argument(
-        '--no-outlier-filter',
-        action='store_true',
-        help='Disable outlier filtering in power measurements'
-    )
-    
-    parser.add_argument(
-        '--prometheus-url',
-        default='http://localhost:9090',
-        help='Prometheus server URL (default: http://localhost:9090)'
-    )
-    
-    args = parser.parse_args()
-    
-=======
         help='Path to test results JSON file (default: latest in ./test_results/)'
     )
-
+    
     parser.add_argument(
         '--predict-future',
         type=str,
         metavar='STREAMS',
         help='Comma-separated list of stream counts to predict (e.g., "1,2,4,8,12")'
     )
-
+    
     parser.add_argument(
         '--multivariate',
         action='store_true',
         help='Use multivariate ML predictor (more features, ensemble models)'
     )
-
+    
     args = parser.parse_args()
-
->>>>>>> feature/ml-regression
+    
     # Determine results file
     if args.results_file:
         results_file = args.results_file
@@ -1249,8 +837,7 @@ Examples:
             results_files = sorted(results_dir.glob('test_results_*.json'), reverse=True)
             if results_files:
                 results_file = results_files[0]
-                if not args.quiet:
-                    logger.info(f"Using most recent results file: {results_file}")
+                logger.info(f"Using most recent results file: {results_file}")
             else:
                 logger.error("No results files found in ./test_results")
                 parser.print_help()
@@ -1259,10 +846,7 @@ Examples:
             logger.error("No results directory found")
             parser.print_help()
             return 1
-<<<<<<< HEAD
     
-=======
-
     # Parse prediction stream counts
     predict_streams = None
     if args.predict_future:
@@ -1272,73 +856,14 @@ Examples:
         except ValueError:
             logger.error(f"Invalid stream counts: {args.predict_future}")
             return 1
-
->>>>>>> feature/ml-regression
+    
     try:
-        analyzer = ResultsAnalyzer(results_file, prometheus_url=args.prometheus_url)
+        analyzer = ResultsAnalyzer(results_file)
         results = analyzer.generate_report()
-<<<<<<< HEAD
         
-        # Train PowerPredictor on the results
-        predictor = PowerPredictor()
-        predictor.fit(results)
-        
-        # Handle custom prediction stream counts
-        custom_predictions = None
-        if args.predict:
-            try:
-                custom_predictions = [int(s.strip()) for s in args.predict.split(',')]
-                if not args.quiet:
-                    logger.info(f"Will predict for custom stream counts: {custom_predictions}")
-            except ValueError:
-                logger.error(f"Invalid --predict format: {args.predict}")
-                return 1
-        
-        # Print output unless quiet mode
-        if not args.quiet:
-            if args.model_only:
-                # Show only model info and predictions
-                analyzer.print_power_predictions(results, predictor)
-                if custom_predictions:
-                    print(f"\n{'─' * 100}")
-                    print("CUSTOM PREDICTIONS")
-                    print("─" * 100)
-                    for streams in custom_predictions:
-                        power = predictor.predict(streams)
-                        if power is not None:
-                            print(f"  {streams:>3} streams: {power:>8.2f} W")
-            else:
-                # Full output
-                analyzer.print_summary(results)
-                analyzer.print_power_predictions(results, predictor)
-                if custom_predictions:
-                    print(f"\n{'─' * 100}")
-                    print("CUSTOM PREDICTIONS")
-                    print("─" * 100)
-                    for streams in custom_predictions:
-                        power = predictor.predict(streams)
-                        if power is not None:
-                            print(f"  {streams:>3} streams: {power:>8.2f} W")
-        
-        # Export CSV if requested
-        if args.export_csv:
-            analyzer.export_csv(output_file=args.export_csv, predictor=predictor)
-        elif not args.quiet:
-            # Default CSV export
-            analyzer.export_csv(predictor=predictor)
-        
-        # Export model metadata
-        if args.export_model_metadata:
-            analyzer.export_model_metadata(predictor, output_file=args.export_model_metadata)
-        elif not args.quiet:
-            # Default model metadata export
-            analyzer.export_model_metadata(predictor)
-        
-=======
-
         # Print summary
         analyzer.print_summary(results)
-
+        
         # Train and use predictor
         if args.multivariate:
             # Use advanced multivariate predictor
@@ -1349,9 +874,9 @@ Examples:
                 n_bootstrap=100,
                 cv_folds=5
             )
-
+            
             success = mv_predictor.fit(results, target='mean_power_watts')
-
+            
             if success:
                 if predict_streams:
                     analyzer.print_multivariate_predictions(results, mv_predictor, predict_streams)
@@ -1361,19 +886,18 @@ Examples:
             else:
                 logger.warning("Multivariate predictor training failed, falling back to simple predictor")
                 args.multivariate = False
-
+        
         if not args.multivariate:
             # Use simple PowerPredictor (backward compatible)
             predictor = PowerPredictor()
             predictor.fit(results)
-
+            
             # Print power predictions
             analyzer.print_power_predictions(results, predictor)
-
+            
             # Export CSV with predictions
             analyzer.export_csv(predictor=predictor)
-
->>>>>>> feature/ml-regression
+        
         return 0
     except Exception as e:
         logger.error(f"Analysis failed: {e}")

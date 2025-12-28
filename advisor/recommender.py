@@ -41,7 +41,7 @@ class TranscodingRecommender:
     - Transparent ranking: provides justification for recommendations
     - Production-ready: handles missing data, edge cases gracefully
     """
-
+    
     def __init__(self, scorer: Optional[EnergyEfficiencyScorer] = None):
         """
         Initialize the recommender.
@@ -50,7 +50,7 @@ class TranscodingRecommender:
             scorer: EnergyEfficiencyScorer instance. If None, uses default scorer.
         """
         self.scorer = scorer or EnergyEfficiencyScorer()
-
+    
     def analyze_and_rank(self, scenarios: List[Dict]) -> List[Dict]:
         """
         Compute efficiency scores and rank scenarios.
@@ -78,21 +78,21 @@ class TranscodingRecommender:
             score = self.scorer.compute_score(scenario_copy)
             scenario_copy['efficiency_score'] = score
             scored_scenarios.append(scenario_copy)
-
+        
         # Separate scenarios with valid scores from those without
         with_scores = [s for s in scored_scenarios if s['efficiency_score'] is not None]
         without_scores = [s for s in scored_scenarios if s['efficiency_score'] is None]
-
+        
         # Sort by score (descending: higher efficiency is better)
         with_scores.sort(key=lambda s: s['efficiency_score'], reverse=True)
-
+        
         # Assign ranks to scored scenarios
         for rank, scenario in enumerate(with_scores, start=1):
             scenario['efficiency_rank'] = rank
-
+        
         # Combine: ranked scenarios first, then unscored ones
         return with_scores + without_scores
-
+    
     def analyze_and_rank_by_ladder(self, scenarios: List[Dict]) -> Dict[str, List[Dict]]:
         """
         Compute efficiency scores and rank scenarios, grouped by output ladder.
@@ -119,42 +119,42 @@ class TranscodingRecommender:
         """
         # Group scenarios by output ladder
         ladder_groups = defaultdict(list)
-
+        
         for scenario in scenarios:
             # Create a copy to avoid mutating input
             scenario_copy = scenario.copy()
-
+            
             # Get output ladder
             ladder = self.scorer.get_output_ladder(scenario_copy)
             scenario_copy['output_ladder'] = ladder
-
+            
             # Compute efficiency score
             score = self.scorer.compute_score(scenario_copy)
             scenario_copy['efficiency_score'] = score
-
+            
             # Group by ladder (None for scenarios without ladder)
             ladder_key = ladder if ladder else '_no_ladder_'
             ladder_groups[ladder_key].append(scenario_copy)
-
+        
         # Rank within each ladder group
         ranked_by_ladder = {}
         for ladder_key, group_scenarios in ladder_groups.items():
             # Separate scenarios with valid scores
             with_scores = [s for s in group_scenarios if s['efficiency_score'] is not None]
             without_scores = [s for s in group_scenarios if s['efficiency_score'] is None]
-
+            
             # Sort by score (descending: higher efficiency is better)
             with_scores.sort(key=lambda s: s['efficiency_score'], reverse=True)
-
+            
             # Assign ranks within this ladder
             for rank, scenario in enumerate(with_scores, start=1):
                 scenario['efficiency_rank'] = rank
-
+            
             # Combine: ranked scenarios first, then unscored ones
             ranked_by_ladder[ladder_key] = with_scores + without_scores
-
+        
         return ranked_by_ladder
-
+    
     def get_best_per_ladder(self, scenarios: List[Dict]) -> Dict[str, Optional[Dict]]:
         """
         Get the best configuration for each output ladder.
@@ -173,16 +173,16 @@ class TranscodingRecommender:
             >>>         print(f"{ladder}: {best['name']} - {best['efficiency_score']:.4f}")
         """
         by_ladder = self.analyze_and_rank_by_ladder(scenarios)
-
+        
         best_per_ladder = {}
         for ladder_key, ranked_scenarios in by_ladder.items():
             if ranked_scenarios and ranked_scenarios[0].get('efficiency_score') is not None:
                 best_per_ladder[ladder_key] = ranked_scenarios[0]
             else:
                 best_per_ladder[ladder_key] = None
-
+        
         return best_per_ladder
-
+    
     def get_best_configuration(self, scenarios: List[Dict]) -> Optional[Dict]:
         """
         Get the single best transcoding configuration.
@@ -201,13 +201,13 @@ class TranscodingRecommender:
             >>>     print(f"Power: {best['power']['mean_watts']:.2f} W")
         """
         ranked = self.analyze_and_rank(scenarios)
-
+        
         if not ranked or ranked[0]['efficiency_score'] is None:
             logger.warning("No valid configurations with efficiency scores found")
             return None
-
+        
         return ranked[0]
-
+    
     def get_top_n(self, scenarios: List[Dict], n: int = 5) -> List[Dict]:
         """
         Get top N transcoding configurations by efficiency.
@@ -226,12 +226,12 @@ class TranscodingRecommender:
             >>>     print(f"{i}. {config['name']}: {config['efficiency_score']:.4f} Mbps/W")
         """
         ranked = self.analyze_and_rank(scenarios)
-
+        
         # Return only scenarios with valid scores
         with_scores = [s for s in ranked if s['efficiency_score'] is not None]
-
+        
         return with_scores[:n]
-
+    
     def get_recommendation_summary(self, scenarios: List[Dict]) -> Dict:
         """
         Generate a comprehensive recommendation summary.
@@ -256,24 +256,24 @@ class TranscodingRecommender:
         """
         ranked = self.analyze_and_rank(scenarios)
         with_scores = [s for s in ranked if s['efficiency_score'] is not None]
-
+        
         best_config = with_scores[0] if with_scores else None
         top_5 = with_scores[:5]
-
+        
         efficiency_range = None
         if with_scores:
             efficiency_scores = [s['efficiency_score'] for s in with_scores]
             efficiency_range = (min(efficiency_scores), max(efficiency_scores))
-
+        
         power_range = None
         with_power = [
-            s for s in scenarios
+            s for s in scenarios 
             if s.get('power') and s['power'].get('mean_watts') is not None
         ]
         if with_power:
             power_values = [s['power']['mean_watts'] for s in with_power]
             power_range = (min(power_values), max(power_values))
-
+        
         return {
             'best_config': best_config,
             'top_5': top_5,
@@ -282,7 +282,7 @@ class TranscodingRecommender:
             'efficiency_range': efficiency_range,
             'power_range': power_range,
         }
-
+    
     def compare_configurations(
         self, config_a: Dict, config_b: Dict
     ) -> Dict:
@@ -307,7 +307,7 @@ class TranscodingRecommender:
         """
         score_a = self.scorer.compute_score(config_a)
         score_b = self.scorer.compute_score(config_b)
-
+        
         if score_a is None or score_b is None:
             return {
                 'winner': 'tie',
@@ -316,21 +316,21 @@ class TranscodingRecommender:
                 'power_diff': None,
                 'justification': 'Cannot compare: missing efficiency data',
             }
-
+        
         efficiency_diff = score_a - score_b
-
+        
         # Avoid division by zero
         avg_score = (score_a + score_b) / 2
         efficiency_pct_diff = (efficiency_diff / avg_score) * 100 if avg_score > 0 else 0
-
+        
         winner = 'config_a' if efficiency_diff > 0 else 'config_b' if efficiency_diff < 0 else 'tie'
-
+        
         power_a = config_a.get('power', {}).get('mean_watts')
         power_b = config_b.get('power', {}).get('mean_watts')
         power_diff = None
         if power_a is not None and power_b is not None:
             power_diff = power_a - power_b
-
+        
         # Generate justification
         if winner == 'tie':
             justification = f"Configurations are equally efficient (both {score_a:.4f} Mbps/W)"
@@ -342,7 +342,7 @@ class TranscodingRecommender:
                 f"{winner_name} is {abs(efficiency_pct_diff):.1f}% more efficient "
                 f"({winner_score:.4f} Mbps/W vs {loser_score:.4f} Mbps/W)"
             )
-
+        
         return {
             'winner': winner,
             'efficiency_diff': efficiency_diff,
@@ -350,11 +350,11 @@ class TranscodingRecommender:
             'power_diff': power_diff,
             'justification': justification,
         }
-
+    
     # ============================================================================
     # Placeholder for future CLI interface
     # ============================================================================
-
+    
     def generate_cli_report(self, scenarios: List[Dict]) -> str:
         """
         PLACEHOLDER: Generate CLI-friendly recommendation report.
