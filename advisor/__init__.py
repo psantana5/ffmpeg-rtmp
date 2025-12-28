@@ -8,9 +8,10 @@ The advisor transforms raw measurement data into actionable recommendations,
 helping operators select optimal transcoding pipelines for their hardware.
 """
 
+from .modeling import PowerPredictor
 from .recommender import TranscodingRecommender
 from .scoring import EnergyEfficiencyScorer
 
-__all__ = ['EnergyEfficiencyScorer', 'TranscodingRecommender']
+__all__ = ['EnergyEfficiencyScorer', 'TranscodingRecommender', 'PowerPredictor']
 
 __version__ = '0.1.0'
