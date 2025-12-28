@@ -119,10 +119,18 @@ class ModelLoader:
             if hasattr(model, 'get_model_info'):
                 info = model.get_model_info()
                 metadata.update(info)
-                return metadata
+                
+                # Add features if not present
+                if 'features' not in metadata or not metadata['features']:
+                    # PowerPredictor
+                    if hasattr(model, 'training_data'):
+                        metadata['features'] = ['stream_count']
+                    # MultivariatePredictor
+                    elif hasattr(model, 'feature_names'):
+                        metadata['features'] = model.feature_names
             
-            # PowerPredictor
-            if hasattr(model, 'model') and hasattr(model, 'training_data'):
+            # PowerPredictor (fallback if no get_model_info)
+            elif hasattr(model, 'model') and hasattr(model, 'training_data'):
                 metadata['trained'] = model.model is not None
                 metadata['n_samples'] = len(model.training_data)
                 metadata['features'] = ['stream_count']
@@ -134,7 +142,7 @@ class ModelLoader:
                     streams = [s for s, _ in model.training_data]
                     metadata['stream_range'] = (min(streams), max(streams))
             
-            # MultivariatePredictor
+            # MultivariatePredictor (fallback if no get_model_info)
             elif hasattr(model, 'pipelines') and hasattr(model, 'feature_names'):
                 metadata['trained'] = bool(model.pipelines)
                 metadata['features'] = model.feature_names
@@ -194,9 +202,10 @@ class ModelLoader:
                 elif hasattr(model, '_extract_features') and hasattr(model, 'predict'):
                     # MultivariatePredictor
                     features = model._extract_features(scenario)
-                    if features is not None:
+                    if features is not None and isinstance(features, dict):
                         result = model.predict(features, return_confidence=False)
-                        predicted = result.get('mean')
+                        if isinstance(result, dict):
+                            predicted = result.get('mean')
                 
                 if predicted is not None:
                     residual = measured - predicted
