@@ -123,6 +123,22 @@ Or manually:
 
 - `make targets`
 
+### 4) Verify exporter health
+
+```bash
+# Quick health check of all exporters
+python3 check_exporters_health.py
+
+# Continuous monitoring
+python3 check_exporters_health.py --interval 60
+```
+
+### 5) Learn about the system
+
+- **[Exporter Data Flow & Setup Guide](docs/exporter-data-flow.md)** - Complete documentation on how each exporter works, data sources, and troubleshooting
+- **[Exporter Health Check](docs/exporter-health-check.md)** - Health monitoring system documentation
+- **[Power Prediction Models](docs/power-prediction-model.md)** - ML model documentation
+
 ---
 
 ## Running tests
