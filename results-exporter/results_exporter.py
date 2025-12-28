@@ -409,6 +409,7 @@ class ResultsExporter:
             mean_power = (energy_j / duration) if duration > 0 else 0.0
             
             # Query power samples over time to calculate standard deviation
+            # Note: stdev requires at least 2 values; if 0 or 1 values, power_stdev remains 0.0
             power_query = f'sum(rapl_power_watts{{zone=~"package.*"}})'
             power_data = self.client.query_range(power_query, start, end, step="5s")
             power_values = _extract_values(power_data)
@@ -445,9 +446,9 @@ class ResultsExporter:
             per_frame_mj = (energy_j / (fps_val * duration)) * 1000.0
             energy_mj_per_frame = per_frame_mj
         
-        # Calculate prediction confidence bounds using 95% confidence interval
-        # confidence_interval = mean ± (1.96 * stdev / sqrt(n))
-        # For simplicity, we use mean ± 2 * stdev as an approximation
+        # Calculate prediction confidence bounds using ~95% confidence interval
+        # Using mean ± 2×stdev as an approximation (covers ~95.4% for normal distribution)
+        # For a precise 95% CI, use mean ± 1.96×stdev, but 2×stdev is simpler and conservative
         prediction_confidence_high = mean_power + (2.0 * power_stdev) if mean_power > 0 else 0.0
         prediction_confidence_low = max(0.0, mean_power - (2.0 * power_stdev)) if mean_power > 0 else 0.0
 
