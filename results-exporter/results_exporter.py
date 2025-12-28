@@ -6,7 +6,7 @@ import re
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from statistics import mean
+from statistics import mean, stdev
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
@@ -400,12 +400,20 @@ class ResultsExporter:
 
         energy_j = 0.0
         mean_power = 0.0
+        power_stdev = 0.0
         if duration > 0:
             window = f"{max(1, int(duration))}s"
             energy_query = f'sum(increase(rapl_energy_joules_total{{zone=~"package.*"}}[{window}]))'
             energy_data = self.client.query(energy_query, ts=end)
             energy_j = _extract_instant_value(energy_data)
             mean_power = (energy_j / duration) if duration > 0 else 0.0
+            
+            # Query power samples over time to calculate standard deviation
+            power_query = f'sum(rapl_power_watts{{zone=~"package.*"}})'
+            power_data = self.client.query_range(power_query, start, end, step="5s")
+            power_values = _extract_values(power_data)
+            if power_values and len(power_values) > 1:
+                power_stdev = stdev(power_values)
 
         container_cpu_query = "docker_containers_total_cpu_percent"
         container_data = self.client.query_range(container_cpu_query, start, end, step="5s")
@@ -436,10 +444,17 @@ class ResultsExporter:
         if isinstance(fps_val, (int, float)) and energy_j and duration > 0 and (fps_val * duration) > 0:
             per_frame_mj = (energy_j / (fps_val * duration)) * 1000.0
             energy_mj_per_frame = per_frame_mj
+        
+        # Calculate prediction confidence bounds using 95% confidence interval
+        # confidence_interval = mean ± (1.96 * stdev / sqrt(n))
+        # For simplicity, we use mean ± 2 * stdev as an approximation
+        prediction_confidence_high = mean_power + (2.0 * power_stdev) if mean_power > 0 else 0.0
+        prediction_confidence_low = max(0.0, mean_power - (2.0 * power_stdev)) if mean_power > 0 else 0.0
 
         return {
             "duration_s": duration,
             "mean_power_w": mean_power,
+            "power_stdev_w": power_stdev,
             "total_energy_j": energy_j,
             "total_energy_wh": total_energy_wh,
             "container_cpu_percent": mean_container_cpu,
@@ -448,6 +463,8 @@ class ResultsExporter:
             "energy_wh_per_min": energy_wh_per_min,
             "energy_wh_per_mbps": energy_wh_per_mbps,
             "energy_mj_per_frame": energy_mj_per_frame,
+            "prediction_confidence_high": prediction_confidence_high,
+            "prediction_confidence_low": prediction_confidence_low,
         }
 
     def build_metrics(self) -> str:
@@ -526,6 +543,12 @@ class ResultsExporter:
         output.append("# TYPE results_scenario_efficiency_score gauge")
         output.append("# HELP results_scenario_total_pixels Total pixels delivered across all outputs")
         output.append("# TYPE results_scenario_total_pixels gauge")
+        output.append("# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval (W)")
+        output.append("# TYPE results_scenario_prediction_confidence_high gauge")
+        output.append("# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval (W)")
+        output.append("# TYPE results_scenario_prediction_confidence_low gauge")
+        output.append("# HELP results_scenario_power_stdev Standard deviation of power measurements (W)")
+        output.append("# TYPE results_scenario_power_stdev gauge")
 
         baseline = self._find_baseline(scenarios)
         baseline_stats = None
@@ -585,6 +608,11 @@ class ResultsExporter:
             
             if total_pixels > 0:
                 output.append(f"results_scenario_total_pixels{lbl} {total_pixels:.0f}")
+            
+            # Export prediction confidence metrics
+            output.append(f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}")
+            output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
+            output.append(f"results_scenario_power_stdev{lbl} {stats['power_stdev_w']:.4f}")
 
             if baseline_stats and scenario is not baseline:
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
