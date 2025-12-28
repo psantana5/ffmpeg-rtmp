@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit ml-info ml-debug
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -37,6 +37,10 @@ help:
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
+	@echo ""
+	@echo "ML Diagnostics"
+	@echo "  make ml-info         Show ML model overview and metadata"
+	@echo "  make ml-debug        Debug ML model predictions and residuals"
 	@echo ""
 	@echo "Development"
 	@echo "  make lint            Run ruff checks"
@@ -95,6 +99,12 @@ test-batch:
 
 analyze:
 	$(PYTHON) analyze_results.py
+
+ml-info:
+	$(PYTHON) scripts/queries/ml_overview.py
+
+ml-debug:
+	$(PYTHON) scripts/queries/ml_debug.py
 
 lint:
 	$(PYTHON) -m ruff check .
