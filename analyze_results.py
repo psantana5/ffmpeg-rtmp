@@ -5,6 +5,7 @@ Queries Prometheus and generates comprehensive reports
 Includes energy-aware transcoding recommendations
 """
 
+import argparse
 import csv
 import json
 import logging
@@ -900,14 +901,103 @@ class ResultsAnalyzer:
 
 
 def main():
-    if len(sys.argv) < 2:
+    parser = argparse.ArgumentParser(
+        description='Analyze FFmpeg RTMP power monitoring test results',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Analyze most recent results
+  python3 analyze_results.py
+  
+  # Analyze specific file
+  python3 analyze_results.py test_results/test_results_20231215_143022.json
+  
+  # Predict power for custom stream counts
+  python3 analyze_results.py --predict 1,2,4,8,16
+  
+  # Show model details only
+  python3 analyze_results.py --model-only
+  
+  # Export only (no console output)
+  python3 analyze_results.py --quiet --export-csv results.csv
+        '''
+    )
+    
+    parser.add_argument(
+        'results_file',
+        nargs='?',
+        type=Path,
+        help='Path to test results JSON file (default: most recent in test_results/)'
+    )
+    
+    parser.add_argument(
+        '--model',
+        choices=['auto', 'linear', 'polynomial'],
+        default='auto',
+        help='Model type to use (default: auto - selects based on data size)'
+    )
+    
+    parser.add_argument(
+        '--predict',
+        type=str,
+        help='Comma-separated list of stream counts to predict (e.g., "1,2,4,8,16")'
+    )
+    
+    parser.add_argument(
+        '--model-only',
+        action='store_true',
+        help='Show only model information and predictions, skip detailed scenario analysis'
+    )
+    
+    parser.add_argument(
+        '--export-csv',
+        type=Path,
+        metavar='FILE',
+        help='Export results to CSV file (default: auto-generated in same directory as results)'
+    )
+    
+    parser.add_argument(
+        '--export-model-metadata',
+        type=Path,
+        metavar='FILE',
+        help='Export model metadata to JSON file (default: test_results/model_metadata.json)'
+    )
+    
+    parser.add_argument(
+        '--quiet',
+        action='store_true',
+        help='Suppress console output (useful with --export-csv)'
+    )
+    
+    parser.add_argument(
+        '--no-outlier-filter',
+        action='store_true',
+        help='Disable outlier filtering in power measurements'
+    )
+    
+    parser.add_argument(
+        '--prometheus-url',
+        default='http://localhost:9090',
+        help='Prometheus server URL (default: http://localhost:9090)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine results file
+    if args.results_file:
+        results_file = args.results_file
+        if not results_file.exists():
+            logger.error(f"Results file not found: {results_file}")
+            return 1
+    else:
         # Find most recent results file
         results_dir = Path('./test_results')
         if results_dir.exists():
             results_files = sorted(results_dir.glob('test_results_*.json'), reverse=True)
             if results_files:
                 results_file = results_files[0]
-                logger.info(f"Using most recent results file: {results_file}")
+                if not args.quiet:
+                    logger.info(f"Using most recent results file: {results_file}")
             else:
                 logger.error("No results files found in ./test_results")
                 print("Usage: python3 analyze_results.py [results_file.json]")
@@ -916,29 +1006,65 @@ def main():
             logger.error("No results directory found")
             print("Usage: python3 analyze_results.py [results_file.json]")
             return 1
-    else:
-        results_file = Path(sys.argv[1])
-        if not results_file.exists():
-            logger.error(f"Results file not found: {results_file}")
-            return 1
     
     try:
-        analyzer = ResultsAnalyzer(results_file)
+        analyzer = ResultsAnalyzer(results_file, prometheus_url=args.prometheus_url)
         results = analyzer.generate_report()
         
         # Train PowerPredictor on the results
         predictor = PowerPredictor()
         predictor.fit(results)
         
-        # Print summary with power predictions
-        analyzer.print_summary(results)
-        analyzer.print_power_predictions(results, predictor)
+        # Handle custom prediction stream counts
+        custom_predictions = None
+        if args.predict:
+            try:
+                custom_predictions = [int(s.strip()) for s in args.predict.split(',')]
+                if not args.quiet:
+                    logger.info(f"Will predict for custom stream counts: {custom_predictions}")
+            except ValueError:
+                logger.error(f"Invalid --predict format: {args.predict}")
+                return 1
         
-        # Export CSV with predictions
-        analyzer.export_csv(predictor=predictor)
+        # Print output unless quiet mode
+        if not args.quiet:
+            if args.model_only:
+                # Show only model info and predictions
+                analyzer.print_power_predictions(results, predictor)
+                if custom_predictions:
+                    print(f"\n{'─' * 100}")
+                    print("CUSTOM PREDICTIONS")
+                    print("─" * 100)
+                    for streams in custom_predictions:
+                        power = predictor.predict(streams)
+                        if power is not None:
+                            print(f"  {streams:>3} streams: {power:>8.2f} W")
+            else:
+                # Full output
+                analyzer.print_summary(results)
+                analyzer.print_power_predictions(results, predictor)
+                if custom_predictions:
+                    print(f"\n{'─' * 100}")
+                    print("CUSTOM PREDICTIONS")
+                    print("─" * 100)
+                    for streams in custom_predictions:
+                        power = predictor.predict(streams)
+                        if power is not None:
+                            print(f"  {streams:>3} streams: {power:>8.2f} W")
         
-        # Export model metadata for observability
-        analyzer.export_model_metadata(predictor)
+        # Export CSV if requested
+        if args.export_csv:
+            analyzer.export_csv(output_file=args.export_csv, predictor=predictor)
+        elif not args.quiet:
+            # Default CSV export
+            analyzer.export_csv(predictor=predictor)
+        
+        # Export model metadata
+        if args.export_model_metadata:
+            analyzer.export_model_metadata(predictor, output_file=args.export_model_metadata)
+        elif not args.quiet:
+            # Default model metadata export
+            analyzer.export_model_metadata(predictor)
         
         return 0
     except Exception as e:
