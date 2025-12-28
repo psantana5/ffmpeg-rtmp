@@ -312,7 +312,7 @@ class CostMetricsExporter:
             safe_name = scenario_name.replace(' ', '_').replace('"', '')
             
             # Extract additional labels
-            streams = scenario.get('streams', 1)
+            streams = scenario.get('streams')
             bitrate = scenario.get('bitrate', '')
             encoder = scenario.get('encoder_type', 'unknown')
             

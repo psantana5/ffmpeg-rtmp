@@ -219,7 +219,7 @@ services:
       - ./cost_exporter.py:/app/cost_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
-      - "9503:9503"
+      - "9504:9504"
     restart: unless-stopped
     networks:
       - streaming-net
