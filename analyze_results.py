@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from advisor import TranscodingRecommender
+from advisor import PowerPredictor, TranscodingRecommender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -527,8 +527,98 @@ class ResultsAnalyzer:
                         print(f"   Bitrate: {bitrate}")
 
         print("\n" + "=" * 100 + "\n")
+    
+    def print_power_predictions(self, results: List[Dict], predictor):
+        """
+        Print power scalability predictions and comparison table.
+        
+        This method displays:
+        1. Model metadata (type, training samples, stream range)
+        2. Predicted power for standard stream counts (1, 2, 4, 8, 12)
+        3. Comparison table showing measured vs predicted for training data
+        
+        The comparison table helps assess model quality by showing how well
+        predictions match actual measurements on training data. Large differences
+        may indicate:
+        - Poor model fit (low R² score)
+        - Non-linear effects not captured by linear model
+        - Inconsistent measurements in training data
+        
+        Args:
+            results: List of analyzed scenario dicts (from generate_report)
+            predictor: Trained PowerPredictor instance
+        """
+        print(f"\n{'=' * 100}")
+        print("POWER SCALABILITY PREDICTIONS")
+        print("=" * 100)
+        
+        # Get model info
+        model_info = predictor.get_model_info()
+        
+        if not model_info['trained']:
+            print("\nPower prediction model could not be trained (insufficient data)")
+            return
+        
+        # Display model metadata
+        print(f"\nModel Type: {model_info['model_type'].upper()}")
+        print(f"Training Samples: {model_info['n_samples']}")
+        if model_info['stream_range']:
+            min_s, max_s = model_info['stream_range']
+            print(f"Stream Range: {min_s} - {max_s} streams")
+        
+        # Predict for key stream counts (standard capacity planning points)
+        # These represent typical workload sizes: single stream, small (2-4),
+        # medium (8), and large (12) deployments
+        target_streams = [1, 2, 4, 8, 12]
+        predictions = {}
+        
+        print("\nPredicted Power Consumption:")
+        print("─" * 100)
+        for streams in target_streams:
+            power = predictor.predict(streams)
+            if power is not None:
+                predictions[streams] = power
+                print(f"  {streams:>2} streams: {power:>8.2f} W")
+        
+        # Create comparison table: Streams | Measured (W) | Predicted (W) | Diff (W)
+        # This shows model accuracy on training data (should be close to 0 diff)
+        print(f"\n{'─' * 100}")
+        print("MEASURED vs PREDICTED COMPARISON")
+        print("─" * 100)
+        print("(Shows model fit quality on training data)")
+        
+        # Extract measured data from training
+        # Group by stream count and average if multiple measurements exist
+        measured_data = {}
+        for streams, power in predictor.training_data:
+            if streams not in measured_data:
+                measured_data[streams] = []
+            measured_data[streams].append(power)
+        
+        # Average multiple measurements for same stream count
+        # This handles cases where different scenarios have same stream count
+        # (e.g., "4 Streams @ 2500k" and "4 Streams @ 1080p")
+        measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
+        
+        # Print comparison table header
+        print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12}")
+        print("─" * 100)
+        
+        # Show all measured stream counts with predictions
+        for streams in sorted(measured_avg.keys()):
+            measured = measured_avg[streams]
+            predicted = predictor.predict(streams)
+            diff = predicted - measured if predicted is not None else None
+            
+            measured_str = f"{measured:.2f}"
+            predicted_str = f"{predicted:.2f}" if predicted is not None else "N/A"
+            diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
+            
+            print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12}")
+        
+        print("─" * 100)
 
-    def export_csv(self, output_file: str = None):
+    def export_csv(self, output_file: str = None, predictor=None):
         """Export results to CSV"""
         if output_file is None:
             output_file = self.results_file.parent / f"{self.results_file.stem}_analysis.csv"
@@ -543,6 +633,7 @@ class ResultsAnalyzer:
             writer = csv.DictWriter(f, fieldnames=[
                 'name', 'bitrate', 'resolution', 'fps', 'duration',
                 'mean_power_w', 'median_power_w', 'total_energy_wh',
+                'predicted_mean_power_w',
                 'net_power_w', 'net_energy_wh', 'net_container_cpu_pct',
                 'docker_overhead_w', 'docker_overhead_pct',
                 'container_cpu_pct', 'container_power_w',
@@ -565,6 +656,17 @@ class ResultsAnalyzer:
                     row['mean_power_w'] = r['power']['mean_watts']
                     row['median_power_w'] = r['power']['median_watts']
                     row['total_energy_wh'] = r['power']['total_energy_wh']
+                
+                # Add predicted power if predictor is available
+                if predictor is not None:
+                    streams = predictor._infer_stream_count(r['name'])
+                    if streams is not None:
+                        predicted_power = predictor.predict(streams)
+                        row['predicted_mean_power_w'] = predicted_power
+                    else:
+                        row['predicted_mean_power_w'] = None
+                else:
+                    row['predicted_mean_power_w'] = None
 
                 if 'net' in r:
                     row['net_power_w'] = r['net'].get('power_w')
@@ -621,8 +723,17 @@ def main():
     try:
         analyzer = ResultsAnalyzer(results_file)
         results = analyzer.generate_report()
+        
+        # Train PowerPredictor on the results
+        predictor = PowerPredictor()
+        predictor.fit(results)
+        
+        # Print summary with power predictions
         analyzer.print_summary(results)
-        analyzer.export_csv()
+        analyzer.print_power_predictions(results, predictor)
+        
+        # Export CSV with predictions
+        analyzer.export_csv(predictor=predictor)
         
         return 0
     except Exception as e:
