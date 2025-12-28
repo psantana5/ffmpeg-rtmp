@@ -50,7 +50,9 @@ You can:
   - Scores transcoding configurations by energy efficiency.
   - Ranks scenarios by throughput-per-watt metric.
   - Recommends optimal pipeline for the hardware.
+  - **Power Prediction Model**: Machine learning-based prediction of power consumption for untested workload sizes.
   - Extensible for future quality metrics (VMAF/PSNR).
+  - See [Power Prediction Documentation](docs/power-prediction-model.md) for details.
 
 - **Prometheus** (`prometheus`)
   - Scrapes all exporters.
@@ -269,13 +271,16 @@ This command:
 - **Computes energy efficiency scores** for each configuration
 - **Ranks scenarios** by efficiency (Mbps per watt)
 - **Recommends the optimal configuration** for your hardware
-- Exports results to CSV (including efficiency scores and ranks)
+- **Predicts power consumption for untested workload sizes** using machine learning
+- Exports results to CSV (including efficiency scores, ranks, and predictions)
 
 The analysis report now includes:
 
 1. **Traditional power metrics**: Mean power, energy consumption, Docker overhead
 2. **Energy efficiency rankings**: Shows which configurations deliver the most throughput per watt
 3. **Recommendation**: Identifies the best configuration for energy-efficient transcoding
+4. **Power scalability predictions**: ML-based predictions for 1, 2, 4, 8, 12 concurrent streams
+5. **Measured vs Predicted comparison**: Validates model accuracy on training data
 
 Example output:
 ```
@@ -293,7 +298,32 @@ Most energy-efficient configuration: 4 streams @ 2500k
   Efficiency Score: 0.0667 Mbps/W
   Mean Power: 150.00 W
   Bitrate: 2500k
+
+POWER SCALABILITY PREDICTIONS
+══════════════════════════════════════════════════════════════════════
+Model Type: LINEAR
+Training Samples: 4
+Stream Range: 1 - 8 streams
+
+Predicted Power Consumption:
+──────────────────────────────────────────────────────────────────────
+   1 streams:    45.23 W
+   2 streams:    78.45 W
+   4 streams:   145.12 W
+   8 streams:   278.67 W
+  12 streams:   412.23 W
+
+MEASURED vs PREDICTED COMPARISON
+──────────────────────────────────────────────────────────────────────
+Streams    Measured (W)    Predicted (W)   Diff (W)    
+──────────────────────────────────────────────────────────────────────
+1          45.00           45.23           +0.23
+2          80.00           78.45           -1.55
+4          150.00          145.12          -4.88
+8          280.00          278.67          -1.33
 ```
+
+For detailed information about the power prediction model, see [docs/power-prediction-model.md](docs/power-prediction-model.md).
 
 ### Python API
 
