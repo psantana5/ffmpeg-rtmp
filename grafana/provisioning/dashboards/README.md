@@ -272,6 +272,47 @@ Optimize PromQL queries:
 - Add rate limiters if needed
 - Consider increasing Prometheus retention
 
+### Query Returns "Empty query result"
+
+**Symptom:** Query shows "Empty query result" or "Result series: 0"
+
+**Common Causes:**
+
+1. **Non-existent metrics:** The metric name is not exported by any exporter
+   - Example: `results_scenario_prediction_confidence_high` and `results_scenario_prediction_confidence_low` are **not implemented**
+   - Verify metric exists: `curl http://localhost:9502/metrics | grep <metric_name>`
+   - Check available metrics in the "Metrics Reference" section above
+
+2. **No data in time range:** Metric exists but has no data points in selected time range
+   - Adjust time range picker in Grafana
+   - Verify tests have been run: `ls -lh test_results/`
+
+3. **Label filter doesn't match:** Label selectors exclude all series
+   - Check label values: `curl http://localhost:9090/api/v1/label/<label>/values`
+   - Simplify query to test: remove label filters one by one
+
+4. **Datasource not configured:** Dashboard cannot reach Prometheus
+   - See "Datasource Issues" section below
+
+### Datasource Issues
+
+**Symptom:** "Cannot find datasource" or datasource errors
+
+**Common Causes:**
+
+1. **Dashboard file in wrong directory:**
+   - ✅ Dashboards belong in: `grafana/provisioning/dashboards/`
+   - ❌ **NOT** in: `grafana/provisioning/datasources/`
+   - Only `prometheus.yml` should be in datasources directory
+
+2. **Datasource variable not defined:**
+   - Verify dashboard has `DS_PROMETHEUS` variable in `templating.list`
+   - Check panels use `"uid": "${DS_PROMETHEUS}"`
+
+3. **Prometheus not running:**
+   - Check: `curl http://localhost:9090/-/healthy`
+   - View logs: `docker logs prometheus`
+
 ## Best Practices
 
 ### 1. Dashboard Organization
