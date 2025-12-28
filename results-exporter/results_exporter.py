@@ -753,8 +753,9 @@ class ResultsExporter:
                 # These are computed using mean ± 2*stdev for ~95% confidence
                 output.append(f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}")
                 output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
-                # Use measured power as "predicted" when ML model is not available
+                # Use measured power and energy as "predicted" when ML model is not available
                 output.append(f"results_scenario_predicted_power_watts{lbl} {stats['mean_power_w']:.4f}")
+                output.append(f"results_scenario_predicted_energy_joules{lbl} {stats['total_energy_j']:.4f}")
 
             if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
