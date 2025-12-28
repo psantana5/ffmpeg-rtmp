@@ -638,25 +638,16 @@ class ResultsExporter:
         output.append("# TYPE results_scenario_efficiency_score gauge")
         output.append("# HELP results_scenario_total_pixels Total pixels delivered across all outputs")
         output.append("# TYPE results_scenario_total_pixels gauge")
-<<<<<<< HEAD
-        output.append("# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval (W)")
-        output.append("# TYPE results_scenario_prediction_confidence_high gauge")
-        output.append("# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval (W)")
-        output.append("# TYPE results_scenario_prediction_confidence_low gauge")
         output.append("# HELP results_scenario_power_stdev Standard deviation of power measurements (W)")
         output.append("# TYPE results_scenario_power_stdev gauge")
-=======
         output.append("# HELP results_scenario_predicted_power_watts Predicted power consumption (W) from ML model")
         output.append("# TYPE results_scenario_predicted_power_watts gauge")
         output.append("# HELP results_scenario_predicted_energy_joules Predicted total energy (J) from ML model")
         output.append("# TYPE results_scenario_predicted_energy_joules gauge")
-        output.append("# HELP results_scenario_predicted_efficiency_score Predicted efficiency score from ML model")
-        output.append("# TYPE results_scenario_predicted_efficiency_score gauge")
-        output.append("# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval")
+        output.append("# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval (W)")
         output.append("# TYPE results_scenario_prediction_confidence_low gauge")
-        output.append("# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval")
+        output.append("# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval (W)")
         output.append("# TYPE results_scenario_prediction_confidence_high gauge")
->>>>>>> a9959ea (Add Prometheus metrics and CLI for multivariate predictions)
 
         baseline = self._find_baseline(scenarios)
         baseline_stats = None
@@ -743,12 +734,9 @@ class ResultsExporter:
             if total_pixels > 0:
                 output.append(f"results_scenario_total_pixels{lbl} {total_pixels:.0f}")
             
-<<<<<<< HEAD
-            # Export prediction confidence metrics
-            output.append(f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}")
-            output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
+            # Export power standard deviation
             output.append(f"results_scenario_power_stdev{lbl} {stats['power_stdev_w']:.4f}")
-=======
+            
             # Generate ML predictions if predictor is trained
             predictions = self._predict_for_scenario(scenario_copy, stats)
             if predictions:
@@ -760,7 +748,13 @@ class ResultsExporter:
                     output.append(f"results_scenario_prediction_confidence_low{lbl} {predictions['ci_low']:.4f}")
                 if predictions['ci_high'] is not None:
                     output.append(f"results_scenario_prediction_confidence_high{lbl} {predictions['ci_high']:.4f}")
->>>>>>> a9959ea (Add Prometheus metrics and CLI for multivariate predictions)
+            else:
+                # If no ML predictions available, use statistical confidence intervals
+                # These are computed using mean ± 2*stdev for ~95% confidence
+                output.append(f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}")
+                output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
+                # Use measured power as "predicted" when ML model is not available
+                output.append(f"results_scenario_predicted_power_watts{lbl} {stats['mean_power_w']:.4f}")
 
             if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
