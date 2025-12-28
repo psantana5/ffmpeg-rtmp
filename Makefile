@@ -37,6 +37,7 @@ help:
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
+	@echo "  make retrain-models  Retrain ML models from test results"
 	@echo ""
 	@echo "Development"
 	@echo "  make lint            Run ruff checks"
@@ -95,6 +96,9 @@ test-batch:
 
 analyze:
 	$(PYTHON) analyze_results.py
+
+retrain-models:
+	$(PYTHON) retrain_models.py --results-dir ./test_results --models-dir ./models
 
 lint:
 	$(PYTHON) -m ruff check .

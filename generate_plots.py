@@ -4,15 +4,14 @@ Generate professional plots from FFmpeg power monitoring test results.
 Creates publication-ready figures for power consumption analysis.
 """
 
-import json
 import argparse
+import json
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict
+
 import matplotlib.pyplot as plt
-import matplotlib.style as style
 import numpy as np
 import pandas as pd
-from datetime import datetime
 
 
 def setup_plot_style():
