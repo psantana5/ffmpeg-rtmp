@@ -273,7 +273,7 @@ class CostMetricsExporter:
             encoder = scenario.get('encoder_type', 'unknown')
             
             # Skip metrics without required labels (streams or bitrate)
-            if streams is None or not bitrate:
+            if streams is None or bitrate is None or bitrate == '':
                 logger.debug(
                     f"Skipping scenario '{scenario_name}': "
                     f"missing streams or bitrate labels"

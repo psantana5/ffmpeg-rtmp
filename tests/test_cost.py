@@ -8,6 +8,17 @@ from advisor.cost import CostModel
 class TestCostModelLoadAware:
     """Tests for load-aware CostModel class."""
     
+    # Common pricing constants for tests
+    # Derived from typical cloud pricing:
+    #   CPU: $0.50/hour → 0.000138889 $/core-second
+    #   Energy: $0.12/kWh → 3.33e-8 $/joule
+    PRICE_PER_CORE_SECOND_TYPICAL = 0.000138889
+    PRICE_PER_JOULE_TYPICAL = 3.33e-8
+    
+    # Simple test values for validation
+    PRICE_PER_CORE_SECOND_TEST = 0.0001
+    PRICE_PER_JOULE_TEST = 1e-7
+    
     def test_initialization_default(self):
         """Test default initialization."""
         model = CostModel()
@@ -18,18 +29,18 @@ class TestCostModelLoadAware:
     def test_initialization_with_values(self):
         """Test initialization with custom values."""
         model = CostModel(
-            price_per_core_second=0.000138889,
-            price_per_joule=3.33e-8,
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TYPICAL,
+            price_per_joule=self.PRICE_PER_JOULE_TYPICAL,
             currency='EUR'
         )
-        assert pytest.approx(model.price_per_core_second, rel=1e-6) == 0.000138889
-        assert pytest.approx(model.price_per_joule, rel=1e-6) == 3.33e-8
+        assert pytest.approx(model.price_per_core_second, rel=1e-6) == self.PRICE_PER_CORE_SECOND_TYPICAL
+        assert pytest.approx(model.price_per_joule, rel=1e-6) == self.PRICE_PER_JOULE_TYPICAL
         assert model.currency == 'EUR'
     
     def test_compute_cost_load_aware(self):
         """Test load-aware compute cost calculation."""
         model = CostModel(
-            price_per_core_second=0.0001  # Simple value for testing
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST
         )
         
         scenario = {
@@ -47,7 +58,7 @@ class TestCostModelLoadAware:
     def test_compute_cost_load_aware_with_gpu(self):
         """Test load-aware compute cost with GPU usage."""
         model = CostModel(
-            price_per_core_second=0.0001
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST
         )
         
         scenario = {
@@ -66,7 +77,7 @@ class TestCostModelLoadAware:
     def test_energy_cost_load_aware(self):
         """Test load-aware energy cost calculation from integrated power."""
         model = CostModel(
-            price_per_joule=1e-7  # Simple value for testing
+            price_per_joule=self.PRICE_PER_JOULE_TEST  # Simple value for testing
         )
         
         scenario = {
@@ -84,8 +95,8 @@ class TestCostModelLoadAware:
     def test_total_cost_load_aware(self):
         """Test total cost using load-aware calculation."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         scenario = {
@@ -106,8 +117,8 @@ class TestCostModelLoadAware:
     def test_load_aware_scales_with_streams(self):
         """Test that cost increases with more streams (higher CPU usage)."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         # Single stream scenario
@@ -138,8 +149,8 @@ class TestCostModelLoadAware:
     def test_load_aware_scales_with_bitrate(self):
         """Test that cost increases with higher bitrate (higher CPU usage)."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         # Low bitrate scenario
@@ -168,8 +179,8 @@ class TestCostModelLoadAware:
     def test_load_aware_idle_baseline_lowest_cost(self):
         """Test that idle baseline has lowest cost."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         # Idle baseline
@@ -200,8 +211,8 @@ class TestCostModelLoadAware:
     def test_cost_per_watch_hour_no_hardcoded_viewers(self):
         """Test that cost per watch hour requires viewer count (not hardcoded)."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         scenario = {
@@ -226,8 +237,8 @@ class TestCostModelLoadAware:
     def test_cost_per_watch_hour_from_scenario(self):
         """Test cost per watch hour using viewer count from scenario."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         scenario = {
@@ -246,8 +257,8 @@ class TestCostModelLoadAware:
     def test_cost_per_pixel_load_aware(self):
         """Test cost per pixel with load-aware calculation."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         scenario = {
@@ -269,8 +280,8 @@ class TestCostModelLoadAware:
     def test_missing_data_returns_none(self):
         """Test that missing data returns None gracefully."""
         model = CostModel(
-            price_per_core_second=0.0001,
-            price_per_joule=1e-7
+            price_per_core_second=self.PRICE_PER_CORE_SECOND_TEST,
+            price_per_joule=self.PRICE_PER_JOULE_TEST
         )
         
         # Missing CPU data
@@ -334,6 +345,7 @@ class TestCostModelIntegration:
     
     def test_comprehensive_scenario_analysis(self):
         """Test comprehensive cost analysis for a transcoding scenario."""
+        # Use typical cloud pricing: $0.50/hour CPU, $0.12/kWh energy
         model = CostModel(
             price_per_core_second=0.000138889,  # $0.50/hour / 3600
             price_per_joule=3.33e-8,  # $0.12/kWh / 3.6e6

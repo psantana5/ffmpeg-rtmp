@@ -12,8 +12,8 @@ Provides load-aware cost analysis for energy-aware transcoding optimization:
 This enables cost-optimized transcoding decisions for cloud and edge deployments.
 
 Cost Formulas (Load-Aware):
-    compute_cost = sum(cpu_usage_cores * step_seconds) * PRICE_PER_CORE_SECOND
-    energy_cost = sum(power_watts * step_seconds) * PRICE_PER_JOULE
+    compute_cost = sum(cpu_usage_cores[i] * step_seconds for each i) * PRICE_PER_CORE_SECOND
+    energy_cost = sum(power_watts[i] * step_seconds for each i) * PRICE_PER_JOULE
     total_cost = compute_cost + energy_cost
 """
 
