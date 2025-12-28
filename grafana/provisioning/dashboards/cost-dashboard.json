@@ -112,7 +112,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_energy",
+          "expr": "cost_energy_load_aware",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Energy",
           "range": true,
           "refId": "A"
@@ -123,7 +123,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_compute",
+          "expr": "cost_compute_load_aware",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Compute",
           "range": true,
           "refId": "B"
@@ -219,7 +219,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_total",
+          "expr": "cost_total_load_aware",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Total",
           "range": true,
           "refId": "A"
@@ -313,15 +313,15 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_pixel * 1000000",
+          "expr": "cost_total_load_aware",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Cost per Megapixel Delivered",
+      "title": "Total Cost by Scenario",
       "type": "timeseries",
-      "description": "Cost efficiency: dollars per million pixels delivered"
+      "description": "Total load-aware cost for each transcoding scenario"
     },
     {
       "datasource": {
@@ -407,15 +407,15 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_watch_hour",
+          "expr": "cost_total_load_aware",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Cost per Viewer Watch Hour",
+      "title": "Total Cost by Scenario (Time Series)",
       "type": "timeseries",
-      "description": "Cost per hour of video watched by viewers"
+      "description": "Total load-aware cost over time for each scenario"
     },
     {
       "datasource": {
@@ -479,7 +479,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "sum(cost_total)",
+          "expr": "sum(cost_total_load_aware)",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Total",
           "range": true,
           "refId": "A"
@@ -550,7 +550,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "sum(cost_energy)",
+          "expr": "sum(cost_energy_load_aware)",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Energy",
           "range": true,
           "refId": "A"
@@ -621,7 +621,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "sum by (scenario) (cost_total)",
+          "expr": "sum by (scenario) (cost_total_load_aware)",
           "legendFormat": "{{scenario}}",
           "range": true,
           "refId": "A"
@@ -738,7 +738,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "cost_total",
+          "expr": "cost_total_load_aware",
           "format": "table",
           "instant": true,
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}}) - Total",
@@ -752,7 +752,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "cost_energy",
+          "expr": "cost_energy_load_aware",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -767,7 +767,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "cost_compute",
+          "expr": "cost_compute_load_aware",
           "format": "table",
           "hide": false,
           "instant": true,

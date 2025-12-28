@@ -4,22 +4,12 @@ Cost Metrics Prometheus Exporter
 
 Exports cost analysis metrics as Prometheus metrics for Grafana visualization.
 
-Exports two sets of metrics to avoid Prometheus time series conflicts:
-1. Legacy metrics (duration-based): cost_compute, cost_energy, cost_total
-2. Load-aware metrics: cost_compute_load_aware, cost_energy_load_aware, cost_total_load_aware
-
-Legacy metrics use wall-clock duration and hourly pricing.
 Load-aware metrics use actual CPU usage and power measurements from Prometheus.
 
 Metrics exported:
-- cost_total: Total cost per scenario (legacy, duration-based)
-- cost_energy: Energy cost per scenario (legacy, duration-based)
-- cost_compute: Compute cost per scenario (legacy, duration-based)
 - cost_total_load_aware: Total cost (load-aware, scales with actual usage)
 - cost_energy_load_aware: Energy cost (load-aware, scales with actual power)
 - cost_compute_load_aware: Compute cost (load-aware, scales with actual CPU)
-- cost_per_pixel: Cost per pixel delivered
-- cost_per_watch_hour: Cost per viewer watch hour
 
 All metrics include labels: scenario, streams, bitrate, encoder, currency, service
 
@@ -27,9 +17,6 @@ Usage:
     # With Prometheus for load-aware metrics
     python3 cost_exporter.py --port 9504 --prometheus-url http://prometheus:9090 \
         --energy-cost 0.12 --cpu-cost 0.50
-    
-    # Without Prometheus (legacy metrics only)
-    python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
 """
 
 import argparse
@@ -119,9 +106,7 @@ class CostMetricsExporter:
     """
     Exports cost metrics as Prometheus metrics.
     
-    Supports two modes:
-    1. Legacy: Read from test results JSON (duration-based costs)
-    2. Load-aware: Query Prometheus for real CPU/power metrics
+    Exports load-aware metrics that query Prometheus for real CPU/power metrics.
     """
     
     def __init__(
@@ -168,7 +153,7 @@ class CostMetricsExporter:
                 logger.warning(f"Failed to initialize Prometheus client: {e}")
                 logger.info("Falling back to legacy mode")
         else:
-            logger.info("Using legacy mode (duration-based costs)")
+            logger.info("Load-aware mode requires Prometheus URL")
     
     def load_latest_results(self) -> List[Dict]:
         """Load scenarios from most recent test results file."""
@@ -260,9 +245,8 @@ class CostMetricsExporter:
         """
         Generate Prometheus metrics in text format.
         
-        Exports both legacy (duration-based) and load-aware metrics with different names:
-        - Legacy: cost_total, cost_energy, cost_compute (duration-based)
-        - Load-aware: cost_total_load_aware, cost_energy_load_aware, cost_compute_load_aware
+        Exports only load-aware metrics:
+        - cost_total_load_aware, cost_energy_load_aware, cost_compute_load_aware
         
         Returns:
             Prometheus metrics text
@@ -283,20 +267,8 @@ class CostMetricsExporter:
         
         output = []
         
-        # Metrics definitions
+        # Metrics definitions - Load-aware metrics only
         currency = self.cost_model.currency
-        # Legacy metrics (duration-based)
-        output.append(f"# HELP cost_total Total cost ({currency}) - legacy duration-based")
-        output.append("# TYPE cost_total gauge")
-        output.append(f"# HELP cost_energy Energy cost ({currency}) - legacy duration-based")
-        output.append("# TYPE cost_energy gauge")
-        output.append(f"# HELP cost_compute Compute cost ({currency}) - legacy duration-based")
-        output.append("# TYPE cost_compute gauge")
-        output.append(f"# HELP cost_per_pixel Cost per pixel ({currency})")
-        output.append("# TYPE cost_per_pixel gauge")
-        output.append(f"# HELP cost_per_watch_hour Cost per watch hour ({currency})")
-        output.append("# TYPE cost_per_watch_hour gauge")
-        # Load-aware metrics
         output.append(f"# HELP cost_total_load_aware Total cost ({currency}) - load-aware")
         output.append("# TYPE cost_total_load_aware gauge")
         output.append(f"# HELP cost_energy_load_aware Energy cost ({currency}) - load-aware")
@@ -334,29 +306,6 @@ class CostMetricsExporter:
                 f'service="cost-analysis"'
             )
             
-            # Always compute legacy costs (duration-based)
-            legacy_total_cost = self.cost_model.compute_total_cost(scenario)
-            legacy_energy_cost = self.cost_model.compute_energy_cost(scenario)
-            legacy_compute_cost = self.cost_model.compute_compute_cost(scenario)
-            legacy_cost_per_pixel = self.cost_model.compute_cost_per_pixel(scenario)
-            legacy_cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour(
-                scenario, viewers=1
-            )
-            
-            # Export legacy metrics
-            if legacy_total_cost is not None:
-                output.append(f"cost_total{{{labels}}} {legacy_total_cost:.8f}")
-            if legacy_energy_cost is not None:
-                output.append(f"cost_energy{{{labels}}} {legacy_energy_cost:.8f}")
-            if legacy_compute_cost is not None:
-                output.append(f"cost_compute{{{labels}}} {legacy_compute_cost:.8f}")
-            if legacy_cost_per_pixel is not None:
-                output.append(f"cost_per_pixel{{{labels}}} {legacy_cost_per_pixel:.4e}")
-            if legacy_cost_per_watch_hour is not None:
-                output.append(
-                    f"cost_per_watch_hour{{{labels}}} {legacy_cost_per_watch_hour:.8f}"
-                )
-            
             # Compute and export load-aware costs if data is available
             has_load_aware_data = (
                 'cpu_usage_cores' in scenario and 
@@ -370,11 +319,17 @@ class CostMetricsExporter:
                 
                 # Export load-aware metrics
                 if load_aware_total_cost is not None:
-                    output.append(f"cost_total_load_aware{{{labels}}} {load_aware_total_cost:.8f}")
+                    output.append(
+                        f"cost_total_load_aware{{{labels}}} {load_aware_total_cost:.8f}"
+                    )
                 if load_aware_energy_cost is not None:
-                    output.append(f"cost_energy_load_aware{{{labels}}} {load_aware_energy_cost:.8f}")
+                    output.append(
+                        f"cost_energy_load_aware{{{labels}}} {load_aware_energy_cost:.8f}"
+                    )
                 if load_aware_compute_cost is not None:
-                    output.append(f"cost_compute_load_aware{{{labels}}} {load_aware_compute_cost:.8f}")
+                    output.append(
+                        f"cost_compute_load_aware{{{labels}}} {load_aware_compute_cost:.8f}"
+                    )
         
         result = '\n'.join(output) + '\n'
         
