@@ -188,11 +188,18 @@ def print_scenario_deep_dive(
             
             if confidence:
                 ci_low, ci_high = confidence
-                print(f"\nConfidence Interval (95%):")
+                ci_width = ci_high - ci_low
+                
+                # Get actual confidence level from model
+                confidence_pct = 95  # Default
+                if hasattr(model, 'confidence_level'):
+                    confidence_pct = int(model.confidence_level * 100)
+                
+                print(f"\nConfidence Interval ({confidence_pct}%):")
                 print(f"  Lower Bound:  {ci_low:.2f} W")
                 print(f"  Upper Bound:  {ci_high:.2f} W")
-                print(f"  Width:        {ci_high - ci_low:.2f} W")
-                print(f"\n  Interpretation: The model predicts with 95% confidence that")
+                print(f"  Width:        {ci_width:.2f} W")
+                print(f"\n  Interpretation: The model predicts with {confidence_pct}% confidence that")
                 print(f"  the true power consumption is between {ci_low:.1f}W and {ci_high:.1f}W")
     
     except Exception as e:

@@ -290,9 +290,11 @@ class ModelLoader:
                                 poly_transformer = pipeline.named_steps['poly']
                                 n_output_features = poly_transformer.n_output_features_
                                 if len(importances) == n_output_features:
-                                    # Sum importances for polynomial terms back to original features
-                                    # This is a simplification
-                                    feature_names = model.feature_names
+                                    # Note: This is a simplification that only uses linear term importances
+                                    # Proper aggregation would sum importances of all polynomial terms
+                                    # (e.g., x, x^2 for a single feature), but that requires
+                                    # understanding the polynomial feature transformation structure.
+                                    # For now, we only show importance of the first len(feature_names) features.
                                     importances = importances[:len(feature_names)]
                             
                             for name, importance in zip(feature_names, importances):
