@@ -442,7 +442,7 @@ class ResultsExporter:
 
             # Query power samples over time to calculate standard deviation
             # Note: stdev requires at least 2 values; if 0 or 1 values, power_stdev remains 0.0
-            power_query = f'sum(rapl_power_watts{{zone=~"package.*"}})'
+            power_query = 'sum(rapl_power_watts{zone=~"package.*"})'
             power_data = self.client.query_range(power_query, start, end, step="5s")
             power_values = _extract_values(power_data)
             if power_values and len(power_values) > 1:
@@ -542,7 +542,7 @@ class ResultsExporter:
             success = self.predictor.fit(scenarios, target='mean_power_watts')
             if success:
                 self.predictor_trained = True
-                print(f"✓ ML predictor trained successfully")
+                print("✓ ML predictor trained successfully")
                 info = self.predictor.get_model_info()
                 print(
                     f"  Best model: {info.get('best_model', 'unknown')} (R²={info.get('best_score', {}).get('r2', 0):.4f})"
