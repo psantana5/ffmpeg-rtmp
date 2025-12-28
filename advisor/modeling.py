@@ -7,6 +7,93 @@ transcoding workload characteristics (e.g., number of concurrent streams).
 The PowerPredictor class trains regression models on historical measurements
 and predicts power consumption for untested stream counts, enabling capacity
 planning and energy-aware scaling decisions.
+
+Mathematical Model
+==================
+
+Linear Regression (< 6 unique stream counts):
+    Power(streams) = β₀ + β₁ × streams
+    
+    Where:
+    - β₀ (intercept): Baseline power consumption (idle/overhead)
+    - β₁ (coefficient): Incremental power per additional stream
+    - streams: Number of concurrent transcoding streams
+
+Polynomial Regression (≥ 6 unique stream counts):
+    Power(streams) = β₀ + β₁ × streams + β₂ × streams²
+    
+    Where:
+    - β₀ (intercept): Baseline power consumption
+    - β₁ (linear coefficient): Linear component of power scaling
+    - β₂ (quadratic coefficient): Captures non-linear scaling effects
+    - streams: Number of concurrent transcoding streams
+    
+    The quadratic term captures effects like:
+    - Thermal throttling at high loads
+    - Cache contention and memory bandwidth saturation
+    - CPU frequency scaling behavior
+
+Data Requirements
+=================
+
+Input Data (from ResultsAnalyzer scenarios):
+    - Scenario name: String containing stream count information
+      Examples: "4 Streams @ 2500k", "8 streams @ 1080p"
+    - Power data: Dictionary with 'mean_watts' key
+      Example: {'mean_watts': 150.0}
+
+Training Data Structure:
+    - List of (streams: int, power: float) tuples
+    - Minimum: 1 data point (will train, but predictions may be poor)
+    - Recommended: 4+ data points for linear, 7+ for polynomial
+    - Missing power data is automatically filtered out
+
+Model Selection Logic:
+    - If unique_stream_counts < 6: Use Linear Regression
+      Rationale: Insufficient data for reliable polynomial fitting
+    - If unique_stream_counts ≥ 6: Use Polynomial Regression (degree=2)
+      Rationale: Enough data to capture non-linear power scaling
+
+Prediction Methodology
+======================
+
+The model uses scikit-learn's LinearRegression with optional polynomial
+feature transformation:
+
+1. Training Phase (fit method):
+   - Parse scenario names to extract stream counts
+   - Filter scenarios with valid power measurements
+   - Create feature matrix X (stream counts) and target vector y (power)
+   - For polynomial: Transform X using PolynomialFeatures(degree=2)
+   - Fit LinearRegression to transformed features
+   - Calculate R² score to assess model quality
+
+2. Prediction Phase (predict method):
+   - Accept arbitrary stream count as input
+   - For polynomial: Apply same feature transformation
+   - Use trained model to predict power consumption
+   - Clamp predictions to non-negative values (physical constraint)
+
+Limitations and Caveats
+========================
+
+1. Assumes consistent hardware and configuration across measurements
+2. Does not account for:
+   - Different video codecs (H.264 vs H.265 vs AV1)
+   - Different resolutions or bitrates per stream
+   - Ambient temperature effects on thermal throttling
+   - Power management settings (governor, turbo boost)
+3. Extrapolation beyond training range may be unreliable
+4. Small datasets (< 3 points) will have poor prediction quality
+5. Model assumes power scales primarily with stream count, not other factors
+
+Use Cases
+=========
+
+1. Capacity Planning: Predict power for N concurrent streams
+2. Cost Estimation: Estimate energy costs for different workload sizes
+3. Thermal Management: Identify safe operating limits before testing
+4. Infrastructure Sizing: Determine power requirements for target throughput
 """
 
 import logging
@@ -24,16 +111,31 @@ class PowerPredictor:
     """
     Predicts power consumption based on number of concurrent streams.
     
-    This class:
+    This class implements a machine learning model for predicting system power
+    consumption as a function of transcoding workload (measured in concurrent streams).
+    
+    Architecture:
     1. Extracts stream counts from scenario names (e.g., "4 Streams @ 2500k" → 4)
     2. Trains a regression model on measured power vs stream count
     3. Automatically switches to polynomial regression (degree=2) if enough data
     4. Predicts power for arbitrary stream counts
     
+    Model Selection:
+    - Linear regression: Used when < 6 unique stream counts (simpler, more stable)
+    - Polynomial regression (degree=2): Used when ≥ 6 unique stream counts
+      (captures non-linear effects like thermal throttling)
+    
     Design principles:
     - Graceful degradation: falls back to linear if insufficient data
     - Robust parsing: handles various scenario name formats
     - Production-ready: handles edge cases and missing data
+    - Physical constraints: predictions are clamped to non-negative values
+    
+    Attributes:
+        model: sklearn LinearRegression model (None until trained)
+        poly_features: sklearn PolynomialFeatures transformer (None if linear)
+        is_polynomial: bool indicating if polynomial regression is used
+        training_data: List of (streams, power) tuples used for training
     
     Example:
         >>> predictor = PowerPredictor()
@@ -47,7 +149,12 @@ class PowerPredictor:
     """
     
     def __init__(self):
-        """Initialize the power predictor."""
+        """
+        Initialize the power predictor.
+        
+        Creates an untrained predictor with default settings.
+        Call fit() with training data before making predictions.
+        """
         self.model = None
         self.poly_features = None
         self.is_polynomial = False
@@ -95,23 +202,80 @@ class PowerPredictor:
         """
         Train the power prediction model on scenario data.
         
-        This method:
-        1. Extracts (streams, power) pairs from scenarios
-        2. Filters out scenarios without power data or stream counts
-        3. Trains linear regression by default
-        4. Switches to polynomial (degree=2) if >= 6 unique stream counts
+        Training Algorithm:
+        -------------------
+        1. Data Extraction:
+           - Parse each scenario name to infer stream count
+           - Extract mean_watts from power measurements
+           - Filter out scenarios missing either value
+        
+        2. Feature Engineering:
+           - X (features): Stream counts as 1D array [n_samples, 1]
+           - y (target): Mean power measurements as 1D array [n_samples]
+        
+        3. Model Selection:
+           - Count unique stream values in training data
+           - If unique_streams < 6: Use Linear Regression
+             Formula: Power = β₀ + β₁ × streams
+           - If unique_streams ≥ 6: Use Polynomial Regression (degree=2)
+             Formula: Power = β₀ + β₁ × streams + β₂ × streams²
+        
+        4. Model Training:
+           - For polynomial: Transform X to [1, streams, streams²]
+           - Fit LinearRegression using ordinary least squares (OLS)
+           - OLS minimizes: Σ(y_true - y_pred)²
+        
+        5. Model Validation:
+           - Calculate R² score: R² = 1 - (SS_res / SS_tot)
+             Where SS_res = Σ(y_true - y_pred)²
+                   SS_tot = Σ(y_true - y_mean)²
+           - R² ranges from -∞ to 1 (1 = perfect fit)
+           - Log R² for model quality assessment
+        
+        Data Requirements:
+        ------------------
+        - Minimum: 1 scenario with valid stream count and power data
+        - Recommended: 4+ for linear, 7+ for polynomial
+        - Each scenario dict must have:
+          * 'name': String with stream count information
+          * 'power': Dict with 'mean_watts' key (float)
+        
+        Edge Cases Handled:
+        -------------------
+        - Missing 'power' key: Scenario skipped
+        - None or missing 'mean_watts': Scenario skipped
+        - Cannot infer stream count: Scenario skipped, debug logged
+        - Zero valid scenarios: Returns False, warning logged
         
         Args:
-            scenarios: List of scenario dicts from ResultsAnalyzer
+            scenarios: List of scenario dicts from ResultsAnalyzer.
+                      Each dict should contain:
+                      - 'name': str (e.g., "4 Streams @ 2500k")
+                      - 'power': {'mean_watts': float}
             
         Returns:
-            True if model was trained successfully, False otherwise
+            True if model was trained successfully (>0 valid data points),
+            False if no valid training data found.
+            
+        Side Effects:
+            - Sets self.model to trained LinearRegression
+            - Sets self.poly_features (if polynomial) or None (if linear)
+            - Sets self.is_polynomial flag
+            - Stores training_data as list of (streams, power) tuples
+            - Logs training progress and R² score
             
         Example:
             >>> predictor = PowerPredictor()
+            >>> scenarios = [
+            ...     {'name': '2 Streams @ 2500k', 'power': {'mean_watts': 80.0}},
+            ...     {'name': '4 Streams @ 2500k', 'power': {'mean_watts': 150.0}},
+            ...     {'name': '8 Streams @ 2500k', 'power': {'mean_watts': 280.0}},
+            ... ]
             >>> success = predictor.fit(scenarios)
             >>> if success:
             ...     print(f"Model trained on {len(predictor.training_data)} data points")
+            ...     info = predictor.get_model_info()
+            ...     print(f"Model type: {info['model_type']}")
         """
         # Extract (streams, power) pairs
         training_pairs = []
@@ -187,16 +351,84 @@ class PowerPredictor:
         """
         Predict power consumption for a given number of streams.
         
+        Prediction Algorithm:
+        ---------------------
+        1. Input Validation:
+           - Check if model is trained (self.model is not None)
+           - Return None if untrained
+        
+        2. Feature Preparation:
+           - Create feature array: X = [[streams]]
+           - For polynomial model: Transform to [1, streams, streams²]
+             Using PolynomialFeatures.transform()
+           - For linear model: Use raw stream count
+        
+        3. Prediction:
+           - Linear: Power = β₀ + β₁ × streams
+           - Polynomial: Power = β₀ + β₁ × streams + β₂ × streams²
+           - Where β coefficients were learned during training
+        
+        4. Post-Processing:
+           - Clamp prediction to non-negative values: max(0, prediction)
+           - Rationale: Physical constraint (power cannot be negative)
+           - This handles edge cases like predicting for 0 streams
+        
+        Interpolation vs Extrapolation:
+        --------------------------------
+        - Interpolation (within training range): Generally reliable
+          Example: Trained on [2, 4, 8] streams, predict for 6 streams
+        
+        - Extrapolation (outside training range): Use with caution
+          Example: Trained on [2, 4, 8] streams, predict for 16 streams
+          
+          Risks:
+          * Linear model: Assumes constant power per stream (may diverge)
+          * Polynomial model: Can diverge rapidly outside training range
+          * Real systems: May have thermal limits, throttling not in model
+        
+        Recommended Usage:
+        ------------------
+        - Best: Predict within or near training range
+        - Acceptable: Predict within 2x max training stream count
+        - Caution: Predict beyond 2x max training stream count
+        
+        Physical Interpretation:
+        ------------------------
+        The predicted power represents the expected system-wide power
+        consumption (CPU package + DRAM) when transcoding N concurrent
+        streams with similar characteristics to training data.
+        
+        This does NOT account for:
+        - Different codec settings (preset, tune, etc.)
+        - Different resolutions or bitrates per stream
+        - Ambient temperature effects
+        - Power management policy changes
+        
         Args:
-            streams: Number of concurrent streams
+            streams: Number of concurrent transcoding streams (integer).
+                    Can be any non-negative integer, though extrapolation
+                    beyond training range is less reliable.
             
         Returns:
-            Predicted mean power in watts, or None if model not trained
+            Predicted mean power consumption in watts (float), or None if
+            model has not been trained. Predictions are guaranteed to be
+            non-negative due to physical constraint clamping.
+            
+        Raises:
+            No exceptions raised. Returns None for untrained model.
             
         Example:
-            >>> power = predictor.predict(8)
-            >>> if power:
-            ...     print(f"8 streams: {power:.2f} W")
+            >>> predictor = PowerPredictor()
+            >>> scenarios = [...]  # Training data
+            >>> predictor.fit(scenarios)
+            >>> 
+            >>> # Interpolation (reliable)
+            >>> power_6 = predictor.predict(6)
+            >>> print(f"6 streams: {power_6:.2f} W")
+            >>> 
+            >>> # Extrapolation (use with caution)
+            >>> power_16 = predictor.predict(16)
+            >>> print(f"16 streams (extrapolated): {power_16:.2f} W")
         """
         if self.model is None:
             logger.warning("PowerPredictor not trained yet")
