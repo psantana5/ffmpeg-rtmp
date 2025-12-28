@@ -42,7 +42,7 @@ The test suite is organized into focused test files, each covering a specific mo
 | `test_scoring.py` | `advisor.scoring` | Energy efficiency scoring algorithms (throughput-per-watt, pixels-per-joule) | 11 tests |
 | `test_recommender.py` | `advisor.recommender` | Configuration ranking and recommendation logic | 11 tests |
 | `test_modeling.py` | `advisor.modeling` | Simple power prediction model (PowerPredictor v0.1) | 14 tests |
-| `test_multivariate_modeling.py` | `advisor.multivariate` | Advanced multivariate power prediction (MultivariatePredictor v0.2) | 22 tests |
+| `test_multivariate_modeling.py` | `advisor.modeling` | Advanced multivariate power prediction (MultivariatePredictor v0.2) | 22 tests |
 | `test_output_ladder.py` | Output ladder support | Multi-resolution transcoding and pixel-based scoring | 18 tests |
 | `test_results_exporter.py` | `results-exporter/` | Prometheus metrics export and feature extraction | 9 tests |
 | `test_integration.py` | End-to-end | Integration tests with the analysis pipeline | 9 tests |
