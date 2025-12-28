@@ -679,8 +679,9 @@ class ResultsAnalyzer:
         
         This method displays:
         1. Model metadata (type, training samples, stream range)
-        2. Predicted power for standard stream counts (1, 2, 4, 8, 12)
-        3. Comparison table showing measured vs predicted for training data
+        2. Model quality metrics (R², RMSE, MAE, cross-validation)
+        3. Predicted power for standard stream counts (1, 2, 4, 8, 12)
+        4. Comparison table showing measured vs predicted for training data
         
         The comparison table helps assess model quality by showing how well
         predictions match actual measurements on training data. Large differences
@@ -710,6 +711,28 @@ class ResultsAnalyzer:
         if model_info['stream_range']:
             min_s, max_s = model_info['stream_range']
             print(f"Stream Range: {min_s} - {max_s} streams")
+        
+        # Display model quality metrics
+        print(f"\nModel Quality Metrics:")
+        print(f"  R² Score: {model_info['r2_score']:.4f}")
+        if model_info['r2_score'] >= 0.9:
+            quality = "Excellent"
+        elif model_info['r2_score'] >= 0.7:
+            quality = "Good"
+        elif model_info['r2_score'] >= 0.5:
+            quality = "Moderate"
+        else:
+            quality = "Poor"
+        print(f"    (Interpretation: {quality} fit)")
+        print(f"  RMSE: {model_info['rmse']:.2f} W")
+        print(f"  MAE: {model_info['mae']:.2f} W")
+        
+        # Display cross-validation results if available
+        if model_info['cv_scores']:
+            cv = model_info['cv_scores']
+            print(f"\nCross-Validation ({cv['n_folds']}-fold):")
+            print(f"  RMSE: {cv['rmse_mean']:.2f} ± {cv['rmse_std']:.2f} W")
+            print(f"  (Tests model generalization to unseen data)")
         
         # Predict for key stream counts (standard capacity planning points)
         # These represent typical workload sizes: single stream, small (2-4),
@@ -746,7 +769,7 @@ class ResultsAnalyzer:
         measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
         
         # Print comparison table header
-        print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12}")
+        print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12} {'% Error':<10}")
         print("─" * 100)
         
         # Show all measured stream counts with predictions
@@ -754,12 +777,14 @@ class ResultsAnalyzer:
             measured = measured_avg[streams]
             predicted = predictor.predict(streams)
             diff = predicted - measured if predicted is not None else None
+            pct_error = (abs(diff) / measured * 100) if diff is not None and measured > 0 else None
             
             measured_str = f"{measured:.2f}"
             predicted_str = f"{predicted:.2f}" if predicted is not None else "N/A"
             diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
+            pct_str = f"{pct_error:.1f}%" if pct_error is not None else "N/A"
             
-            print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12}")
+            print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12} {pct_str:<10}")
         
         print("─" * 100)
 
@@ -840,6 +865,38 @@ class ResultsAnalyzer:
                 writer.writerow(row)
 
         logger.info(f"CSV exported to {output_file}")
+    
+    def export_model_metadata(self, predictor, output_file: str = None):
+        """
+        Export model metadata to JSON for observability and integration.
+        
+        This file can be used by:
+        - Prometheus exporters to expose model quality metrics
+        - Grafana dashboards to display model performance
+        - CI/CD pipelines to track model drift
+        
+        Args:
+            predictor: Trained PowerPredictor instance
+            output_file: Output path (default: test_results/model_metadata.json)
+        """
+        if output_file is None:
+            output_file = self.results_file.parent / "model_metadata.json"
+        
+        model_info = predictor.get_model_info()
+        
+        # Add additional context
+        metadata = {
+            'model_info': model_info,
+            'hardware': self.hardware_metadata,
+            'timestamp': self.results_file.stem.replace('test_results_', ''),
+            'results_file': str(self.results_file.name),
+            'model_version': '1.0',  # Versioning for model evolution tracking
+        }
+        
+        with open(output_file, 'w') as f:
+            json.dump(metadata, f, indent=2, default=str)
+        
+        logger.info(f"Model metadata exported to {output_file}")
 
 
 def main():
@@ -879,6 +936,9 @@ def main():
         
         # Export CSV with predictions
         analyzer.export_csv(predictor=predictor)
+        
+        # Export model metadata for observability
+        analyzer.export_model_metadata(predictor)
         
         return 0
     except Exception as e:

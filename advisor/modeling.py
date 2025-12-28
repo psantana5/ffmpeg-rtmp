@@ -33,6 +33,39 @@ Polynomial Regression (≥ 6 unique stream counts):
     - Cache contention and memory bandwidth saturation
     - CPU frequency scaling behavior
 
+Model Quality Metrics
+=====================
+
+R² (Coefficient of Determination):
+    R² = 1 - (SS_res / SS_tot)
+    Range: (-∞, 1], where 1 = perfect fit
+    Interpretation:
+    - R² > 0.9: Excellent fit
+    - R² > 0.7: Good fit
+    - R² > 0.5: Moderate fit
+    - R² < 0.5: Poor fit
+
+RMSE (Root Mean Squared Error):
+    RMSE = √(Σ(y_true - y_pred)² / n)
+    Units: Same as target (watts)
+    Interpretation: Average prediction error magnitude
+
+MAE (Mean Absolute Error):
+    MAE = Σ|y_true - y_pred| / n
+    Units: Same as target (watts)
+    Interpretation: Average absolute prediction error
+
+Cross-Validation
+================
+
+K-Fold Cross-Validation (when n_samples >= 5):
+    - Splits data into k folds (default k=3 for small datasets, k=5 for larger)
+    - Trains on k-1 folds, validates on remaining fold
+    - Repeats k times with different validation fold
+    - Reports mean and std of CV scores
+    
+Purpose: Detect overfitting and assess generalization
+
 Data Requirements
 =================
 
@@ -66,7 +99,8 @@ feature transformation:
    - Create feature matrix X (stream counts) and target vector y (power)
    - For polynomial: Transform X using PolynomialFeatures(degree=2)
    - Fit LinearRegression to transformed features
-   - Calculate R² score to assess model quality
+   - Calculate quality metrics (R², RMSE, MAE)
+   - Optionally perform cross-validation
 
 2. Prediction Phase (predict method):
    - Accept arbitrary stream count as input
@@ -102,6 +136,8 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import PolynomialFeatures
 
 logger = logging.getLogger(__name__)
@@ -159,6 +195,12 @@ class PowerPredictor:
         self.poly_features = None
         self.is_polynomial = False
         self.training_data = []  # Store (streams, power) tuples
+        
+        # Model quality metrics (computed during fit)
+        self.r2_score = None
+        self.rmse = None
+        self.mae = None
+        self.cv_scores = None  # Cross-validation scores (if computed)
         
     def _infer_stream_count(self, scenario_name: str) -> Optional[int]:
         """
@@ -323,6 +365,7 @@ class PowerPredictor:
             X_poly = self.poly_features.fit_transform(X)
             self.model = LinearRegression()
             self.model.fit(X_poly, y)
+            X_transformed = X_poly
         else:
             # Use linear regression for small datasets
             logger.info(f"Using linear regression with {unique_streams} unique stream counts")
@@ -330,20 +373,53 @@ class PowerPredictor:
             self.poly_features = None
             self.model = LinearRegression()
             self.model.fit(X, y)
+            X_transformed = X
         
-        # Log model statistics
-        if self.is_polynomial:
-            X_transformed = self.poly_features.transform(X)
-            y_pred = self.model.predict(X_transformed)
-        else:
-            y_pred = self.model.predict(X)
+        # Calculate model quality metrics
+        y_pred = self.model.predict(X_transformed)
         
-        # Calculate R² score
-        ss_res = np.sum((y - y_pred) ** 2)
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
-        r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+        # R² score (coefficient of determination)
+        self.r2_score = r2_score(y, y_pred)
         
-        logger.info(f"PowerPredictor trained on {len(training_pairs)} data points, R² = {r2:.4f}")
+        # RMSE (Root Mean Squared Error)
+        self.rmse = np.sqrt(mean_squared_error(y, y_pred))
+        
+        # MAE (Mean Absolute Error)
+        self.mae = mean_absolute_error(y, y_pred)
+        
+        logger.info(
+            f"PowerPredictor trained on {len(training_pairs)} data points: "
+            f"R²={self.r2_score:.4f}, RMSE={self.rmse:.2f}W, MAE={self.mae:.2f}W"
+        )
+        
+        # Perform cross-validation if enough data
+        if len(training_pairs) >= 5:
+            # Use 3-fold CV for smaller datasets, 5-fold for larger
+            n_folds = 3 if len(training_pairs) < 10 else 5
+            
+            try:
+                # Negative MSE scoring (sklearn convention: higher is better)
+                cv_scores = cross_val_score(
+                    self.model,
+                    X_transformed,
+                    y,
+                    cv=n_folds,
+                    scoring='neg_mean_squared_error'
+                )
+                # Convert to positive RMSE
+                self.cv_scores = {
+                    'rmse_mean': np.sqrt(-cv_scores.mean()),
+                    'rmse_std': np.sqrt(cv_scores.std()),
+                    'n_folds': n_folds
+                }
+                logger.info(
+                    f"Cross-validation ({n_folds}-fold): "
+                    f"RMSE={self.cv_scores['rmse_mean']:.2f} ± "
+                    f"{self.cv_scores['rmse_std']:.2f}W"
+                )
+            except Exception as e:
+                logger.warning(f"Cross-validation failed: {e}")
+                self.cv_scores = None
         
         return True
     
@@ -446,14 +522,21 @@ class PowerPredictor:
     
     def get_model_info(self) -> Dict:
         """
-        Get information about the trained model.
+        Get comprehensive information about the trained model.
         
         Returns:
-            Dict with model metadata:
-                - 'trained': bool
+            Dict with model metadata and quality metrics:
+                - 'trained': bool - Whether model is trained
                 - 'model_type': 'linear' or 'polynomial'
-                - 'n_samples': number of training samples
-                - 'stream_range': (min, max) stream counts in training data
+                - 'n_samples': int - Number of training samples
+                - 'stream_range': tuple(int, int) - (min, max) stream counts
+                - 'r2_score': float - R² coefficient of determination
+                - 'rmse': float - Root mean squared error (watts)
+                - 'mae': float - Mean absolute error (watts)
+                - 'cv_scores': dict - Cross-validation results (if computed)
+                    - 'rmse_mean': float - Mean CV RMSE
+                    - 'rmse_std': float - Std of CV RMSE
+                    - 'n_folds': int - Number of CV folds
         """
         if self.model is None:
             return {
@@ -461,6 +544,10 @@ class PowerPredictor:
                 'model_type': None,
                 'n_samples': 0,
                 'stream_range': None,
+                'r2_score': None,
+                'rmse': None,
+                'mae': None,
+                'cv_scores': None,
             }
         
         streams = [s for s, _ in self.training_data]
@@ -470,4 +557,8 @@ class PowerPredictor:
             'model_type': 'polynomial' if self.is_polynomial else 'linear',
             'n_samples': len(self.training_data),
             'stream_range': (min(streams), max(streams)) if streams else None,
+            'r2_score': self.r2_score,
+            'rmse': self.rmse,
+            'mae': self.mae,
+            'cv_scores': self.cv_scores,
         }
