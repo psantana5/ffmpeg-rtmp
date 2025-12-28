@@ -91,8 +91,9 @@ class ModelRetrainer:
             hardware_id = f"{cpu_id}_{os_name}"
             
             # Truncate if too long
-            if len(hardware_id) > 100:
-                hardware_id = hardware_id[:100]
+            MAX_HARDWARE_ID_LENGTH = 100
+            if len(hardware_id) > MAX_HARDWARE_ID_LENGTH:
+                hardware_id = hardware_id[:MAX_HARDWARE_ID_LENGTH]
             
             return hardware_id
         except Exception as e:

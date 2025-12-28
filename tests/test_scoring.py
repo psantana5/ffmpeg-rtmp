@@ -159,8 +159,8 @@ class TestEnergyEfficiencyScorer:
         
         # compute_quality_adjusted_score is now implemented
         result = scorer.compute_quality_adjusted_score(scenario, vmaf_score=85.0, psnr_score=40.0)
-        # Should return a score (not raise NotImplementedError)
-        assert result is not None or result is None  # May be None if validation fails
+        # Should return a valid score when scenario has required data
+        assert isinstance(result, (float, type(None)))
         
         # These are still not implemented
         with pytest.raises(NotImplementedError):
