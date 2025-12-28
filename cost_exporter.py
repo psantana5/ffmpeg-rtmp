@@ -12,7 +12,7 @@ Metrics exported:
 - cost_per_watch_hour: Cost per viewer watch hour
 
 Usage:
-    python3 cost_exporter.py --port 9503 --energy-cost 0.12 --cpu-cost 0.50
+    python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
 """
 
 import argparse

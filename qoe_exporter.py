@@ -13,7 +13,7 @@ Metrics exported:
 - qoe_computation_duration_seconds: Time taken to compute quality metrics
 
 Usage:
-    python3 qoe_exporter.py --port 9502
+    python3 qoe_exporter.py --port 9503
 """
 
 import argparse
