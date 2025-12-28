@@ -5,14 +5,17 @@ Queries Prometheus and generates comprehensive reports
 Includes energy-aware transcoding recommendations
 """
 
+import argparse
 import csv
 import json
 import logging
+import os
 import statistics
-import sys
+import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import requests
 
 from advisor import PowerPredictor, TranscodingRecommender
@@ -22,6 +25,111 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def filter_outliers_iqr(values: List[float], factor: float = 1.5) -> Tuple[List[float], int]:
+    """
+    Filter outliers using IQR (Interquartile Range) method.
+    
+    Args:
+        values: List of numeric values
+        factor: IQR multiplier for outlier threshold (default 1.5 = standard)
+                Higher values are more permissive
+    
+    Returns:
+        Tuple of (filtered_values, num_outliers_removed)
+    """
+    if len(values) < 4:  # Need at least 4 values for meaningful IQR
+        return values, 0
+    
+    arr = np.array(values)
+    q1 = np.percentile(arr, 25)
+    q3 = np.percentile(arr, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered = arr[(arr >= lower_bound) & (arr <= upper_bound)]
+    num_outliers = len(values) - len(filtered)
+    
+    if num_outliers > 0:
+        logger.info(f"Filtered {num_outliers} outliers from {len(values)} samples "
+                   f"(bounds: {lower_bound:.2f} - {upper_bound:.2f})")
+    
+    return filtered.tolist(), num_outliers
+
+
+def get_hardware_metadata() -> Dict:
+    """
+    Capture hardware and environment metadata for reproducibility.
+    
+    Returns:
+        Dict with hardware information including:
+        - cpu_model: CPU model name
+        - cpu_count: Number of logical CPUs
+        - cpu_freq_mhz: Current CPU frequency (if available)
+        - ffmpeg_version: FFmpeg version string
+        - kernel_version: Linux kernel version
+    """
+    metadata = {}
+    
+    # CPU model
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if 'model name' in line:
+                    metadata['cpu_model'] = line.split(':')[1].strip()
+                    break
+    except Exception as e:
+        logger.debug(f"Could not read CPU model: {e}")
+        metadata['cpu_model'] = 'unknown'
+    
+    # CPU count
+    try:
+        metadata['cpu_count'] = os.cpu_count()
+    except Exception:
+        metadata['cpu_count'] = None
+    
+    # CPU frequency
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if 'cpu MHz' in line:
+                    metadata['cpu_freq_mhz'] = float(line.split(':')[1].strip())
+                    break
+    except Exception:
+        metadata['cpu_freq_mhz'] = None
+    
+    # FFmpeg version
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            # Extract first line (version info)
+            metadata['ffmpeg_version'] = result.stdout.split('\n')[0]
+    except Exception as e:
+        logger.debug(f"Could not get FFmpeg version: {e}")
+        metadata['ffmpeg_version'] = 'unknown'
+    
+    # Kernel version
+    try:
+        result = subprocess.run(
+            ['uname', '-r'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            metadata['kernel_version'] = result.stdout.strip()
+    except Exception:
+        metadata['kernel_version'] = 'unknown'
+    
+    return metadata
 
 
 class PrometheusClient:
@@ -78,10 +186,27 @@ class ResultsAnalyzer:
             self.data = json.load(f)
         
         self.scenarios = self.data.get('scenarios', [])
+        
+        # Capture hardware metadata for reproducibility
+        self.hardware_metadata = get_hardware_metadata()
+        logger.info(f"Hardware: {self.hardware_metadata.get('cpu_model', 'unknown')}")
+        
         logger.info(f"Loaded {len(self.scenarios)} scenarios from {results_file}")
     
-    def get_metric_stats(self, data: Optional[Dict]) -> Optional[Dict]:
-        """Calculate statistics from metric data"""
+    def get_metric_stats(
+        self, data: Optional[Dict], filter_outliers: bool = True
+    ) -> Optional[Dict]:
+        """
+        Calculate statistics from metric data with optional outlier filtering.
+        
+        Args:
+            data: Prometheus query result
+            filter_outliers: If True, applies IQR-based outlier filtering
+        
+        Returns:
+            Dict with statistics including mean, median, stdev, min, max, samples
+            Also includes 'outliers_removed' count if filtering was applied
+        """
         if not data or 'data' not in data or 'result' not in data['data']:
             return None
         
@@ -99,7 +224,22 @@ class ResultsAnalyzer:
         if not values:
             return None
         
-        return {
+        outliers_removed = 0
+        if filter_outliers and len(values) >= 4:
+            values, outliers_removed = filter_outliers_iqr(values)
+            
+            if not values:  # All values were outliers (shouldn't happen with reasonable data)
+                logger.warning("All values filtered as outliers, using original data")
+                # Re-extract values without filtering
+                values = []
+                for result in results:
+                    if 'values' in result:
+                        values.extend([float(v[1]) for v in result['values']])
+                    elif 'value' in result:
+                        values.append(float(result['value'][1]))
+                outliers_removed = 0
+        
+        stats = {
             'mean': statistics.mean(values),
             'median': statistics.median(values),
             'stdev': statistics.stdev(values) if len(values) > 1 else 0,
@@ -107,6 +247,11 @@ class ResultsAnalyzer:
             'max': max(values),
             'samples': len(values)
         }
+        
+        if filter_outliers:
+            stats['outliers_removed'] = outliers_removed
+        
+        return stats
 
     def get_instant_value(self, data: Optional[Dict]) -> Optional[float]:
         if not data or 'data' not in data or 'result' not in data['data']:
@@ -534,8 +679,9 @@ class ResultsAnalyzer:
         
         This method displays:
         1. Model metadata (type, training samples, stream range)
-        2. Predicted power for standard stream counts (1, 2, 4, 8, 12)
-        3. Comparison table showing measured vs predicted for training data
+        2. Model quality metrics (R², RMSE, MAE, cross-validation)
+        3. Predicted power for standard stream counts (1, 2, 4, 8, 12)
+        4. Comparison table showing measured vs predicted for training data
         
         The comparison table helps assess model quality by showing how well
         predictions match actual measurements on training data. Large differences
@@ -565,6 +711,28 @@ class ResultsAnalyzer:
         if model_info['stream_range']:
             min_s, max_s = model_info['stream_range']
             print(f"Stream Range: {min_s} - {max_s} streams")
+        
+        # Display model quality metrics
+        print("\nModel Quality Metrics:")
+        print(f"  R² Score: {model_info['r2_score']:.4f}")
+        if model_info['r2_score'] >= 0.9:
+            quality = "Excellent"
+        elif model_info['r2_score'] >= 0.7:
+            quality = "Good"
+        elif model_info['r2_score'] >= 0.5:
+            quality = "Moderate"
+        else:
+            quality = "Poor"
+        print(f"    (Interpretation: {quality} fit)")
+        print(f"  RMSE: {model_info['rmse']:.2f} W")
+        print(f"  MAE: {model_info['mae']:.2f} W")
+        
+        # Display cross-validation results if available
+        if model_info['cv_scores']:
+            cv = model_info['cv_scores']
+            print(f"\nCross-Validation ({cv['n_folds']}-fold):")
+            print(f"  RMSE: {cv['rmse_mean']:.2f} ± {cv['rmse_std']:.2f} W")
+            print("  (Tests model generalization to unseen data)")
         
         # Predict for key stream counts (standard capacity planning points)
         # These represent typical workload sizes: single stream, small (2-4),
@@ -601,7 +769,10 @@ class ResultsAnalyzer:
         measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
         
         # Print comparison table header
-        print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12}")
+        print(
+            f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} "
+            f"{'Diff (W)':<12} {'% Error':<10}"
+        )
         print("─" * 100)
         
         # Show all measured stream counts with predictions
@@ -609,12 +780,17 @@ class ResultsAnalyzer:
             measured = measured_avg[streams]
             predicted = predictor.predict(streams)
             diff = predicted - measured if predicted is not None else None
+            pct_error = (abs(diff) / measured * 100) if diff is not None and measured > 0 else None
             
             measured_str = f"{measured:.2f}"
             predicted_str = f"{predicted:.2f}" if predicted is not None else "N/A"
             diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
+            pct_str = f"{pct_error:.1f}%" if pct_error is not None else "N/A"
             
-            print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12}")
+            print(
+                f"{streams:<10} {measured_str:<15} {predicted_str:<15} "
+                f"{diff_str:<12} {pct_str:<10}"
+            )
         
         print("─" * 100)
 
@@ -695,17 +871,138 @@ class ResultsAnalyzer:
                 writer.writerow(row)
 
         logger.info(f"CSV exported to {output_file}")
+    
+    def export_model_metadata(self, predictor, output_file: str = None):
+        """
+        Export model metadata to JSON for observability and integration.
+        
+        This file can be used by:
+        - Prometheus exporters to expose model quality metrics
+        - Grafana dashboards to display model performance
+        - CI/CD pipelines to track model drift
+        
+        Args:
+            predictor: Trained PowerPredictor instance
+            output_file: Output path (default: test_results/model_metadata.json)
+        """
+        if output_file is None:
+            output_file = self.results_file.parent / "model_metadata.json"
+        
+        model_info = predictor.get_model_info()
+        
+        # Add additional context
+        metadata = {
+            'model_info': model_info,
+            'hardware': self.hardware_metadata,
+            'timestamp': self.results_file.stem.replace('test_results_', ''),
+            'results_file': str(self.results_file.name),
+            'model_version': '1.0',  # Versioning for model evolution tracking
+        }
+        
+        with open(output_file, 'w') as f:
+            json.dump(metadata, f, indent=2, default=str)
+        
+        logger.info(f"Model metadata exported to {output_file}")
 
 
 def main():
-    if len(sys.argv) < 2:
+    parser = argparse.ArgumentParser(
+        description='Analyze FFmpeg RTMP power monitoring test results',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Analyze most recent results
+  python3 analyze_results.py
+  
+  # Analyze specific file
+  python3 analyze_results.py test_results/test_results_20231215_143022.json
+  
+  # Predict power for custom stream counts
+  python3 analyze_results.py --predict 1,2,4,8,16
+  
+  # Show model details only
+  python3 analyze_results.py --model-only
+  
+  # Export only (no console output)
+  python3 analyze_results.py --quiet --export-csv results.csv
+        '''
+    )
+    
+    parser.add_argument(
+        'results_file',
+        nargs='?',
+        type=Path,
+        help='Path to test results JSON file (default: most recent in test_results/)'
+    )
+    
+    parser.add_argument(
+        '--model',
+        choices=['auto', 'linear', 'polynomial'],
+        default='auto',
+        help='Model type to use (default: auto - selects based on data size)'
+    )
+    
+    parser.add_argument(
+        '--predict',
+        type=str,
+        help='Comma-separated list of stream counts to predict (e.g., "1,2,4,8,16")'
+    )
+    
+    parser.add_argument(
+        '--model-only',
+        action='store_true',
+        help='Show only model information and predictions, skip detailed scenario analysis'
+    )
+    
+    parser.add_argument(
+        '--export-csv',
+        type=Path,
+        metavar='FILE',
+        help='Export results to CSV file (default: auto-generated in same directory as results)'
+    )
+    
+    parser.add_argument(
+        '--export-model-metadata',
+        type=Path,
+        metavar='FILE',
+        help='Export model metadata to JSON file (default: test_results/model_metadata.json)'
+    )
+    
+    parser.add_argument(
+        '--quiet',
+        action='store_true',
+        help='Suppress console output (useful with --export-csv)'
+    )
+    
+    parser.add_argument(
+        '--no-outlier-filter',
+        action='store_true',
+        help='Disable outlier filtering in power measurements'
+    )
+    
+    parser.add_argument(
+        '--prometheus-url',
+        default='http://localhost:9090',
+        help='Prometheus server URL (default: http://localhost:9090)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine results file
+    if args.results_file:
+        results_file = args.results_file
+        if not results_file.exists():
+            logger.error(f"Results file not found: {results_file}")
+            return 1
+    else:
         # Find most recent results file
         results_dir = Path('./test_results')
         if results_dir.exists():
             results_files = sorted(results_dir.glob('test_results_*.json'), reverse=True)
             if results_files:
                 results_file = results_files[0]
-                logger.info(f"Using most recent results file: {results_file}")
+                if not args.quiet:
+                    logger.info(f"Using most recent results file: {results_file}")
             else:
                 logger.error("No results files found in ./test_results")
                 print("Usage: python3 analyze_results.py [results_file.json]")
@@ -714,26 +1011,65 @@ def main():
             logger.error("No results directory found")
             print("Usage: python3 analyze_results.py [results_file.json]")
             return 1
-    else:
-        results_file = Path(sys.argv[1])
-        if not results_file.exists():
-            logger.error(f"Results file not found: {results_file}")
-            return 1
     
     try:
-        analyzer = ResultsAnalyzer(results_file)
+        analyzer = ResultsAnalyzer(results_file, prometheus_url=args.prometheus_url)
         results = analyzer.generate_report()
         
         # Train PowerPredictor on the results
         predictor = PowerPredictor()
         predictor.fit(results)
         
-        # Print summary with power predictions
-        analyzer.print_summary(results)
-        analyzer.print_power_predictions(results, predictor)
+        # Handle custom prediction stream counts
+        custom_predictions = None
+        if args.predict:
+            try:
+                custom_predictions = [int(s.strip()) for s in args.predict.split(',')]
+                if not args.quiet:
+                    logger.info(f"Will predict for custom stream counts: {custom_predictions}")
+            except ValueError:
+                logger.error(f"Invalid --predict format: {args.predict}")
+                return 1
         
-        # Export CSV with predictions
-        analyzer.export_csv(predictor=predictor)
+        # Print output unless quiet mode
+        if not args.quiet:
+            if args.model_only:
+                # Show only model info and predictions
+                analyzer.print_power_predictions(results, predictor)
+                if custom_predictions:
+                    print(f"\n{'─' * 100}")
+                    print("CUSTOM PREDICTIONS")
+                    print("─" * 100)
+                    for streams in custom_predictions:
+                        power = predictor.predict(streams)
+                        if power is not None:
+                            print(f"  {streams:>3} streams: {power:>8.2f} W")
+            else:
+                # Full output
+                analyzer.print_summary(results)
+                analyzer.print_power_predictions(results, predictor)
+                if custom_predictions:
+                    print(f"\n{'─' * 100}")
+                    print("CUSTOM PREDICTIONS")
+                    print("─" * 100)
+                    for streams in custom_predictions:
+                        power = predictor.predict(streams)
+                        if power is not None:
+                            print(f"  {streams:>3} streams: {power:>8.2f} W")
+        
+        # Export CSV if requested
+        if args.export_csv:
+            analyzer.export_csv(output_file=args.export_csv, predictor=predictor)
+        elif not args.quiet:
+            # Default CSV export
+            analyzer.export_csv(predictor=predictor)
+        
+        # Export model metadata
+        if args.export_model_metadata:
+            analyzer.export_model_metadata(predictor, output_file=args.export_model_metadata)
+        elif not args.quiet:
+            # Default model metadata export
+            analyzer.export_model_metadata(predictor)
         
         return 0
     except Exception as e:

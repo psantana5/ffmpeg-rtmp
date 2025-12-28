@@ -1,0 +1,66 @@
+{
+  "scenarios": [
+    {
+      "type": "single",
+      "name": "Baseline (idle system)",
+      "bitrate": "0k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 60,
+      "stabilization": 10,
+      "cooldown": 10
+    },
+    {
+      "type": "single",
+      "name": "Single Stream 720p @ 1Mbps",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "stabilization": 10,
+      "cooldown": 10
+    },
+    {
+      "type": "single",
+      "name": "Single Stream 720p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "stabilization": 10,
+      "cooldown": 10
+    },
+    {
+      "type": "single",
+      "name": "Single Stream 1080p @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 120,
+      "stabilization": 10,
+      "cooldown": 10
+    },
+    {
+      "type": "multi",
+      "name": "2 Concurrent Streams @ 2.5Mbps",
+      "count": 2,
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 120,
+      "stabilization": 10,
+      "cooldown": 10
+    },
+    {
+      "type": "multi",
+      "name": "4 Concurrent Streams @ 2.5Mbps",
+      "count": 4,
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 120,
+      "stabilization": 10,
+      "cooldown": 10
+    }
+  ]
+}

@@ -4,11 +4,10 @@ RAPL Power Monitoring Exporter for Prometheus
 Reads Intel RAPL (Running Average Power Limit) data and exposes as Prometheus metrics
 """
 
-import time
 import os
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from threading import Thread
 
 
 class RAPLReader:

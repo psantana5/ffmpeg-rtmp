@@ -4,11 +4,11 @@ import json
 import os
 import re
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from statistics import mean
 from urllib.parse import urlencode
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 
 def _escape_label_value(value: str) -> str:
