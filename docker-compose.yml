@@ -23,7 +23,7 @@ services:
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
     ports:
       - "9093:9093"
     restart: unless-stopped
@@ -36,7 +36,7 @@ services:
       retries: 3
 
   nginx-exporter:
-    image:  mauricioabreu/nginx-rtmp-exporter
+    image: mauricioabreu/nginx-rtmp-exporter
     container_name: nginx-exporter
     environment:
       - NGINX_RTMP_URL=http://nginx-rtmp/stat
@@ -58,10 +58,10 @@ services:
       - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -141,9 +141,9 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
     ports:
       - "9100:9100"
     restart: unless-stopped
@@ -196,7 +196,7 @@ services:
       - ./qoe_exporter.py:/app/qoe_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
-      - "9503:9503"
+      - "9504:9504"
     restart: unless-stopped
     networks:
       - streaming-net
@@ -219,7 +219,7 @@ services:
       - ./cost_exporter.py:/app/cost_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
-      - "9504:9504"
+      - "9503:9503"
     restart: unless-stopped
     networks:
       - streaming-net
