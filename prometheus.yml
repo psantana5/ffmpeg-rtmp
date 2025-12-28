@@ -52,3 +52,15 @@ scrape_configs:
       - targets: ['results-exporter:9502']
         labels:
           service: 'analysis'
+
+  - job_name: 'qoe-exporter'
+    static_configs:
+      - targets: ['qoe-exporter:9503']
+        labels:
+          service: 'quality'
+
+  - job_name: 'cost-exporter'
+    static_configs:
+      - targets: ['cost-exporter:9504']
+        labels:
+          service: 'cost-analysis'

@@ -18,11 +18,17 @@ Usage:
 import argparse
 import json
 import logging
+import pickle
+import platform
+import shutil
+import statistics
 import platform
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import requests
 
 from advisor import MultivariatePredictor, PowerPredictor
 
@@ -31,6 +37,48 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+class PrometheusClient:
+    """Lightweight Prometheus client for querying metrics."""
+    
+    def __init__(self, base_url: str = 'http://localhost:9090'):
+        self.base_url = base_url
+    
+    def query_range(
+        self, query: str, start: float, end: float, step: str = '5s'
+    ) -> Optional[Dict]:
+        """Execute range query."""
+        url = f"{self.base_url}/api/v1/query_range"
+        params = {
+            'query': query,
+            'start': float(start),
+            'end': float(end),
+            'step': step
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.debug(f"Error querying Prometheus range: {e}")
+            return None
+    
+    def query(self, query: str, ts: float = None) -> Optional[Dict]:
+        """Execute instant query."""
+        url = f"{self.base_url}/api/v1/query"
+        params = {'query': query}
+        if ts is not None:
+            params['time'] = float(ts)
+        
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.debug(f"Error querying Prometheus instant: {e}")
+            return None
 
 
 class ModelRetrainer:
@@ -49,6 +97,8 @@ class ModelRetrainer:
         self,
         results_dir: Path,
         models_dir: Path,
+        hardware_id: Optional[str] = None,
+        prometheus_url: str = 'http://localhost:9090'
         hardware_id: Optional[str] = None
     ):
         """
@@ -58,10 +108,12 @@ class ModelRetrainer:
             results_dir: Directory containing test_results_*.json files
             models_dir: Directory to store trained models
             hardware_id: Hardware identifier (auto-detected if not provided)
+            prometheus_url: Prometheus server URL for enriching data
         """
         self.results_dir = results_dir
         self.models_dir = models_dir
         self.hardware_id = hardware_id or self._detect_hardware_id()
+        self.prometheus_client = PrometheusClient(prometheus_url)
         
         # Create hardware-specific model directory
         self.hardware_model_dir = self.models_dir / self.hardware_id
@@ -134,6 +186,147 @@ class ModelRetrainer:
         
         logger.info(f"Total scenarios loaded: {len(scenarios)}")
         return scenarios
+    
+    def _get_metric_stats(self, data: Optional[Dict]) -> Optional[Dict]:
+        """Calculate statistics from Prometheus metric data."""
+        if not data or 'data' not in data or 'result' not in data['data']:
+            return None
+        
+        results = data['data']['result']
+        if not results:
+            return None
+        
+        values = []
+        for result in results:
+            if 'values' in result:
+                values.extend([float(v[1]) for v in result['values']])
+            elif 'value' in result:
+                values.append(float(result['value'][1]))
+        
+        if not values:
+            return None
+        
+        return {
+            'mean': statistics.mean(values),
+            'median': statistics.median(values),
+            'stdev': statistics.stdev(values) if len(values) > 1 else 0,
+            'min': min(values),
+            'max': max(values),
+        }
+    
+    def _get_instant_value(self, data: Optional[Dict]) -> Optional[float]:
+        """Extract instant value from Prometheus query result."""
+        if not data or 'data' not in data or 'result' not in data['data']:
+            return None
+        results = data['data']['result']
+        if not results:
+            return None
+        value = results[0].get('value')
+        if not value or len(value) < 2:
+            return None
+        try:
+            return float(value[1])
+        except Exception:
+            return None
+    
+    def _get_energy_joules(self, zone_regex: str, start: float, end: float) -> Optional[float]:
+        """Get energy consumption in joules from RAPL."""
+        duration = max(0.0, float(end) - float(start))
+        if duration <= 0:
+            return None
+        window = f"{max(1, int(duration))}s"
+        query = f'sum(increase(rapl_energy_joules_total{{zone=~"{zone_regex}"}}[{window}]))'
+        data = self.prometheus_client.query(query, ts=end)
+        return self._get_instant_value(data)
+    
+    def enrich_scenario_with_power_data(self, scenario: Dict) -> Dict:
+        """
+        Enrich a scenario with power data from Prometheus.
+        
+        Args:
+            scenario: Scenario dict with timestamps
+            
+        Returns:
+            Enriched scenario dict with power measurements
+        """
+        start = scenario.get('start_time')
+        end = scenario.get('end_time')
+        
+        if not start or not end:
+            logger.debug(f"Scenario '{scenario.get('name')}' has no timestamps")
+            return scenario
+        
+        # Query power consumption
+        power_query = 'sum(rapl_power_watts{zone=~"package.*"})'
+        power_data = self.prometheus_client.query_range(power_query, start, end, step='5s')
+        power_stats = self._get_metric_stats(power_data)
+        
+        # Get energy from RAPL counter
+        package_energy_j = self._get_energy_joules('package.*', start, end)
+        
+        if power_stats:
+            duration = end - start
+            mean_power_from_energy = None
+            if package_energy_j is not None and duration > 0:
+                mean_power_from_energy = package_energy_j / duration
+            
+            total_energy_j = None
+            if package_energy_j is not None:
+                total_energy_j = package_energy_j
+            else:
+                total_energy_j = power_stats['mean'] * duration
+            
+            mean_watts = power_stats['mean']
+            if mean_power_from_energy is not None:
+                mean_watts = mean_power_from_energy
+            
+            scenario['power'] = {
+                'mean_watts': round(mean_watts, 2),
+                'median_watts': round(power_stats['median'], 2),
+                'min_watts': round(power_stats['min'], 2),
+                'max_watts': round(power_stats['max'], 2),
+                'stdev_watts': round(power_stats['stdev'], 2),
+                'total_energy_joules': (
+                    round(total_energy_j, 2) if total_energy_j is not None else None
+                ),
+                'total_energy_wh': (
+                    round((total_energy_j / 3600), 4) if total_energy_j is not None else None
+                ),
+            }
+        
+        return scenario
+    
+    def enrich_scenarios(self, scenarios: List[Dict]) -> List[Dict]:
+        """
+        Enrich all scenarios with power data from Prometheus.
+        
+        Args:
+            scenarios: List of scenario dicts
+            
+        Returns:
+            List of enriched scenarios
+        """
+        enriched = []
+        enriched_count = 0
+        
+        logger.info("Enriching scenarios with power data from Prometheus...")
+        
+        for scenario in scenarios:
+            enriched_scenario = self.enrich_scenario_with_power_data(scenario)
+            enriched.append(enriched_scenario)
+            
+            if 'power' in enriched_scenario:
+                enriched_count += 1
+        
+        logger.info(f"Enriched {enriched_count}/{len(scenarios)} scenarios with power data")
+        
+        if enriched_count == 0:
+            logger.warning(
+                "No scenarios were enriched with power data. "
+                "Make sure Prometheus is running and has collected metrics for the test periods."
+            )
+        
+        return enriched
     
     def retrain_power_predictor(self, scenarios: List[Dict]) -> bool:
         """
@@ -305,6 +498,9 @@ class ModelRetrainer:
             logger.error("No scenarios to train on")
             return False
         
+        # Enrich scenarios with power data from Prometheus
+        scenarios = self.enrich_scenarios(scenarios)
+        
         # Train models
         power_success = self.retrain_power_predictor(scenarios)
         multivariate_success = self.retrain_multivariate_predictor(scenarios)
@@ -342,6 +538,12 @@ def main():
         type=str,
         help='Hardware identifier (auto-detected if not provided)'
     )
+    parser.add_argument(
+        '--prometheus-url',
+        type=str,
+        default='http://localhost:9090',
+        help='Prometheus server URL (default: http://localhost:9090)'
+    )
     
     args = parser.parse_args()
     
@@ -357,6 +559,8 @@ def main():
     retrainer = ModelRetrainer(
         results_dir=args.results_dir,
         models_dir=args.models_dir,
+        hardware_id=args.hardware_id,
+        prometheus_url=args.prometheus_url
         hardware_id=args.hardware_id
     )
     

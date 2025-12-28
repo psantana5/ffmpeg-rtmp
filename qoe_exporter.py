@@ -237,8 +237,8 @@ def main():
     parser.add_argument(
         '--port',
         type=int,
-        default=9502,
-        help='Port to listen on (default: 9502)'
+        default=9504,
+        help='Port to listen on (default: 9504)'
     )
     parser.add_argument(
         '--results-dir',
