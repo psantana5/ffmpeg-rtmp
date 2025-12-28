@@ -790,6 +790,7 @@
       "type": "table"
     }
   ],
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
     "ffmpeg",
@@ -821,7 +822,7 @@
           "query": "label_values(results_scenario_mean_power_watts, run_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
