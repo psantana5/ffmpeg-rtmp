@@ -309,7 +309,7 @@ class ExporterHealthChecker:
         if not result.has_metrics:
             result.error_message = "No metrics found"
             status_icon = "!" if not self.use_unicode else "⚠️"
-            logger.warning(f"{status_icon}  {config.name}: No metrics found")
+            logger.warning(f"{status_icon} {config.name}: No metrics found")
             return result
         
         # Check for expected metrics
@@ -323,7 +323,7 @@ class ExporterHealthChecker:
             result.error_message = f"Missing metrics: {', '.join(missing)}"
             status_icon = "!" if not self.use_unicode else "⚠️"
             logger.warning(
-                f"{status_icon}  {config.name}: Missing expected metrics: {', '.join(missing)}"
+                f"{status_icon} {config.name}: Missing expected metrics: {', '.join(missing)}"
             )
         
         # Check for data
@@ -332,7 +332,7 @@ class ExporterHealthChecker:
         if not result.has_data:
             result.error_message = "No data in metrics"
             status_icon = "!" if not self.use_unicode else "⚠️"
-            logger.warning(f"{status_icon}  {config.name}: No data in metrics")
+            logger.warning(f"{status_icon} {config.name}: No data in metrics")
         
         # Log success
         if result.is_healthy:
