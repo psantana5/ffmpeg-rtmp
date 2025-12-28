@@ -658,15 +658,11 @@ class ResultsAnalyzer:
                     row['total_energy_wh'] = r['power']['total_energy_wh']
                 
                 # Add predicted power if predictor is available
-                if predictor:
-                    from advisor.modeling import PowerPredictor
-                    if isinstance(predictor, PowerPredictor):
-                        streams = predictor._infer_stream_count(r['name'])
-                        if streams is not None:
-                            predicted_power = predictor.predict(streams)
-                            row['predicted_mean_power_w'] = predicted_power
-                        else:
-                            row['predicted_mean_power_w'] = None
+                if predictor is not None:
+                    streams = predictor._infer_stream_count(r['name'])
+                    if streams is not None:
+                        predicted_power = predictor.predict(streams)
+                        row['predicted_mean_power_w'] = predicted_power
                     else:
                         row['predicted_mean_power_w'] = None
                 else:
