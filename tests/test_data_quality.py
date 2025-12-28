@@ -2,8 +2,8 @@
 Tests for data quality improvements: outlier detection, hardware metadata, etc.
 """
 
-import pytest
 import numpy as np
+
 from analyze_results import filter_outliers_iqr, get_hardware_metadata
 
 
