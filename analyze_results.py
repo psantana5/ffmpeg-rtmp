@@ -9,10 +9,12 @@ import csv
 import json
 import logging
 import statistics
+import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import requests
 
 from advisor import PowerPredictor, TranscodingRecommender
@@ -22,6 +24,112 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def filter_outliers_iqr(values: List[float], factor: float = 1.5) -> Tuple[List[float], int]:
+    """
+    Filter outliers using IQR (Interquartile Range) method.
+    
+    Args:
+        values: List of numeric values
+        factor: IQR multiplier for outlier threshold (default 1.5 = standard)
+                Higher values are more permissive
+    
+    Returns:
+        Tuple of (filtered_values, num_outliers_removed)
+    """
+    if len(values) < 4:  # Need at least 4 values for meaningful IQR
+        return values, 0
+    
+    arr = np.array(values)
+    q1 = np.percentile(arr, 25)
+    q3 = np.percentile(arr, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered = arr[(arr >= lower_bound) & (arr <= upper_bound)]
+    num_outliers = len(values) - len(filtered)
+    
+    if num_outliers > 0:
+        logger.info(f"Filtered {num_outliers} outliers from {len(values)} samples "
+                   f"(bounds: {lower_bound:.2f} - {upper_bound:.2f})")
+    
+    return filtered.tolist(), num_outliers
+
+
+def get_hardware_metadata() -> Dict:
+    """
+    Capture hardware and environment metadata for reproducibility.
+    
+    Returns:
+        Dict with hardware information including:
+        - cpu_model: CPU model name
+        - cpu_count: Number of logical CPUs
+        - cpu_freq_mhz: Current CPU frequency (if available)
+        - ffmpeg_version: FFmpeg version string
+        - kernel_version: Linux kernel version
+    """
+    metadata = {}
+    
+    # CPU model
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if 'model name' in line:
+                    metadata['cpu_model'] = line.split(':')[1].strip()
+                    break
+    except Exception as e:
+        logger.debug(f"Could not read CPU model: {e}")
+        metadata['cpu_model'] = 'unknown'
+    
+    # CPU count
+    try:
+        import os
+        metadata['cpu_count'] = os.cpu_count()
+    except Exception:
+        metadata['cpu_count'] = None
+    
+    # CPU frequency
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if 'cpu MHz' in line:
+                    metadata['cpu_freq_mhz'] = float(line.split(':')[1].strip())
+                    break
+    except Exception:
+        metadata['cpu_freq_mhz'] = None
+    
+    # FFmpeg version
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            # Extract first line (version info)
+            metadata['ffmpeg_version'] = result.stdout.split('\n')[0]
+    except Exception as e:
+        logger.debug(f"Could not get FFmpeg version: {e}")
+        metadata['ffmpeg_version'] = 'unknown'
+    
+    # Kernel version
+    try:
+        result = subprocess.run(
+            ['uname', '-r'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            metadata['kernel_version'] = result.stdout.strip()
+    except Exception:
+        metadata['kernel_version'] = 'unknown'
+    
+    return metadata
 
 
 class PrometheusClient:
@@ -78,10 +186,27 @@ class ResultsAnalyzer:
             self.data = json.load(f)
         
         self.scenarios = self.data.get('scenarios', [])
+        
+        # Capture hardware metadata for reproducibility
+        self.hardware_metadata = get_hardware_metadata()
+        logger.info(f"Hardware: {self.hardware_metadata.get('cpu_model', 'unknown')}")
+        
         logger.info(f"Loaded {len(self.scenarios)} scenarios from {results_file}")
     
-    def get_metric_stats(self, data: Optional[Dict]) -> Optional[Dict]:
-        """Calculate statistics from metric data"""
+    def get_metric_stats(
+        self, data: Optional[Dict], filter_outliers: bool = True
+    ) -> Optional[Dict]:
+        """
+        Calculate statistics from metric data with optional outlier filtering.
+        
+        Args:
+            data: Prometheus query result
+            filter_outliers: If True, applies IQR-based outlier filtering
+        
+        Returns:
+            Dict with statistics including mean, median, stdev, min, max, samples
+            Also includes 'outliers_removed' count if filtering was applied
+        """
         if not data or 'data' not in data or 'result' not in data['data']:
             return None
         
@@ -99,7 +224,22 @@ class ResultsAnalyzer:
         if not values:
             return None
         
-        return {
+        outliers_removed = 0
+        if filter_outliers and len(values) >= 4:
+            values, outliers_removed = filter_outliers_iqr(values)
+            
+            if not values:  # All values were outliers (shouldn't happen with reasonable data)
+                logger.warning("All values filtered as outliers, using original data")
+                # Re-extract values without filtering
+                values = []
+                for result in results:
+                    if 'values' in result:
+                        values.extend([float(v[1]) for v in result['values']])
+                    elif 'value' in result:
+                        values.append(float(result['value'][1]))
+                outliers_removed = 0
+        
+        stats = {
             'mean': statistics.mean(values),
             'median': statistics.median(values),
             'stdev': statistics.stdev(values) if len(values) > 1 else 0,
@@ -107,6 +247,11 @@ class ResultsAnalyzer:
             'max': max(values),
             'samples': len(values)
         }
+        
+        if filter_outliers:
+            stats['outliers_removed'] = outliers_removed
+        
+        return stats
 
     def get_instant_value(self, data: Optional[Dict]) -> Optional[float]:
         if not data or 'data' not in data or 'result' not in data['data']:
