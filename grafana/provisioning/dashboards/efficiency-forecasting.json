@@ -516,6 +516,7 @@
       "type": "piechart"
     }
   ],
+  "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
     "ffmpeg",
@@ -547,7 +548,7 @@
           "query": "label_values(results_scenario_efficiency_score, run_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
