@@ -4,13 +4,11 @@ Docker Overhead Monitoring Exporter
 Monitors Docker engine and container resource usage for overhead calculation
 """
 
-import time
-import subprocess
 import json
-import re
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import os
 import socket
+import subprocess
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class DockerStatsCollector:

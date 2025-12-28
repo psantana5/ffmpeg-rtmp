@@ -22,6 +22,7 @@ import pickle
 import platform
 import shutil
 import statistics
+import platform
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -98,6 +99,7 @@ class ModelRetrainer:
         models_dir: Path,
         hardware_id: Optional[str] = None,
         prometheus_url: str = 'http://localhost:9090'
+        hardware_id: Optional[str] = None
     ):
         """
         Initialize model retrainer.
@@ -367,6 +369,7 @@ class ModelRetrainer:
             latest_path.symlink_to(model_filename)
         except Exception:
             # Symlinks may not work on all systems, just copy instead
+            import shutil
             shutil.copy(model_path, latest_path)
         
         logger.info(f"PowerPredictor saved to {model_path}")
@@ -377,6 +380,8 @@ class ModelRetrainer:
         self, predictor: PowerPredictor, path: Path, info: Dict
     ):
         """Save PowerPredictor with metadata."""
+        import pickle
+        
         model_data = {
             'model': predictor.model,
             'poly_features': predictor.poly_features,
@@ -432,6 +437,7 @@ class ModelRetrainer:
             latest_path.symlink_to(model_filename)
         except Exception:
             # Symlinks may not work on all systems, just copy instead
+            import shutil
             shutil.copy(model_path, latest_path)
         
         logger.info(f"MultivariatePredictor saved to {model_path}")
@@ -555,6 +561,7 @@ def main():
         models_dir=args.models_dir,
         hardware_id=args.hardware_id,
         prometheus_url=args.prometheus_url
+        hardware_id=args.hardware_id
     )
     
     if retrainer.retrain_all():

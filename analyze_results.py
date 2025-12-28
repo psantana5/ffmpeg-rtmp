@@ -10,7 +10,6 @@ import csv
 import json
 import logging
 import statistics
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 

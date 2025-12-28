@@ -13,7 +13,7 @@ Metrics exported:
 - qoe_computation_duration_seconds: Time taken to compute quality metrics
 
 Usage:
-    python3 qoe_exporter.py --port 9503
+    python3 qoe_exporter.py --port 9502
 """
 
 import argparse
@@ -237,8 +237,8 @@ def main():
     parser.add_argument(
         '--port',
         type=int,
-        default=9503,
-        help='Port to listen on (default: 9503)'
+        default=9504,
+        help='Port to listen on (default: 9504)'
     )
     parser.add_argument(
         '--results-dir',

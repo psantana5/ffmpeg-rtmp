@@ -13,6 +13,7 @@ Metrics exported:
 
 Usage:
     python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
+    python3 cost_exporter.py --port 9503 --energy-cost 0.12 --cpu-cost 0.50
 """
 
 import argparse
@@ -214,8 +215,8 @@ def main():
     parser.add_argument(
         '--port',
         type=int,
-        default=9504,
-        help='Port to listen on (default: 9504)'
+        default=9503,
+        help='Port to listen on (default: 9503)'
     )
     parser.add_argument(
         '--results-dir',
