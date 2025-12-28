@@ -196,7 +196,7 @@ services:
       - ./qoe_exporter.py:/app/qoe_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
-      - "9504:9504"
+      - "9503:9503"
     restart: unless-stopped
     networks:
       - streaming-net
