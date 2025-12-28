@@ -186,6 +186,55 @@ services:
       timeout: 5s
       retries: 3
 
+  qoe-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.qoe-exporter
+    container_name: qoe-exporter
+    volumes:
+      - ./test_results:/results:ro
+      - ./qoe_exporter.py:/app/qoe_exporter.py:ro
+      - ./advisor:/app/advisor:ro
+    ports:
+      - "9503:9503"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - QOE_EXPORTER_PORT=9503
+      - RESULTS_DIR=/results
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9503/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  cost-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.cost-exporter
+    container_name: cost-exporter
+    volumes:
+      - ./test_results:/results:ro
+      - ./cost_exporter.py:/app/cost_exporter.py:ro
+      - ./advisor:/app/advisor:ro
+    ports:
+      - "9504:9504"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - COST_EXPORTER_PORT=9504
+      - RESULTS_DIR=/results
+      - ENERGY_COST_PER_KWH=0.12
+      - CPU_COST_PER_HOUR=0.50
+      - CURRENCY=USD
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   streaming-net:
     driver: bridge
