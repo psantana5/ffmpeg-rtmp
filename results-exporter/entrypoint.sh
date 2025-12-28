@@ -15,5 +15,5 @@ chmod 755 "$RESULTS_DIR"
 echo "Results directory configured: $RESULTS_DIR"
 echo "Starting results exporter..."
 
-# Execute the main application
-exec python3 /app/results_exporter.py
+# Execute the main application with unbuffered output
+exec python3 -u /app/results_exporter.py
