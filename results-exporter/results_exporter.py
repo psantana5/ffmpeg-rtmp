@@ -131,6 +131,7 @@ class ResultsExporter:
         # ML predictor for future predictions
         self.predictor = None
         self.predictor_trained = False
+        self.last_trained_run_id = None  # Track which run_id was used for training
         
         # Log initialization
         print(f"Results exporter initialized with results_dir={self.results_dir}")
@@ -499,11 +500,13 @@ class ResultsExporter:
         
         # Only train if we have enough data
         if len(scenarios) < 3:
+            print(f"Insufficient scenarios for ML training: {len(scenarios)} < 3")
             return
         
         try:
             # Initialize predictor if needed
             if self.predictor is None:
+                print("Initializing MultivariatePredictor...")
                 self.predictor = MultivariatePredictor(
                     models=['linear', 'poly2', 'rf'],  # Skip poly3 and gbm for speed
                     confidence_level=0.95,
@@ -512,15 +515,21 @@ class ResultsExporter:
                 )
             
             # Train on mean_power_watts
+            print(f"Training ML predictor on {len(scenarios)} scenarios...")
             success = self.predictor.fit(scenarios, target='mean_power_watts')
             if success:
                 self.predictor_trained = True
-                print(f"ML predictor trained on {len(scenarios)} scenarios")
+                print(f"✓ ML predictor trained successfully")
                 info = self.predictor.get_model_info()
-                print(f"  Best model: {info['best_model']} (R²={info['best_score']['r2']:.4f})")
+                print(f"  Best model: {info.get('best_model', 'unknown')} (R²={info.get('best_score', {}).get('r2', 0):.4f})")
+            else:
+                print("✗ ML predictor training failed (insufficient data or error)")
+                self.predictor_trained = False
             
         except Exception as e:
-            print(f"Failed to train predictor: {e}")
+            print(f"✗ Failed to train predictor: {e}")
+            import traceback
+            traceback.print_exc()
             self.predictor_trained = False
     
     def _predict_for_scenario(self, scenario: dict, stats: dict) -> dict | None:
@@ -680,10 +689,16 @@ class ResultsExporter:
             scenarios_with_stats.append((scenario_copy, stats))
         
         # Train predictor on scenarios with valid data
-        if PREDICTOR_AVAILABLE and not self.predictor_trained:
+        # Retrain if we have a new run_id or if predictor hasn't been trained yet
+        if PREDICTOR_AVAILABLE:
             valid_scenarios = [s for s, _ in scenarios_with_stats if s.get('power', {}).get('mean_watts')]
-            if len(valid_scenarios) >= 3:
+            should_train = (
+                len(valid_scenarios) >= 3 and
+                (not self.predictor_trained or self.last_trained_run_id != run_id)
+            )
+            if should_train:
                 self._train_predictor(valid_scenarios)
+                self.last_trained_run_id = run_id
 
         for scenario_copy, stats in scenarios_with_stats:
             # Use original scenario for labels
@@ -751,6 +766,11 @@ class ResultsExporter:
                     output.append(f"results_scenario_predicted_power_watts{lbl} {predictions['power_watts']:.4f}")
                 if predictions['energy_joules'] is not None:
                     output.append(f"results_scenario_predicted_energy_joules{lbl} {predictions['energy_joules']:.4f}")
+            else:
+                # Export zero/NaN values so Grafana dashboards don't show "No data"
+                # This helps distinguish between "predictor not trained" vs "no metrics at all"
+                output.append(f"results_scenario_predicted_power_watts{lbl} NaN")
+                output.append(f"results_scenario_predicted_energy_joules{lbl} NaN")
 
             if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
