@@ -1,0 +1,50 @@
+{
+  "scenarios": [
+    {
+      "type": "single",
+      "name": "ABR Ladder: 1080p+720p+480p @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 180,
+      "stabilization": 15,
+      "cooldown": 15,
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
+    },
+    {
+      "type": "single",
+      "name": "ABR Ladder: 1080p+720p+480p @ 8Mbps",
+      "bitrate": "8000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 180,
+      "stabilization": 15,
+      "cooldown": 15,
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30}
+      ]
+    },
+    {
+      "type": "single",
+      "name": "ABR Ladder: 1080p+720p+480p+360p @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 180,
+      "stabilization": 15,
+      "cooldown": 15,
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30},
+        {"resolution": "1280x720", "fps": 30},
+        {"resolution": "854x480", "fps": 30},
+        {"resolution": "640x360", "fps": 30}
+      ]
+    }
+  ]
+}
