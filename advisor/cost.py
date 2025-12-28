@@ -1,8 +1,8 @@
 """
 Cost Modeling Module
 
-Provides load-aware cost analysis for energy-aware transcoding optimization:
-- Cloud pricing models ($/core-second, $/joule)
+Provides cost analysis for energy-aware transcoding optimization:
+- Cloud pricing models (€/kWh, €/GPU-hour, $/instance-hour, $/core-second)
 - Load-aware compute cost based on actual CPU usage (not wall-clock time)
 - Energy cost based on integrated power measurements (joules)
 - Cost per pixel delivered
@@ -12,28 +12,43 @@ Provides load-aware cost analysis for energy-aware transcoding optimization:
 This enables cost-optimized transcoding decisions for cloud and edge deployments.
 
 Cost Formulas (Load-Aware):
-    compute_cost = sum(cpu_usage_cores[i] * step_seconds for each i) * PRICE_PER_CORE_SECOND
-    energy_cost = sum(power_watts[i] * step_seconds for each i) * PRICE_PER_JOULE
+    compute_cost = sum_over_time(cpu_usage_cores) * PRICE_PER_CORE_SECOND
+    energy_cost = sum_over_time(power_watts * step_seconds) * PRICE_PER_JOULE
     total_cost = compute_cost + energy_cost
 """
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
 
 class CostModel:
     """
-    Computes load-aware cost metrics for transcoding scenarios based on actual
-    CPU usage and power consumption.
+    Computes cost metrics for transcoding scenarios based on energy consumption
+    and cloud pricing.
+    
+    Supports two modes:
+        1. Legacy mode (duration-based): Uses wall-clock duration and hourly pricing
+        2. Load-aware mode (recommended): Uses actual CPU usage and power measurements
     
     Load-aware formulas:
         - Compute cost: sum(cpu_usage_cores * step_seconds) * price_per_core_second
         - Energy cost: sum(power_watts * step_seconds) * price_per_joule
         - Total cost: compute_cost + energy_cost
     
-    Example:
+    Example (legacy mode):
+        >>> model = CostModel(energy_cost_per_kwh=0.12, cpu_cost_per_hour=0.50)
+        >>> scenario = {
+        ...     'power': {'mean_watts': 100.0},
+        ...     'duration': 3600,  # 1 hour
+        ...     'resolution': '1920x1080',
+        ...     'fps': 30
+        ... }
+        >>> cost = model.compute_total_cost(scenario)
+        >>> print(f"Total cost: ${cost:.4f}")
+    
+    Example (load-aware mode):
         >>> model = CostModel(
         ...     price_per_core_second=0.000138889,  # $0.50/hour / 3600
         ...     price_per_joule=3.33e-8  # $0.12/kWh / 3.6e6
@@ -51,40 +66,280 @@ class CostModel:
     
     def __init__(
         self,
-        price_per_core_second: float = 0.0,
-        price_per_joule: float = 0.0,
-        currency: str = 'USD'
+        energy_cost_per_kwh: float = 0.0,
+        cpu_cost_per_hour: float = 0.0,
+        gpu_cost_per_hour: float = 0.0,
+        currency: str = 'USD',
+        # New load-aware pricing parameters
+        price_per_core_second: Optional[float] = None,
+        price_per_joule: Optional[float] = None
     ):
         """
-        Initialize cost model with load-aware pricing parameters.
+        Initialize cost model with pricing parameters.
         
         Args:
-            price_per_core_second: Cost per core-second ($/core-second)
-            price_per_joule: Cost per joule ($/J)
+            energy_cost_per_kwh: Cost per kilowatt-hour (€/kWh or $/kWh) - legacy mode
+            cpu_cost_per_hour: CPU/instance cost per hour (€/h or $/h) - legacy mode
+            gpu_cost_per_hour: GPU cost per hour (€/h or $/h) - legacy mode
             currency: Currency code (USD, EUR, etc.)
+            price_per_core_second: Cost per core-second ($/core-second) - load-aware mode
+            price_per_joule: Cost per joule ($/J) - load-aware mode
         
         Note:
-            Conversion helpers from hourly rates:
+            For load-aware mode, set price_per_core_second and price_per_joule.
+            Conversion helpers:
                 - price_per_core_second = cpu_cost_per_hour / 3600
                 - price_per_joule = energy_cost_per_kwh / 3_600_000
         """
-        self.price_per_core_second = price_per_core_second
-        self.price_per_joule = price_per_joule
+        self.energy_cost_per_kwh = energy_cost_per_kwh
+        self.cpu_cost_per_hour = cpu_cost_per_hour
+        self.gpu_cost_per_hour = gpu_cost_per_hour
         self.currency = currency
         
+        # Load-aware pricing
+        if price_per_core_second is not None:
+            self.price_per_core_second = price_per_core_second
+        else:
+            # Auto-derive from hourly rate if not provided
+            self.price_per_core_second = cpu_cost_per_hour / 3600.0 if cpu_cost_per_hour > 0 else 0.0
+        
+        if price_per_joule is not None:
+            self.price_per_joule = price_per_joule
+        else:
+            # Auto-derive from kWh rate if not provided
+            # 1 kWh = 3,600,000 joules
+            self.price_per_joule = energy_cost_per_kwh / 3_600_000.0 if energy_cost_per_kwh > 0 else 0.0
+        
         logger.info(
-            f"CostModel initialized (load-aware only): "
-            f"{self.price_per_core_second:.9f} {currency}/core-second, "
+            f"CostModel initialized: {energy_cost_per_kwh} {currency}/kWh, "
+            f"{cpu_cost_per_hour} {currency}/h (CPU), "
+            f"{gpu_cost_per_hour} {currency}/h (GPU)"
+        )
+        logger.info(
+            f"Load-aware pricing: {self.price_per_core_second:.9f} {currency}/core-second, "
             f"{self.price_per_joule:.2e} {currency}/joule"
         )
+    
+    def compute_total_cost(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute total cost for a transcoding scenario.
+        
+        Total cost includes:
+            - Energy cost (power consumption × time × price)
+            - Compute cost (CPU + GPU instance time × price)
+        
+        Args:
+            scenario: Scenario dict with 'power', 'duration', optionally 'gpu_power'
+            
+        Returns:
+            Total cost in configured currency, or None if insufficient data
+        """
+        energy_cost = self.compute_energy_cost(scenario)
+        compute_cost = self.compute_compute_cost(scenario)
+        
+        if energy_cost is None and compute_cost is None:
+            return None
+        
+        total = (energy_cost or 0.0) + (compute_cost or 0.0)
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"energy_cost={energy_cost if energy_cost is not None else 0.0:.6f}, "
+            f"compute_cost={compute_cost if compute_cost is not None else 0.0:.6f}, "
+            f"total={total:.6f} {self.currency}"
+        )
+        
+        return total
+    
+    def compute_energy_cost(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute energy cost based on power consumption and duration.
+        
+        Formula:
+            energy_cost = (mean_watts / 1000) * (duration / 3600) * cost_per_kwh
+            
+        Where:
+            mean_watts = CPU power + GPU power (if available)
+            duration = test duration in seconds
+            cost_per_kwh = energy price
+        
+        Args:
+            scenario: Scenario dict with 'power' and 'duration'
+            
+        Returns:
+            Energy cost in configured currency, or None if data missing
+        """
+        if self.energy_cost_per_kwh == 0.0:
+            return 0.0
+        
+        # Extract power consumption
+        power = scenario.get('power')
+        if not power or power.get('mean_watts') is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No power data")
+            return None
+        
+        mean_watts = power['mean_watts']
+        
+        # Add GPU power if available
+        gpu_power = scenario.get('gpu_power', {}).get('mean_watts')
+        if gpu_power is not None:
+            mean_watts += gpu_power
+        
+        # Extract duration
+        duration = scenario.get('duration')
+        if not duration or duration <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': No duration data")
+            return None
+        
+        # Calculate energy consumed (kWh)
+        energy_kwh = (mean_watts / 1000.0) * (duration / 3600.0)
+        
+        # Calculate cost
+        cost = energy_kwh * self.energy_cost_per_kwh
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"energy={energy_kwh:.6f} kWh, "
+            f"cost={cost:.6f} {self.currency}"
+        )
+        
+        return cost
+    
+    def compute_compute_cost(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute compute (instance/GPU) cost based on duration and pricing.
+        
+        Formula:
+            compute_cost = (duration / 3600) * (cpu_cost + gpu_cost)
+            
+        Args:
+            scenario: Scenario dict with 'duration'
+            
+        Returns:
+            Compute cost in configured currency, or None if data missing
+        """
+        if self.cpu_cost_per_hour == 0.0 and self.gpu_cost_per_hour == 0.0:
+            return 0.0
+        
+        # Extract duration
+        duration = scenario.get('duration')
+        if not duration or duration <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': No duration data")
+            return None
+        
+        # Calculate hours
+        hours = duration / 3600.0
+        
+        # Calculate cost (CPU + GPU)
+        cost = hours * (self.cpu_cost_per_hour + self.gpu_cost_per_hour)
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"hours={hours:.4f}, "
+            f"cost={cost:.6f} {self.currency}"
+        )
+        
+        return cost
+    
+    def compute_cost_per_pixel(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute cost per pixel delivered.
+        
+        This metric helps compare cost efficiency across different resolutions
+        and output ladders.
+        
+        Formula:
+            cost_per_pixel = total_cost / total_pixels_delivered
+            
+        Where:
+            total_pixels = sum(width * height * fps * duration for each output)
+        
+        Args:
+            scenario: Scenario dict with cost and pixel data
+            
+        Returns:
+            Cost per pixel in configured currency, or None if data missing
+        """
+        total_cost = self.compute_total_cost(scenario)
+        if total_cost is None or total_cost == 0.0:
+            return None
+        
+        # Calculate total pixels
+        total_pixels = self._compute_total_pixels(scenario)
+        if total_pixels is None or total_pixels <= 0:
+            logger.debug(
+                f"Scenario '{scenario.get('name')}': No pixel data"
+            )
+            return None
+        
+        # Calculate cost per pixel
+        cost_per_pixel = total_cost / total_pixels
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"total_cost={total_cost:.6f}, "
+            f"total_pixels={total_pixels:.2e}, "
+            f"cost_per_pixel={cost_per_pixel:.2e} {self.currency}/pixel"
+        )
+        
+        return cost_per_pixel
+    
+    def compute_cost_per_watch_hour(
+        self, scenario: Dict, viewers: int = 1
+    ) -> Optional[float]:
+        """
+        Compute cost per watch hour (viewer-hour).
+        
+        This metric is useful for understanding streaming costs relative to
+        viewer engagement.
+        
+        Formula:
+            cost_per_watch_hour = total_cost / (duration_hours * viewers)
+            
+        Args:
+            scenario: Scenario dict with cost and duration
+            viewers: Number of concurrent viewers (default: 1)
+            
+        Returns:
+            Cost per watch hour in configured currency, or None if data missing
+        """
+        total_cost = self.compute_total_cost(scenario)
+        if total_cost is None:
+            return None
+        
+        duration = scenario.get('duration')
+        if not duration or duration <= 0:
+            return None
+        
+        if viewers <= 0:
+            logger.warning(f"Invalid viewer count: {viewers}")
+            return None
+        
+        # Calculate watch hours
+        duration_hours = duration / 3600.0
+        watch_hours = duration_hours * viewers
+        
+        # Calculate cost per watch hour
+        cost_per_watch_hour = total_cost / watch_hours
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"total_cost={total_cost:.6f}, "
+            f"watch_hours={watch_hours:.2f}, "
+            f"cost_per_watch_hour={cost_per_watch_hour:.6f} "
+            f"{self.currency}/watch-hour"
+        )
+        
+        return cost_per_watch_hour
     
     def _compute_total_pixels(self, scenario: Dict) -> Optional[float]:
         """
         Compute total pixels delivered for a scenario.
         
         Supports two modes:
-        1. Output ladder mode: If 'outputs' is present, sum pixels across all outputs
-        2. Single resolution mode: Use resolution/fps from scenario metadata
+        1. Output ladder mode: If 'outputs' is present, sum pixels across all
+           outputs
+        2. Legacy mode: Use single resolution/fps from scenario metadata
         
         Args:
             scenario: Scenario dict
@@ -118,7 +373,7 @@ class CostModel:
             
             return total_pixels if total_pixels > 0 else None
         
-        # Single resolution mode
+        # Legacy mode: single resolution/fps
         resolution = scenario.get('resolution')
         fps = scenario.get('fps')
         
@@ -159,7 +414,7 @@ class CostModel:
         return (None, None)
     
     # ========================================================================
-    # Load-Aware Cost Calculation Methods
+    # Load-Aware Cost Calculation Methods (Recommended)
     # ========================================================================
     
     def compute_total_cost_load_aware(self, scenario: Dict) -> Optional[float]:
@@ -400,10 +655,15 @@ class CostModel:
         Get current pricing configuration.
         
         Returns:
-            Dict with load-aware pricing information
+            Dict with pricing information (legacy and load-aware)
         """
         return {
+            # Legacy pricing
+            'energy_cost_per_kwh': self.energy_cost_per_kwh,
+            'cpu_cost_per_hour': self.cpu_cost_per_hour,
+            'gpu_cost_per_hour': self.gpu_cost_per_hour,
+            'currency': self.currency,
+            # Load-aware pricing
             'price_per_core_second': self.price_per_core_second,
-            'price_per_joule': self.price_per_joule,
-            'currency': self.currency
+            'price_per_joule': self.price_per_joule
         }
