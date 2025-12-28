@@ -748,8 +748,9 @@ class MultivariatePredictor:
 
             # Categorical: hardware_cpu_model (hash to reduce dimensionality)
             cpu_model = features.get('hardware_cpu_model', 'unknown')
-            # Simple hash encoding (could be improved with feature hashing)
-            cpu_hash = hash(cpu_model) % 10  # Map to 0-9
+            # Use deterministic hash for reproducibility
+            # Sort and use ASCII to ensure consistency
+            cpu_hash = sum(ord(c) for c in cpu_model) % 10  # Map to 0-9
             row.append(float(cpu_hash))
 
             rows.append(row)
@@ -1016,7 +1017,9 @@ class MultivariatePredictor:
                 pipeline.fit(X_boot, y_boot)
                 pred = pipeline.predict(x.reshape(1, -1))[0]
                 predictions.append(pred)
-            except Exception:
+            except (ValueError, RuntimeError) as e:
+                # Skip this bootstrap sample if fitting or prediction fails
+                logger.debug(f"Bootstrap sample failed: {e}")
                 continue
 
         if not predictions:
