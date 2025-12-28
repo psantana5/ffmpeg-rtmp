@@ -3,7 +3,7 @@ apiVersion: 1
 datasources:
   - name: Prometheus
     type: prometheus
-    uid: prometheus
+    uid: DS_PROMETHEUS
     access: proxy
     url: http://prometheus:9090
     isDefault: true
@@ -11,3 +11,4 @@ datasources:
     jsonData:
       timeInterval: 5s
       httpMethod: POST
+      orgId: 1
