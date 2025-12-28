@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import platform
+import shutil
 import statistics
 import sys
 from datetime import datetime
@@ -365,7 +366,6 @@ class ModelRetrainer:
             latest_path.symlink_to(model_filename)
         except Exception:
             # Symlinks may not work on all systems, just copy instead
-            import shutil
             shutil.copy(model_path, latest_path)
         
         logger.info(f"PowerPredictor saved to {model_path}")
@@ -433,7 +433,6 @@ class ModelRetrainer:
             latest_path.symlink_to(model_filename)
         except Exception:
             # Symlinks may not work on all systems, just copy instead
-            import shutil
             shutil.copy(model_path, latest_path)
         
         logger.info(f"MultivariatePredictor saved to {model_path}")
