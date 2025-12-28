@@ -406,6 +406,21 @@ class ResultsExporter:
 
         return (None, None)
 
+    def _is_baseline_scenario(self, scenario: dict, baseline: dict | None) -> bool:
+        """
+        Check if a scenario is the baseline scenario.
+
+        Args:
+            scenario: Scenario to check
+            baseline: Baseline scenario or None
+
+        Returns:
+            True if scenario is the baseline, False otherwise
+        """
+        if baseline is None:
+            return False
+        return scenario.get('name') == baseline.get('name')
+
     def _labels_str(self, labels: dict) -> str:
         parts = [f'{k}="{_escape_label_value(str(v))}"' for k, v in labels.items()]
         return "{" + ",".join(parts) + "}"
@@ -728,7 +743,7 @@ class ResultsExporter:
                 if predictions['ci_high'] is not None:
                     output.append(f"results_scenario_prediction_confidence_high{lbl} {predictions['ci_high']:.4f}")
 
-            if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
+            if baseline_stats and not self._is_baseline_scenario(scenario, baseline):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
                 d_energy = stats["total_energy_wh"] - baseline_stats["total_energy_wh"]
                 d_cpu = stats["container_cpu_percent"] - baseline_stats["container_cpu_percent"]
