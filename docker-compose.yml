@@ -226,8 +226,8 @@ services:
     environment:
       - COST_EXPORTER_PORT=9504
       - RESULTS_DIR=/results
-      - ENERGY_COST_PER_KWH=0.12
-      - CPU_COST_PER_HOUR=0.50
+      - PRICE_PER_CORE_SECOND=0.000138889
+      - PRICE_PER_JOULE=0.000000033
       - CURRENCY=USD
       - PROMETHEUS_URL=http://prometheus:9090
     healthcheck:

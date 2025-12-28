@@ -4,7 +4,7 @@ Energy-Aware Transcoding Advisor
 Provides intelligent recommendations for transcoding configurations based on:
 - Power consumption and energy efficiency
 - Video quality metrics (VMAF, PSNR)
-- Cost analysis and TCO
+- Load-aware cost analysis and TCO
 - Machine learning-based predictions
 - Hardware-aware optimization (CPU & GPU)
 
@@ -13,7 +13,7 @@ Main Components:
 - MultivariatePredictor: Advanced multi-feature prediction with confidence intervals
 - EnergyEfficiencyScorer: Scoring algorithms for comparing configurations
 - TranscodingRecommender: High-level recommendation engine
-- CostModel: Cost analysis and TCO calculations
+- CostModel: Load-aware cost analysis and TCO calculations
 
 Example:
     >>> from advisor import PowerPredictor, TranscodingRecommender, CostModel
@@ -24,8 +24,11 @@ Example:
     >>> recommender = TranscodingRecommender()
     >>> recommendations = recommender.recommend(scenarios)
     >>>
-    >>> cost_model = CostModel(energy_cost_per_kwh=0.12)
-    >>> total_cost = cost_model.compute_total_cost(scenario)
+    >>> cost_model = CostModel(
+    ...     price_per_core_second=0.000138889,
+    ...     price_per_joule=3.33e-8
+    ... )
+    >>> total_cost = cost_model.compute_total_cost_load_aware(scenario)
 """
 
 from .cost import CostModel

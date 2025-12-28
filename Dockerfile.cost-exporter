@@ -24,8 +24,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 ENV COST_EXPORTER_PORT=9504
 ENV RESULTS_DIR=/results
-ENV ENERGY_COST_PER_KWH=0.12
-ENV CPU_COST_PER_HOUR=0.50
+ENV PRICE_PER_CORE_SECOND=0.000138889
+ENV PRICE_PER_JOULE=0.000000033
 ENV CURRENCY=USD
 ENV PROMETHEUS_URL=http://prometheus:9090
 
@@ -33,8 +33,8 @@ ENV PROMETHEUS_URL=http://prometheus:9090
 CMD python3 /app/cost_exporter.py \
     --port ${COST_EXPORTER_PORT} \
     --results-dir ${RESULTS_DIR} \
-    --energy-cost ${ENERGY_COST_PER_KWH} \
-    --cpu-cost ${CPU_COST_PER_HOUR} \
+    --price-per-core-second ${PRICE_PER_CORE_SECOND} \
+    --price-per-joule ${PRICE_PER_JOULE} \
     --currency ${CURRENCY} \
     --prometheus-url ${PROMETHEUS_URL}
 
