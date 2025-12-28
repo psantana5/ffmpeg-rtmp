@@ -117,6 +117,13 @@ class ResultsExporter:
         self._last_refresh = 0.0
         self._cached_metrics = ""
         self._cached_run_id = ""
+        
+        # Log initialization
+        print(f"Results exporter initialized with results_dir={self.results_dir}")
+        print(f"Directory exists: {self.results_dir.exists()}")
+        if self.results_dir.exists():
+            files = list(self.results_dir.glob("test_results_*.json"))
+            print(f"Found {len(files)} result file(s) at startup")
 
     def _latest_results_file(self) -> Path | None:
         if not self.results_dir.exists():
@@ -454,12 +461,18 @@ class ResultsExporter:
             )
 
         run_id = latest.stem
+        
+        # Detect new results file and log it
+        if run_id != self._cached_run_id:
+            print(f"New results file detected: {latest.name}")
+        
         if (now - self._last_refresh) < self.cache_seconds and run_id == self._cached_run_id:
             return self._cached_metrics
 
         try:
             data = self._load_results(latest)
             scenarios = data.get("scenarios", [])
+            print(f"Loaded {len(scenarios)} scenarios from {latest.name}")
         except Exception:
             return (
                 "# HELP results_exporter_up Results exporter is running\n"

@@ -50,9 +50,11 @@ help:
 	@echo ""
 
 up:
+	@mkdir -p test_results
 	$(COMPOSE) up -d
 
 up-build:
+	@mkdir -p test_results
 	$(COMPOSE) up -d --build
 
 down:
@@ -72,9 +74,11 @@ prom-reload:
 	curl -fsS -X POST http://localhost:9090/-/reload >/dev/null
 
 nvidia-up:
+	@mkdir -p test_results
 	$(COMPOSE) --profile nvidia up -d
 
 nvidia-up-build:
+	@mkdir -p test_results
 	$(COMPOSE) --profile nvidia up -d --build
 
 test-suite:
