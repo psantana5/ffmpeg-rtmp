@@ -64,3 +64,9 @@ scrape_configs:
       - targets: ['cost-exporter:9504']
         labels:
           service: 'cost-analysis'
+
+  - job_name: 'exporter-health'
+    static_configs:
+      - targets: ['exporter-health-checker:9600']
+        labels:
+          service: 'monitoring'

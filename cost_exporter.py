@@ -68,9 +68,17 @@ class PrometheusClient:
         url = f"{self.base_url}/api/v1/query_range?{urlencode(params)}"
         req = Request(url, headers={'Accept': 'application/json'})
         
+        # Log the exact query being executed
+        logger.debug(f"Executing PromQL query: {query}")
+        logger.debug(f"Query time range: start={int(start)}, end={int(end)}, step={step}")
+        
         try:
             with urlopen(req, timeout=30) as resp:
-                return json.load(resp)
+                result = json.load(resp)
+                # Debug logging: Log query status
+                status = result.get('status', 'unknown')
+                logger.debug(f"Query status: {status}")
+                return result
         except Exception as e:
             logger.error(f"Prometheus query failed: {e}")
             return None
@@ -86,6 +94,7 @@ class PrometheusClient:
             List of values
         """
         if not query_response:
+            logger.debug("Query returned no response (likely a connection/network issue)")
             return []
         
         data = query_response.get('data', {})
@@ -98,6 +107,11 @@ class PrometheusClient:
                     values.append(float(val))
                 except (ValueError, TypeError):
                     continue
+        
+        # Debug logging: Log number of samples returned
+        num_series = len(results)
+        num_samples = len(values)
+        logger.debug(f"Extracted {num_samples} samples from {num_series} time series")
         
         return values
 
@@ -192,19 +206,23 @@ class CostMetricsExporter:
         if not self.prometheus_client:
             return scenario
         
+        scenario_name = scenario.get('name', 'unknown')
         start_time = scenario.get('start_time')
         end_time = scenario.get('end_time')
         
         if not start_time or not end_time:
-            logger.warning(f"Scenario '{scenario.get('name')}': Missing timestamps")
+            logger.warning(f"Scenario '{scenario_name}': Missing timestamps")
             return scenario
         
         step_seconds = 5  # 5 second resolution
+        
+        logger.debug(f"Enriching scenario '{scenario_name}' with Prometheus data")
         
         try:
             # Query CPU usage
             # Use rate() to get cores per second, then average over step interval
             cpu_query = 'rate(container_cpu_usage_seconds_total{name!~".*POD.*"}[30s])'
+            logger.debug(f"Scenario '{scenario_name}': Querying CPU usage")
             cpu_response = self.prometheus_client.query_range(
                 cpu_query, start_time, end_time, f'{step_seconds}s'
             )
@@ -213,6 +231,7 @@ class CostMetricsExporter:
             # Query power consumption
             # Sum all RAPL zones for total system power
             power_query = 'sum(rapl_power_watts)'
+            logger.debug(f"Scenario '{scenario_name}': Querying power consumption")
             power_response = self.prometheus_client.query_range(
                 power_query, start_time, end_time, f'{step_seconds}s'
             )
@@ -223,20 +242,30 @@ class CostMetricsExporter:
                 scenario['cpu_usage_cores'] = cpu_values
                 scenario['step_seconds'] = step_seconds
                 logger.debug(
-                    f"Scenario '{scenario.get('name')}': "
+                    f"Scenario '{scenario_name}': "
                     f"Enriched with {len(cpu_values)} CPU measurements"
+                )
+            else:
+                logger.warning(
+                    f"Scenario '{scenario_name}': "
+                    f"No CPU usage data returned from Prometheus"
                 )
             
             if power_values:
                 scenario['power_watts'] = power_values
                 logger.debug(
-                    f"Scenario '{scenario.get('name')}': "
+                    f"Scenario '{scenario_name}': "
                     f"Enriched with {len(power_values)} power measurements"
+                )
+            else:
+                logger.warning(
+                    f"Scenario '{scenario_name}': "
+                    f"No power data returned from Prometheus"
                 )
         
         except Exception as e:
             logger.error(
-                f"Failed to enrich scenario '{scenario.get('name')}': {e}"
+                f"Failed to enrich scenario '{scenario_name}': {e}"
             )
         
         return scenario
@@ -247,6 +276,7 @@ class CostMetricsExporter:
         
         Exports only load-aware metrics:
         - cost_total_load_aware, cost_energy_load_aware, cost_compute_load_aware
+        - cost_exporter_alive (health check metric)
         
         Returns:
             Prometheus metrics text
@@ -256,16 +286,26 @@ class CostMetricsExporter:
         if (current_time - self.last_update) < self.cache_ttl and self.metrics_cache:
             return self.metrics_cache.get('output', '')
         
+        logger.debug("Generating Prometheus metrics (cache miss or expired)")
+        
         # Load scenarios
         scenarios = self.load_latest_results()
+        logger.info(f"Loaded {len(scenarios)} scenarios from results directory")
         
         # Enrich with Prometheus metrics if available
         if self.prometheus_client and self.use_load_aware:
+            logger.debug("Enriching scenarios with Prometheus metrics")
             scenarios = [
                 self.enrich_scenario_with_prometheus(s) for s in scenarios
             ]
         
         output = []
+        
+        # Add alive metric for health check
+        output.append("# HELP cost_exporter_alive Cost exporter health check (always 1)")
+        output.append("# TYPE cost_exporter_alive gauge")
+        output.append("cost_exporter_alive 1")
+        logger.debug("Set cost_exporter_alive=1")
         
         # Metrics definitions - Load-aware metrics only
         currency = self.cost_model.currency
@@ -275,6 +315,11 @@ class CostMetricsExporter:
         output.append("# TYPE cost_energy_load_aware gauge")
         output.append(f"# HELP cost_compute_load_aware Compute cost ({currency}) - load-aware")
         output.append("# TYPE cost_compute_load_aware gauge")
+        
+        # Track metrics emission statistics
+        metrics_emitted = 0
+        scenarios_with_data = 0
+        scenarios_without_data = 0
         
         # Export metrics for each scenario
         for scenario in scenarios:
@@ -313,6 +358,9 @@ class CostMetricsExporter:
             )
             
             if has_load_aware_data:
+                scenarios_with_data += 1
+                logger.debug(f"Scenario '{scenario_name}': Computing load-aware costs")
+                
                 load_aware_total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
                 load_aware_energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
                 load_aware_compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
@@ -322,14 +370,51 @@ class CostMetricsExporter:
                     output.append(
                         f"cost_total_load_aware{{{labels}}} {load_aware_total_cost:.8f}"
                     )
+                    logger.debug(
+                        f"Set cost_total_load_aware{{{safe_name}}}={load_aware_total_cost:.8f}"
+                    )
+                    metrics_emitted += 1
                 if load_aware_energy_cost is not None:
                     output.append(
                         f"cost_energy_load_aware{{{labels}}} {load_aware_energy_cost:.8f}"
                     )
+                    logger.debug(
+                        f"Set cost_energy_load_aware{{{safe_name}}}={load_aware_energy_cost:.8f}"
+                    )
+                    metrics_emitted += 1
                 if load_aware_compute_cost is not None:
                     output.append(
                         f"cost_compute_load_aware{{{labels}}} {load_aware_compute_cost:.8f}"
                     )
+                    logger.debug(
+                        f"Set cost_compute_load_aware{{{safe_name}}}={load_aware_compute_cost:.8f}"
+                    )
+                    metrics_emitted += 1
+            else:
+                scenarios_without_data += 1
+                logger.debug(
+                    f"Scenario '{scenario_name}': No load-aware data available, "
+                    f"emitting metrics with value 0"
+                )
+                
+                # Emit metrics with value 0 instead of skipping
+                output.append(f"cost_total_load_aware{{{labels}}} 0")
+                logger.debug(f"Set cost_total_load_aware{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_energy_load_aware{{{labels}}} 0")
+                logger.debug(f"Set cost_energy_load_aware{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_compute_load_aware{{{labels}}} 0")
+                logger.debug(f"Set cost_compute_load_aware{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+        
+        logger.info(
+            f"Metrics generation complete: {metrics_emitted} metrics emitted, "
+            f"{scenarios_with_data} scenarios with data, "
+            f"{scenarios_without_data} scenarios without data"
+        )
         
         result = '\n'.join(output) + '\n'
         

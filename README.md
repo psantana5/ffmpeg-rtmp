@@ -61,6 +61,13 @@ You can:
   - Extensible for future quality metrics (VMAF/PSNR).
   - See [Power Prediction Documentation](docs/power-prediction-model.md) for details.
 
+- **Exporter Health Checker** (`exporter-health-checker`)
+  - Periodically monitors all exporters for health and data availability.
+  - Verifies exporters are reachable and returning expected metrics.
+  - Exposes health status as Prometheus metrics for alerting.
+  - Provides detailed logs for debugging exporter issues.
+  - See [Exporter Health Check Documentation](docs/exporter-health-check.md) for details.
+
 - **Prometheus** (`prometheus`)
   - Scrapes all exporters.
   - Loads alert rules from `prometheus-alerts.yml`.
@@ -115,6 +122,22 @@ Or manually:
 ### 3) Check Prometheus targets
 
 - `make targets`
+
+### 4) Verify exporter health
+
+```bash
+# Quick health check of all exporters
+python3 check_exporters_health.py
+
+# Continuous monitoring
+python3 check_exporters_health.py --interval 60
+```
+
+### 5) Learn about the system
+
+- **[Exporter Data Flow & Setup Guide](docs/exporter-data-flow.md)** - Complete documentation on how each exporter works, data sources, and troubleshooting
+- **[Exporter Health Check](docs/exporter-health-check.md)** - Health monitoring system documentation
+- **[Power Prediction Models](docs/power-prediction-model.md)** - ML model documentation
 
 ---
 
