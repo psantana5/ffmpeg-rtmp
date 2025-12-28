@@ -105,7 +105,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
@@ -152,7 +152,7 @@ class PowerPredictor:
         >>> power = predictor.predict(8)  # Predict power for 8 streams
         >>> print(f"Predicted power for 8 streams: {power:.2f} W")
     """
-    
+
     def __init__(self):
         """
         Initialize the power predictor.
@@ -164,7 +164,7 @@ class PowerPredictor:
         self.poly_features = None
         self.is_polynomial = False
         self.training_data = []  # Store (streams, power) tuples
-        
+
     def _infer_stream_count(self, scenario_name: str) -> Optional[int]:
         """
         Infer number of streams from scenario name.
@@ -182,27 +182,27 @@ class PowerPredictor:
             Number of streams, or None if cannot be inferred
         """
         name_lower = scenario_name.lower()
-        
+
         # Pattern 1: "N stream(s)" or "N-stream"
         match = re.search(r'(\d+)\s*[-\s]*streams?', name_lower)
         if match:
             return int(match.group(1))
-        
+
         # Pattern 2: "single stream" → 1
         if 'single' in name_lower and 'stream' in name_lower:
             return 1
-        
+
         # Pattern 3: "multi stream" without number → None (ambiguous)
         if 'multi' in name_lower:
             return None
-        
+
         # Pattern 4: Check if scenario name starts with a number
         match = re.match(r'^(\d+)\s+', scenario_name)
         if match:
             return int(match.group(1))
-        
+
         return None
-    
+
     def fit(self, scenarios: List[Dict]) -> bool:
         """
         Train the power prediction model on scenario data.
@@ -284,38 +284,38 @@ class PowerPredictor:
         """
         # Extract (streams, power) pairs
         training_pairs = []
-        
+
         for scenario in scenarios:
             # Skip scenarios without power data
             if 'power' not in scenario:
                 continue
-            
+
             mean_power = scenario['power'].get('mean_watts')
             if mean_power is None:
                 continue
-            
+
             # Try to infer stream count from name
             streams = self._infer_stream_count(scenario['name'])
             if streams is None:
                 logger.debug(f"Could not infer stream count from: {scenario['name']}")
                 continue
-            
+
             training_pairs.append((streams, mean_power))
-        
+
         if not training_pairs:
             logger.warning("No valid training data for PowerPredictor")
             return False
-        
+
         # Store training data
         self.training_data = training_pairs
-        
+
         # Prepare feature and target arrays
         X = np.array([streams for streams, _ in training_pairs]).reshape(-1, 1)
         y = np.array([power for _, power in training_pairs])
-        
+
         # Count unique stream counts
         unique_streams = len(set(streams for streams, _ in training_pairs))
-        
+
         # Decide on model type
         if unique_streams >= 6:
             # Use polynomial regression (degree=2) for richer model
@@ -335,23 +335,23 @@ class PowerPredictor:
             self.poly_features = None
             self.model = LinearRegression()
             self.model.fit(X, y)
-        
+
         # Log model statistics
         if self.is_polynomial:
             X_transformed = self.poly_features.transform(X)
             y_pred = self.model.predict(X_transformed)
         else:
             y_pred = self.model.predict(X)
-        
+
         # Calculate R² score
         ss_res = np.sum((y - y_pred) ** 2)
         ss_tot = np.sum((y - np.mean(y)) ** 2)
         r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-        
+
         logger.info(f"PowerPredictor trained on {len(training_pairs)} data points, R² = {r2:.4f}")
-        
+
         return True
-    
+
     def predict(self, streams: int) -> Optional[float]:
         """
         Predict power consumption for a given number of streams.
@@ -438,17 +438,17 @@ class PowerPredictor:
         if self.model is None:
             logger.warning("PowerPredictor not trained yet")
             return None
-        
+
         X = np.array([[streams]])
-        
+
         if self.is_polynomial:
             X = self.poly_features.transform(X)
-        
+
         prediction = self.model.predict(X)[0]
-        
+
         # Ensure non-negative prediction
         return max(0.0, float(prediction))
-    
+
     def get_model_info(self) -> Dict:
         """
         Get information about the trained model.
@@ -467,9 +467,9 @@ class PowerPredictor:
                 'n_samples': 0,
                 'stream_range': None,
             }
-        
+
         streams = [s for s, _ in self.training_data]
-        
+
         return {
             'trained': True,
             'model_type': 'polynomial' if self.is_polynomial else 'linear',
@@ -535,7 +535,7 @@ class MultivariatePredictor:
         ... })
         >>> print(f"Predicted power: {prediction['mean']} ± {prediction['ci_width']} W")
     """
-    
+
     def __init__(
         self,
         models: Optional[List[str]] = None,
@@ -555,31 +555,31 @@ class MultivariatePredictor:
         """
         if models is None:
             models = ['linear', 'poly2', 'poly3', 'rf', 'gbm']
-        
+
         self.models = models
         self.confidence_level = confidence_level
         self.n_bootstrap = n_bootstrap
         self.cv_folds = cv_folds
-        
+
         # Model storage
         self.pipelines = {}  # Dict of model_name -> sklearn Pipeline
         self.best_model_name = None
         self.best_model_score = None
         self.model_scores = {}  # Dict of model_name -> {'r2': float, 'rmse': float}
-        
+
         # Feature and target information
         self.feature_names = []
         self.target_name = None
         self.encoder_categories = {}  # For one-hot encoding
         self.hardware_model = None
-        
+
         # Training data storage for bootstrap
         self.X_train = None
         self.y_train = None
-        
+
         # Model version
         self.version = '1.0'
-    
+
     def _extract_features(self, scenario: Dict) -> Optional[Dict]:
         """
         Extract feature values from a scenario dictionary.
@@ -591,39 +591,39 @@ class MultivariatePredictor:
             Dict of feature_name -> value, or None if missing critical data
         """
         features = {}
-        
+
         # stream_count (required)
         stream_count = self._infer_stream_count(scenario.get('name', ''))
         if stream_count is None:
             return None
         features['stream_count'] = stream_count
-        
+
         # bitrate_mbps
         bitrate_str = scenario.get('bitrate', '0k')
         features['bitrate_mbps'] = self._parse_bitrate_to_mbps(bitrate_str)
-        
+
         # total_pixels
         features['total_pixels'] = self._compute_total_pixels(scenario)
-        
+
         # cpu_usage_pct
         container_usage = scenario.get('container_usage', {})
         features['cpu_usage_pct'] = container_usage.get('cpu_percent', 0.0)
-        
+
         # encoder_type (categorical)
         encoder_type = scenario.get('encoder_type', 'x264')
         features['encoder_type'] = encoder_type
-        
+
         # hardware_cpu_model (categorical)
         hardware = scenario.get('hardware', {})
         cpu_model = hardware.get('cpu_model', 'unknown')
         features['hardware_cpu_model'] = cpu_model
-        
+
         # container_cpu_pct (Docker overhead)
         docker_overhead = scenario.get('docker_overhead', {})
         features['container_cpu_pct'] = docker_overhead.get('cpu_percent', 0.0)
-        
+
         return features
-    
+
     def _infer_stream_count(self, scenario_name: str) -> Optional[int]:
         """Infer number of streams from scenario name (reuse logic from PowerPredictor)."""
         name_lower = scenario_name.lower()
@@ -636,7 +636,7 @@ class MultivariatePredictor:
         if match:
             return int(match.group(1))
         return None
-    
+
     def _parse_bitrate_to_mbps(self, bitrate: str) -> float:
         """Parse bitrate string to Mbps."""
         value = bitrate.strip().upper()
@@ -651,16 +651,16 @@ class MultivariatePredictor:
                 return float(value) / 1000.0
         except ValueError:
             return 0.0
-    
+
     def _compute_total_pixels(self, scenario: Dict) -> float:
         """Compute total pixels delivered (width * height * fps * duration)."""
         duration = scenario.get('duration', 0)
         if not duration or duration <= 0:
             return 0.0
-        
+
         outputs = scenario.get('outputs')
         total_pixels = 0.0
-        
+
         if outputs and isinstance(outputs, list) and len(outputs) > 0:
             for output in outputs:
                 resolution = output.get('resolution')
@@ -678,9 +678,9 @@ class MultivariatePredictor:
                 width, height = self._parse_resolution(resolution)
                 if width is not None and height is not None:
                     total_pixels = width * height * fps * duration
-        
+
         return total_pixels
-    
+
     def _parse_resolution(self, resolution: str) -> Tuple[Optional[int], Optional[int]]:
         """Parse resolution string to (width, height)."""
         if not resolution or resolution == 'N/A':
@@ -694,7 +694,7 @@ class MultivariatePredictor:
         except (ValueError, AttributeError):
             pass
         return (None, None)
-    
+
     def _extract_target(self, scenario: Dict, target_name: str) -> Optional[float]:
         """
         Extract target value from scenario.
@@ -715,7 +715,7 @@ class MultivariatePredictor:
         elif target_name == 'efficiency_score':
             return scenario.get('efficiency_score')
         return None
-    
+
     def _encode_features(self, features_list: List[Dict]) -> np.ndarray:
         """
         Encode features into numpy array with one-hot encoding for categorical variables.
@@ -728,34 +728,34 @@ class MultivariatePredictor:
         """
         if not features_list:
             return np.array([])
-        
+
         # Build feature matrix
         rows = []
         for features in features_list:
             row = []
-            
+
             # Numeric features
             row.append(features.get('stream_count', 0))
             row.append(features.get('bitrate_mbps', 0.0))
             row.append(features.get('total_pixels', 0.0))
             row.append(features.get('cpu_usage_pct', 0.0))
             row.append(features.get('container_cpu_pct', 0.0))
-            
+
             # Categorical: encoder_type
             encoder_type = features.get('encoder_type', 'x264')
             for category in self.encoder_categories.get('encoder_type', []):
                 row.append(1.0 if encoder_type == category else 0.0)
-            
+
             # Categorical: hardware_cpu_model (hash to reduce dimensionality)
             cpu_model = features.get('hardware_cpu_model', 'unknown')
             # Simple hash encoding (could be improved with feature hashing)
             cpu_hash = hash(cpu_model) % 10  # Map to 0-9
             row.append(float(cpu_hash))
-            
+
             rows.append(row)
-        
+
         return np.array(rows)
-    
+
     def fit(
         self,
         scenarios: List[Dict],
@@ -775,39 +775,39 @@ class MultivariatePredictor:
         """
         self.target_name = target
         self.hardware_model = hardware_id
-        
+
         # Extract features and targets
         features_list = []
         targets_list = []
-        
+
         for scenario in scenarios:
             features = self._extract_features(scenario)
             if features is None:
                 continue
-            
+
             target_value = self._extract_target(scenario, target)
             if target_value is None:
                 continue
-            
+
             features_list.append(features)
             targets_list.append(target_value)
-        
+
         if len(features_list) < 2:
             logger.warning(f"Insufficient data for multivariate predictor: {len(features_list)} samples")
             return False
-        
+
         # Build encoder categories from training data
         encoder_types = set(f.get('encoder_type', 'x264') for f in features_list)
         self.encoder_categories['encoder_type'] = sorted(encoder_types)
-        
+
         # Encode features
         X = self._encode_features(features_list)
         y = np.array(targets_list)
-        
+
         # Store for bootstrap
         self.X_train = X
         self.y_train = y
-        
+
         # Build feature names
         self.feature_names = [
             'stream_count', 'bitrate_mbps', 'total_pixels',
@@ -816,17 +816,17 @@ class MultivariatePredictor:
         for enc_type in self.encoder_categories['encoder_type']:
             self.feature_names.append(f'encoder_{enc_type}')
         self.feature_names.append('hardware_hash')
-        
+
         # Train ensemble of models
         logger.info(f"Training {len(self.models)} models on {len(X)} samples...")
-        
+
         for model_name in self.models:
             pipeline = self._create_pipeline(model_name)
-            
+
             try:
                 # Train model
                 pipeline.fit(X, y)
-                
+
                 # Cross-validation score
                 if len(X) >= self.cv_folds:
                     cv_scores = cross_val_score(
@@ -838,39 +838,39 @@ class MultivariatePredictor:
                 else:
                     # Not enough data for CV, use training score
                     r2_score = pipeline.score(X, y)
-                
+
                 # Calculate RMSE
                 y_pred = pipeline.predict(X)
                 rmse = np.sqrt(np.mean((y - y_pred) ** 2))
-                
+
                 self.pipelines[model_name] = pipeline
                 self.model_scores[model_name] = {'r2': r2_score, 'rmse': rmse}
-                
+
                 logger.info(f"  {model_name}: R²={r2_score:.4f}, RMSE={rmse:.2f}")
-            
+
             except Exception as e:
                 logger.warning(f"Failed to train {model_name}: {e}")
                 continue
-        
+
         if not self.pipelines:
             logger.error("No models trained successfully")
             return False
-        
+
         # Select best model
         self.best_model_name = max(
             self.model_scores.keys(),
             key=lambda k: self.model_scores[k]['r2']
         )
         self.best_model_score = self.model_scores[self.best_model_name]
-        
+
         logger.info(
             f"Best model: {self.best_model_name} "
             f"(R²={self.best_model_score['r2']:.4f}, "
             f"RMSE={self.best_model_score['rmse']:.2f})"
         )
-        
+
         return True
-    
+
     def _create_pipeline(self, model_name: str) -> Pipeline:
         """
         Create sklearn pipeline for a given model type.
@@ -882,18 +882,18 @@ class MultivariatePredictor:
             sklearn Pipeline with scaler and model
         """
         steps = [('scaler', StandardScaler())]
-        
+
         if model_name == 'linear':
             steps.append(('model', LinearRegression()))
-        
+
         elif model_name == 'poly2':
             steps.append(('poly', PolynomialFeatures(degree=2)))
             steps.append(('model', LinearRegression()))
-        
+
         elif model_name == 'poly3':
             steps.append(('poly', PolynomialFeatures(degree=3)))
             steps.append(('model', LinearRegression()))
-        
+
         elif model_name == 'rf':
             steps.append(('model', RandomForestRegressor(
                 n_estimators=100,
@@ -901,7 +901,7 @@ class MultivariatePredictor:
                 random_state=42,
                 n_jobs=-1
             )))
-        
+
         elif model_name == 'gbm':
             # Try XGBoost first, fall back to sklearn GradientBoosting
             try:
@@ -921,12 +921,12 @@ class MultivariatePredictor:
                     learning_rate=0.1,
                     random_state=42
                 )))
-        
+
         else:
             raise ValueError(f"Unknown model type: {model_name}")
-        
+
         return Pipeline(steps)
-    
+
     def predict(
         self,
         features: Dict,
@@ -952,36 +952,36 @@ class MultivariatePredictor:
         if not self.pipelines:
             logger.warning("No models trained")
             return {'mean': None, 'model': None}
-        
+
         # Select model
         if model_name is None:
             model_name = self.best_model_name
-        
+
         if model_name not in self.pipelines:
             logger.warning(f"Model {model_name} not available, using {self.best_model_name}")
             model_name = self.best_model_name
-        
+
         pipeline = self.pipelines[model_name]
-        
+
         # Encode features
         X = self._encode_features([features])
-        
+
         # Predict
         mean_prediction = pipeline.predict(X)[0]
-        
+
         result = {
             'mean': float(max(0.0, mean_prediction)),  # Clamp to non-negative
             'model': model_name
         }
-        
+
         if return_confidence:
             ci_low, ci_high = self._bootstrap_confidence_interval(X[0], model_name)
             result['ci_low'] = float(max(0.0, ci_low))
             result['ci_high'] = float(max(0.0, ci_high))
             result['ci_width'] = result['ci_high'] - result['ci_low']
-        
+
         return result
-    
+
     def _bootstrap_confidence_interval(
         self,
         x: np.ndarray,
@@ -1000,16 +1000,16 @@ class MultivariatePredictor:
         if self.X_train is None or self.y_train is None:
             # Cannot compute CI without training data
             return (0.0, 0.0)
-        
+
         predictions = []
         n_samples = len(self.X_train)
-        
+
         for _ in range(self.n_bootstrap):
             # Bootstrap resample
             indices = np.random.choice(n_samples, size=n_samples, replace=True)
             X_boot = self.X_train[indices]
             y_boot = self.y_train[indices]
-            
+
             # Train model on bootstrap sample
             pipeline = self._create_pipeline(model_name)
             try:
@@ -1018,20 +1018,20 @@ class MultivariatePredictor:
                 predictions.append(pred)
             except Exception:
                 continue
-        
+
         if not predictions:
             return (0.0, 0.0)
-        
+
         # Compute percentiles
         alpha = 1 - self.confidence_level
         lower_percentile = (alpha / 2) * 100
         upper_percentile = (1 - alpha / 2) * 100
-        
+
         ci_low = np.percentile(predictions, lower_percentile)
         ci_high = np.percentile(predictions, upper_percentile)
-        
+
         return (ci_low, ci_high)
-    
+
     def predict_batch(
         self,
         features_list: List[Dict],
@@ -1049,21 +1049,21 @@ class MultivariatePredictor:
         """
         if not self.pipelines:
             return [{'mean': None, 'model': None}] * len(features_list)
-        
+
         # Encode all features at once
         X = self._encode_features(features_list)
-        
+
         # Predict with best model
         pipeline = self.pipelines[self.best_model_name]
         predictions = pipeline.predict(X)
-        
+
         results = []
         for i, pred in enumerate(predictions):
             result = {
                 'mean': float(max(0.0, pred)),
                 'model': self.best_model_name
             }
-            
+
             if return_confidence:
                 ci_low, ci_high = self._bootstrap_confidence_interval(
                     X[i], self.best_model_name
@@ -1071,11 +1071,11 @@ class MultivariatePredictor:
                 result['ci_low'] = float(max(0.0, ci_low))
                 result['ci_high'] = float(max(0.0, ci_high))
                 result['ci_width'] = result['ci_high'] - result['ci_low']
-            
+
             results.append(result)
-        
+
         return results
-    
+
     def get_model_info(self) -> Dict:
         """
         Get information about trained models.
@@ -1093,7 +1093,7 @@ class MultivariatePredictor:
                 'hardware': None,
                 'version': self.version
             }
-        
+
         return {
             'trained': True,
             'best_model': self.best_model_name,
@@ -1107,7 +1107,7 @@ class MultivariatePredictor:
             'version': self.version,
             'confidence_level': self.confidence_level
         }
-    
+
     def save(self, filepath: Path):
         """
         Save trained model to disk.
@@ -1116,7 +1116,7 @@ class MultivariatePredictor:
             filepath: Path to save model (will create parent directories)
         """
         filepath.parent.mkdir(parents=True, exist_ok=True)
-        
+
         model_data = {
             'version': self.version,
             'pipelines': self.pipelines,
@@ -1133,12 +1133,12 @@ class MultivariatePredictor:
             'X_train': self.X_train,
             'y_train': self.y_train,
         }
-        
+
         with open(filepath, 'wb') as f:
             pickle.dump(model_data, f)
-        
+
         logger.info(f"Model saved to {filepath}")
-    
+
     @classmethod
     def load(cls, filepath: Path) -> 'MultivariatePredictor':
         """
@@ -1152,14 +1152,14 @@ class MultivariatePredictor:
         """
         with open(filepath, 'rb') as f:
             model_data = pickle.load(f)
-        
+
         # Create instance
         predictor = cls(
             confidence_level=model_data.get('confidence_level', 0.95),
             n_bootstrap=model_data.get('n_bootstrap', 100),
             cv_folds=model_data.get('cv_folds', 5),
         )
-        
+
         # Restore state
         predictor.version = model_data.get('version', '1.0')
         predictor.pipelines = model_data.get('pipelines', {})
@@ -1172,7 +1172,7 @@ class MultivariatePredictor:
         predictor.hardware_model = model_data.get('hardware_model')
         predictor.X_train = model_data.get('X_train')
         predictor.y_train = model_data.get('y_train')
-        
+
         logger.info(f"Model loaded from {filepath}")
-        
+
         return predictor

@@ -13,7 +13,7 @@ from analyze_results import ResultsAnalyzer
 
 class TestAnalyzeResultsIntegration:
     """Integration tests for advisor + analyze_results."""
-    
+
     @pytest.fixture
     def sample_test_results(self):
         """Create sample test results JSON."""
@@ -49,7 +49,7 @@ class TestAnalyzeResultsIntegration:
                 }
             ]
         }
-    
+
     @pytest.fixture
     def mock_prometheus_responses(self):
         """Mock Prometheus responses for power data."""
@@ -69,7 +69,7 @@ class TestAnalyzeResultsIntegration:
                     ]
                 }
             }
-        
+
         def mock_query(query, ts=None):
             # Return mock energy data
             if 'increase(rapl_energy_joules_total' in query:
@@ -82,9 +82,9 @@ class TestAnalyzeResultsIntegration:
                     }
                 }
             return None
-        
+
         return mock_query_range, mock_query
-    
+
     def test_analyzer_computes_efficiency_scores(
         self, sample_test_results, mock_prometheus_responses, tmp_path
     ):
@@ -93,40 +93,40 @@ class TestAnalyzeResultsIntegration:
         results_file = tmp_path / "test_results.json"
         with open(results_file, 'w') as f:
             json.dump(sample_test_results, f)
-        
+
         # Mock Prometheus client
         mock_query_range, mock_query = mock_prometheus_responses
-        
+
         with patch('analyze_results.PrometheusClient') as MockClient:
             mock_client = Mock()
             mock_client.query_range = Mock(side_effect=mock_query_range)
             mock_client.query = Mock(side_effect=mock_query)
             MockClient.return_value = mock_client
-            
+
             # Create analyzer
             analyzer = ResultsAnalyzer(results_file)
-            
+
             # Generate report
             results = analyzer.generate_report()
-            
+
             # Verify results
             assert len(results) > 0
-            
+
             # Check that efficiency scores were computed
             scored_results = [r for r in results if r.get('efficiency_score') is not None]
             assert len(scored_results) > 0
-            
+
             # Verify baseline has no score (0k bitrate)
             baseline = next(r for r in results if 'baseline' in r['name'].lower())
             assert baseline.get('efficiency_score') is None
-            
+
             # Verify streaming scenarios have scores and ranks
             for result in scored_results:
                 assert 'efficiency_score' in result
                 assert result['efficiency_score'] > 0
                 assert 'efficiency_rank' in result
                 assert result['efficiency_rank'] >= 1
-    
+
     def test_csv_export_includes_efficiency_columns(
         self, sample_test_results, mock_prometheus_responses, tmp_path
     ):
@@ -135,25 +135,25 @@ class TestAnalyzeResultsIntegration:
         results_file = tmp_path / "test_results.json"
         with open(results_file, 'w') as f:
             json.dump(sample_test_results, f)
-        
+
         csv_file = tmp_path / "test_analysis.csv"
-        
+
         # Mock Prometheus client
         mock_query_range, mock_query = mock_prometheus_responses
-        
+
         with patch('analyze_results.PrometheusClient') as MockClient:
             mock_client = Mock()
             mock_client.query_range = Mock(side_effect=mock_query_range)
             mock_client.query = Mock(side_effect=mock_query)
             MockClient.return_value = mock_client
-            
+
             # Create analyzer and export CSV
             analyzer = ResultsAnalyzer(results_file)
             analyzer.export_csv(output_file=str(csv_file))
-            
+
             # Verify CSV was created
             assert csv_file.exists()
-            
+
             # Read and verify CSV content
             with open(csv_file, 'r') as f:
                 header = f.readline()
