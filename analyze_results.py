@@ -11,7 +11,6 @@ import json
 import logging
 import statistics
 import subprocess
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -714,7 +713,7 @@ class ResultsAnalyzer:
             print(f"Stream Range: {min_s} - {max_s} streams")
         
         # Display model quality metrics
-        print(f"\nModel Quality Metrics:")
+        print("\nModel Quality Metrics:")
         print(f"  R² Score: {model_info['r2_score']:.4f}")
         if model_info['r2_score'] >= 0.9:
             quality = "Excellent"
@@ -733,7 +732,7 @@ class ResultsAnalyzer:
             cv = model_info['cv_scores']
             print(f"\nCross-Validation ({cv['n_folds']}-fold):")
             print(f"  RMSE: {cv['rmse_mean']:.2f} ± {cv['rmse_std']:.2f} W")
-            print(f"  (Tests model generalization to unseen data)")
+            print("  (Tests model generalization to unseen data)")
         
         # Predict for key stream counts (standard capacity planning points)
         # These represent typical workload sizes: single stream, small (2-4),
@@ -770,7 +769,10 @@ class ResultsAnalyzer:
         measured_avg = {s: sum(powers) / len(powers) for s, powers in measured_data.items()}
         
         # Print comparison table header
-        print(f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} {'Diff (W)':<12} {'% Error':<10}")
+        print(
+            f"{'Streams':<10} {'Measured (W)':<15} {'Predicted (W)':<15} "
+            f"{'Diff (W)':<12} {'% Error':<10}"
+        )
         print("─" * 100)
         
         # Show all measured stream counts with predictions
@@ -785,7 +787,10 @@ class ResultsAnalyzer:
             diff_str = f"{diff:+.2f}" if diff is not None else "N/A"
             pct_str = f"{pct_error:.1f}%" if pct_error is not None else "N/A"
             
-            print(f"{streams:<10} {measured_str:<15} {predicted_str:<15} {diff_str:<12} {pct_str:<10}")
+            print(
+                f"{streams:<10} {measured_str:<15} {predicted_str:<15} "
+                f"{diff_str:<12} {pct_str:<10}"
+            )
         
         print("─" * 100)
 
