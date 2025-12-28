@@ -23,7 +23,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Ranking of transcoding scenarios by energy efficiency score. Higher scores indicate better efficiency (more throughput per watt).",
       "fieldConfig": {
@@ -131,7 +131,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -145,7 +145,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_mean_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -159,7 +159,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type, streams) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -225,7 +225,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Energy efficiency score (pixels per joule). Higher is better. Excludes baseline scenarios.",
       "fieldConfig": {
@@ -300,7 +300,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -318,7 +318,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Energy wasted compared to the most efficient scenario within the same output ladder. Grouped strictly by output_ladder to prevent comparing different resolutions.",
       "fieldConfig": {
@@ -405,7 +405,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# Energy wasted vs optimal within same output_ladder\n# For each output_ladder, find the minimum energy consumption\n# Then calculate the difference for each scenario\nmax by(scenario, output_ladder) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})\n- on(output_ladder) group_left()\nmin by(output_ladder) (results_scenario_total_energy_joules{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -423,7 +423,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Average power consumption by encoder type (CPU vs GPU) across different stream counts.",
       "fieldConfig": {
@@ -537,7 +537,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# CPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"cpu\", scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\"}\n)",
@@ -550,7 +550,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# GPU encoder power vs stream count\navg by(streams, encoder_type) (\n  results_scenario_mean_power_watts{encoder_type=\"gpu\", scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\"}\n)",
@@ -580,7 +580,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Distribution of efficiency scores across scenarios. Note: Stability metrics (coefficient of variation) require time-series data which may not be available for summary-based gauge metrics.",
       "fieldConfig": {
@@ -667,7 +667,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# Efficiency stability: show actual efficiency scores with deduplication\n# Note: Stability metrics require time-series data, which may not be available for gauge metrics\nmax by(scenario, output_ladder) (results_scenario_efficiency_score{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -685,7 +685,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Energy consumption per Mbps of throughput (Wh/Mbps). Lower is better.",
       "fieldConfig": {
@@ -765,7 +765,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# Energy efficiency: Wh per Mbps of throughput\nmax by(scenario, output_ladder, encoder_type) (results_scenario_energy_wh_per_mbps{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -782,7 +782,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Energy consumption per frame in joules (reported as mJ, divide by 1000 for J). Lower is better.",
       "fieldConfig": {
@@ -862,7 +862,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "# Energy per frame in millijoules\nmax by(scenario, output_ladder, encoder_type) (results_scenario_energy_mj_per_frame{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -879,7 +879,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "description": "Power consumption increase (%) compared to baseline idle state. Shows the actual overhead of transcoding workloads.",
       "fieldConfig": {
@@ -988,7 +988,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_power_pct_increase{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -1002,7 +1002,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_mean_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -1016,7 +1016,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
           "expr": "max by(scenario, output_ladder, encoder_type) (results_scenario_delta_power_watts{scenario!~\".*[Bb]aseline.*\", run_id=~\"$run_id\", output_ladder=~\"$output_ladder\", encoder_type=~\"$encoder_type\"})",
@@ -1113,7 +1113,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "DS_PROMETHEUS"
         },
         "definition": "label_values(results_scenario_mean_power_watts, run_id)",
         "hide": 0,
@@ -1135,7 +1135,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "DS_PROMETHEUS"
         },
         "definition": "label_values(results_scenario_mean_power_watts, output_ladder)",
         "hide": 0,
@@ -1157,7 +1157,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "DS_PROMETHEUS"
         },
         "definition": "label_values(results_scenario_mean_power_watts, encoder_type)",
         "hide": 0,

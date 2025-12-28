@@ -22,7 +22,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "fieldConfig": {
         "defaults": {
@@ -50,7 +50,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" },
           "editorMode": "code",
           "expr": "results_scenario_delta_power_watts{run_id=~\"$run_id\"}",
           "legendFormat": "{{scenario}}",
@@ -64,7 +64,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "fieldConfig": {
         "defaults": {
@@ -92,7 +92,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" },
           "editorMode": "code",
           "expr": "results_scenario_net_container_cpu_percent{run_id=~\"$run_id\"}",
           "legendFormat": "{{scenario}}",
@@ -106,7 +106,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "fieldConfig": {
         "defaults": {
@@ -134,7 +134,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" },
           "editorMode": "code",
           "expr": "results_scenario_delta_energy_wh{run_id=~\"$run_id\"}",
           "legendFormat": "{{scenario}}",
@@ -148,7 +148,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "DS_PROMETHEUS"
       },
       "fieldConfig": {
         "defaults": {
@@ -164,7 +164,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" },
           "editorMode": "code",
           "expr": "results_scenario_power_pct_increase{run_id=~\"$run_id\"}",
           "legendFormat": "{{scenario}}",
@@ -197,7 +197,7 @@
         "type": "datasource"
       },
       {
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "datasource": { "type": "prometheus", "uid": "DS_PROMETHEUS" },
         "definition": "label_values(results_scenario_mean_power_watts, run_id)",
         "hide": 0,
         "includeAll": false,
