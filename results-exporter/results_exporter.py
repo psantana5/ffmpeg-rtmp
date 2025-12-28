@@ -774,6 +774,10 @@ class ResultsExporter:
             if 'prediction_confidence_low' in stats:
                 output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
             
+            # Export prediction confidence metrics
+            output.append(f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}")
+            output.append(f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}")
+            output.append(f"results_scenario_power_stdev{lbl} {stats['power_stdev_w']:.4f}")
             # Generate ML predictions if predictor is trained
             predictions = self._predict_for_scenario(scenario_copy, stats)
             if predictions:

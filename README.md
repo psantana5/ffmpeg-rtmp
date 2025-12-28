@@ -50,6 +50,9 @@ You can:
   - Scores transcoding configurations by energy efficiency.
   - Ranks scenarios by throughput-per-watt metric.
   - Recommends optimal pipeline for the hardware.
+<<<<<<< HEAD
+  - **Power Prediction Model**: Machine learning-based prediction of power consumption for untested workload sizes.
+=======
   - **Power Prediction Models**:
     - **PowerPredictor (v0.1)**: Simple univariate prediction based on stream count
     - **MultivariatePredictor (v0.2)**: Advanced ensemble models with:
@@ -58,6 +61,7 @@ You can:
       - Confidence intervals via bootstrapping
       - Hardware-aware model storage
       - Automatic model selection via cross-validation
+>>>>>>> feature/ml-regression
   - Extensible for future quality metrics (VMAF/PSNR).
   - See [Power Prediction Documentation](docs/power-prediction-model.md) for details.
 
@@ -282,6 +286,8 @@ This command:
 - **Recommends the optimal configuration** for your hardware
 - **Predicts power consumption for untested workload sizes** using machine learning
 - Exports results to CSV (including efficiency scores, ranks, and predictions)
+<<<<<<< HEAD
+=======
 
 **Two prediction modes:**
 
@@ -296,16 +302,22 @@ This command:
    - Confidence intervals showing prediction uncertainty
    - Hardware-aware predictions
    - More accurate for complex scenarios
+>>>>>>> feature/ml-regression
 
 The analysis report now includes:
 
 1. **Traditional power metrics**: Mean power, energy consumption, Docker overhead
 2. **Energy efficiency rankings**: Shows which configurations deliver the most throughput per watt
 3. **Recommendation**: Identifies the best configuration for energy-efficient transcoding
+<<<<<<< HEAD
+4. **Power scalability predictions**: ML-based predictions for 1, 2, 4, 8, 12 concurrent streams
+5. **Measured vs Predicted comparison**: Validates model accuracy on training data
+=======
 4. **Power scalability predictions**: ML-based predictions for custom stream counts
 5. **Measured vs Predicted comparison**: Validates model accuracy on training data
 6. **Confidence intervals** (multivariate mode): Shows prediction uncertainty
 7. **Model comparison** (multivariate mode): Shows performance of different models
+>>>>>>> feature/ml-regression
 
 Example output (multivariate mode):
 ```
@@ -350,6 +362,16 @@ Rank   Scenario                             Efficiency          Power        Bit
 2      5 Mbps Stream                          0.0625 Mbps/W      80.00 W    5M          
 3      2.5 Mbps Stream                        0.0417 Mbps/W      60.00 W    2500k       
 
+<<<<<<< HEAD
+RECOMMENDATION
+─────────────────────────────────────────────────────────────────────
+Most energy-efficient configuration: 4 streams @ 2500k
+  Efficiency Score: 0.0667 Mbps/W
+  Mean Power: 150.00 W
+  Bitrate: 2500k
+
+=======
+>>>>>>> feature/ml-regression
 POWER SCALABILITY PREDICTIONS
 ══════════════════════════════════════════════════════════════════════
 Model Type: LINEAR
