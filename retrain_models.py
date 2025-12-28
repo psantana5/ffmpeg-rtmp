@@ -18,6 +18,7 @@ Usage:
 import argparse
 import json
 import logging
+import pickle
 import platform
 import shutil
 import statistics
@@ -50,8 +51,8 @@ class PrometheusClient:
         url = f"{self.base_url}/api/v1/query_range"
         params = {
             'query': query,
-            'start': int(start),
-            'end': int(end),
+            'start': float(start),
+            'end': float(end),
             'step': step
         }
         
@@ -68,7 +69,7 @@ class PrometheusClient:
         url = f"{self.base_url}/api/v1/query"
         params = {'query': query}
         if ts is not None:
-            params['time'] = int(ts)
+            params['time'] = float(ts)
         
         try:
             response = requests.get(url, params=params, timeout=30)
@@ -376,8 +377,6 @@ class ModelRetrainer:
         self, predictor: PowerPredictor, path: Path, info: Dict
     ):
         """Save PowerPredictor with metadata."""
-        import pickle
-        
         model_data = {
             'model': predictor.model,
             'poly_features': predictor.poly_features,
