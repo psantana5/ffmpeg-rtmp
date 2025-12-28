@@ -11,3 +11,4 @@ datasources:
     jsonData:
       timeInterval: 5s
       httpMethod: POST
+    orgId: 1
