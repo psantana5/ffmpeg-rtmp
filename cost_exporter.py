@@ -68,7 +68,7 @@ class PrometheusClient:
         url = f"{self.base_url}/api/v1/query_range?{urlencode(params)}"
         req = Request(url, headers={'Accept': 'application/json'})
         
-        # Debug logging: Log the exact query being executed
+        # Log the exact query being executed
         logger.debug(f"Executing PromQL query: {query}")
         logger.debug(f"Query time range: start={int(start)}, end={int(end)}, step={step}")
         
@@ -94,7 +94,7 @@ class PrometheusClient:
             List of values
         """
         if not query_response:
-            logger.debug("No query response to extract values from")
+            logger.debug("Query returned no response (likely a connection/network issue)")
             return []
         
         data = query_response.get('data', {})
