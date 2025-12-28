@@ -50,20 +50,7 @@ You can:
   - Scores transcoding configurations by energy efficiency.
   - Ranks scenarios by throughput-per-watt metric.
   - Recommends optimal pipeline for the hardware.
-<<<<<<< HEAD
-  - **Power Prediction Model**: Machine learning-based prediction of power consumption for untested workload sizes.
-=======
-  - **Power Prediction Models**:
-    - **PowerPredictor (v0.1)**: Simple univariate prediction based on stream count
-    - **MultivariatePredictor (v0.2)**: Advanced ensemble models with:
-      - Multiple features (bitrate, resolution, CPU usage, encoder type, hardware)
-      - Ensemble models (Linear, Polynomial, RandomForest, GradientBoosting)
-      - Confidence intervals via bootstrapping
-      - Hardware-aware model storage
-      - Automatic model selection via cross-validation
->>>>>>> feature/ml-regression
   - Extensible for future quality metrics (VMAF/PSNR).
-  - See [Power Prediction Documentation](docs/power-prediction-model.md) for details.
 
 - **Prometheus** (`prometheus`)
   - Scrapes all exporters.
@@ -275,84 +262,22 @@ Or via Make:
 
 Analyze the latest run:
 
-- `python3 analyze_results.py` (uses simple PowerPredictor)
-- `python3 analyze_results.py --multivariate` (uses advanced MultivariatePredictor)
-- `python3 analyze_results.py --predict-future 1,2,4,8,12` (custom prediction targets)
+- `python3 analyze_results.py`
 
 This command:
 - Prints a comprehensive summary of all scenarios
 - **Computes energy efficiency scores** for each configuration
-- **Ranks scenarios** by efficiency (Mbps per watt or pixels per joule)
+- **Ranks scenarios** by efficiency (Mbps per watt)
 - **Recommends the optimal configuration** for your hardware
-- **Predicts power consumption for untested workload sizes** using machine learning
-- Exports results to CSV (including efficiency scores, ranks, and predictions)
-<<<<<<< HEAD
-=======
-
-**Two prediction modes:**
-
-1. **Simple Mode (default)**: Uses PowerPredictor (v0.1)
-   - Univariate model based on stream count
-   - Fast and lightweight
-   - Good for basic predictions
-
-2. **Multivariate Mode (`--multivariate`)**: Uses MultivariatePredictor (v0.2)
-   - Multiple features (bitrate, resolution, CPU usage, encoder type, hardware)
-   - Ensemble models (Linear, Polynomial, RandomForest, GradientBoosting)
-   - Confidence intervals showing prediction uncertainty
-   - Hardware-aware predictions
-   - More accurate for complex scenarios
->>>>>>> feature/ml-regression
+- Exports results to CSV (including efficiency scores and ranks)
 
 The analysis report now includes:
 
 1. **Traditional power metrics**: Mean power, energy consumption, Docker overhead
 2. **Energy efficiency rankings**: Shows which configurations deliver the most throughput per watt
 3. **Recommendation**: Identifies the best configuration for energy-efficient transcoding
-<<<<<<< HEAD
-4. **Power scalability predictions**: ML-based predictions for 1, 2, 4, 8, 12 concurrent streams
-5. **Measured vs Predicted comparison**: Validates model accuracy on training data
-=======
-4. **Power scalability predictions**: ML-based predictions for custom stream counts
-5. **Measured vs Predicted comparison**: Validates model accuracy on training data
-6. **Confidence intervals** (multivariate mode): Shows prediction uncertainty
-7. **Model comparison** (multivariate mode): Shows performance of different models
->>>>>>> feature/ml-regression
 
-Example output (multivariate mode):
-```
-MULTIVARIATE MODEL PREDICTIONS
-══════════════════════════════════════════════════════════════════════
-Model: RF (Random Forest)
-Training Samples: 12
-Features: stream_count, bitrate_mbps, total_pixels, cpu_usage_pct, container_cpu_pct, encoder_x264, hardware_hash
-R² Score: 0.9823
-RMSE: 7.34 W
-Confidence Level: 95%
-
-Predicted Power Consumption with Confidence Intervals:
-──────────────────────────────────────────────────────────────────────
-Streams    Mean Power (W)     CI Low (W)      CI High (W)     CI Width (W)    
-──────────────────────────────────────────────────────────────────────
-1            45.23             42.10           48.36            6.26
-2            78.45             73.21           83.69           10.48
-4           145.12            137.89          152.35           14.46
-8           278.67            265.43          291.91           26.48
-12          412.23            394.17          430.29           36.12
-
-Model Performance Comparison:
-──────────────────────────────────────────────────────────────────────
-Model                R² Score        RMSE (W)       
-──────────────────────────────────────────────────────────────────────
-linear                 0.9234          15.23
-poly2                  0.9567          11.45
-rf                     0.9823           7.34
-gbm                    0.9891           5.67
-
-Best Model: gbm (highest R²)
-```
-
-Example output (simple mode):
+Example output:
 ```
 ENERGY EFFICIENCY RANKINGS
 ─────────────────────────────────────────────────────────────────────
@@ -362,41 +287,13 @@ Rank   Scenario                             Efficiency          Power        Bit
 2      5 Mbps Stream                          0.0625 Mbps/W      80.00 W    5M          
 3      2.5 Mbps Stream                        0.0417 Mbps/W      60.00 W    2500k       
 
-<<<<<<< HEAD
 RECOMMENDATION
 ─────────────────────────────────────────────────────────────────────
 Most energy-efficient configuration: 4 streams @ 2500k
   Efficiency Score: 0.0667 Mbps/W
   Mean Power: 150.00 W
   Bitrate: 2500k
-
-=======
->>>>>>> feature/ml-regression
-POWER SCALABILITY PREDICTIONS
-══════════════════════════════════════════════════════════════════════
-Model Type: LINEAR
-Training Samples: 4
-Stream Range: 1 - 8 streams
-
-Predicted Power Consumption:
-──────────────────────────────────────────────────────────────────────
-   1 streams:    45.23 W
-   2 streams:    78.45 W
-   4 streams:   145.12 W
-   8 streams:   278.67 W
-  12 streams:   412.23 W
-
-MEASURED vs PREDICTED COMPARISON
-──────────────────────────────────────────────────────────────────────
-Streams    Measured (W)    Predicted (W)   Diff (W)    
-──────────────────────────────────────────────────────────────────────
-1          45.00           45.23           +0.23
-2          80.00           78.45           -1.55
-4          150.00          145.12          -4.88
-8          280.00          278.67          -1.33
 ```
-
-For detailed information about the power prediction model, see [docs/power-prediction-model.md](docs/power-prediction-model.md).
 
 ### Python API
 

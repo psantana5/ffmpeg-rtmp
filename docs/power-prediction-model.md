@@ -2,6 +2,7 @@
 
 ## Overview
 
+<<<<<<< HEAD
 The Power Prediction Model is a machine learning-based system that predicts power consumption for FFmpeg transcoding workloads based on the number of concurrent streams. This enables capacity planning, cost estimation, and energy-aware scaling decisions without requiring exhaustive testing.
 
 **Key Features:**
@@ -14,6 +15,229 @@ The Power Prediction Model is a machine learning-based system that predicts powe
 ---
 
 ## Mathematical Model
+=======
+The Power Prediction Model is a machine learning-based system that predicts power consumption for FFmpeg transcoding workloads. This document covers two predictors:
+
+1. **PowerPredictor** (v0.1): Simple univariate predictor based on stream count
+2. **MultivariatePredictor** (v0.2): Advanced multivariate predictor with ensemble models and confidence intervals
+
+**Key Features:**
+- Automatic model selection (linear vs polynomial regression)
+- Ensemble models (Random Forest, Gradient Boosting)
+- Robust scenario name parsing
+- Handles missing data gracefully
+- Provides prediction confidence through R² scores and confidence intervals
+- Hardware-aware model storage and versioning
+- Exports predictions to CSV and Prometheus metrics
+
+---
+
+## MultivariatePredictor (v0.2) - Advanced Features
+
+### Architecture
+
+The MultivariatePredictor extends the basic PowerPredictor with:
+
+**Multiple Input Features:**
+- `stream_count`: Number of concurrent transcoding streams
+- `bitrate_mbps`: Bitrate in megabits per second
+- `total_pixels`: Sum of width × height × fps across all outputs
+- `cpu_usage_pct`: Mean CPU usage percentage during scenario
+- `encoder_type`: One-hot encoded (x264, NVENC, etc.)
+- `hardware_cpu_model`: Hashed or one-hot encoded CPU model
+- `container_cpu_pct`: Docker container CPU overhead percentage
+
+**Ensemble of Regression Models:**
+- Linear Regression: Baseline model
+- Polynomial Regression (degree=2,3): Non-linear relationships
+- RandomForestRegressor: Handles complex interactions
+- GradientBoostingRegressor: State-of-the-art performance (with XGBoost fallback)
+
+**Prediction Targets:**
+- `mean_power_watts`: Mean power consumption
+- `total_energy_joules`: Total energy consumed
+- `efficiency_score`: Direct efficiency prediction
+
+**Confidence Intervals:**
+- Bootstrapped prediction intervals
+- Configurable confidence level (default: 95%)
+- Shows prediction uncertainty
+
+**Hardware Awareness:**
+- Per-hardware model storage
+- Automatic hardware fingerprinting
+- Fallback to universal model if hardware unknown
+
+### Usage Examples
+
+#### Basic Training and Prediction
+
+```python
+from advisor import MultivariatePredictor
+
+# Create predictor with ensemble models
+predictor = MultivariatePredictor(
+    models=['linear', 'poly2', 'rf', 'gbm'],
+    confidence_level=0.95,
+    n_bootstrap=100,
+    cv_folds=5
+)
+
+# Train on scenario results
+success = predictor.fit(scenarios, target='mean_power_watts')
+
+if success:
+    # Make prediction with confidence intervals
+    prediction = predictor.predict({
+        'stream_count': 6,
+        'bitrate_mbps': 3.0,
+        'total_pixels': 1920*1080*30*60,
+        'cpu_usage_pct': 80.0,
+        'encoder_type': 'x264',
+        'hardware_cpu_model': 'Intel_i7_9700K',
+        'container_cpu_pct': 7.0
+    }, return_confidence=True)
+    
+    print(f"Predicted power: {prediction['mean']:.2f} W")
+    print(f"Confidence interval: [{prediction['ci_low']:.2f}, {prediction['ci_high']:.2f}] W")
+    print(f"Confidence width: {prediction['ci_width']:.2f} W")
+    print(f"Model used: {prediction['model']}")
+```
+
+#### Model Information
+
+```python
+info = predictor.get_model_info()
+print(f"Trained: {info['trained']}")
+print(f"Best model: {info['best_model']}")
+print(f"R² score: {info['best_score']['r2']:.4f}")
+print(f"RMSE: {info['best_score']['rmse']:.2f} W")
+print(f"Training samples: {info['n_samples']}")
+print(f"Features: {', '.join(info['feature_names'])}")
+```
+
+#### Save and Load Models
+
+```python
+from pathlib import Path
+
+# Save trained model
+model_path = Path('advisor/models/Intel_i7_9700K/power_model_v1.pkl')
+predictor.save(model_path)
+
+# Load saved model
+loaded_predictor = MultivariatePredictor.load(model_path)
+```
+
+#### Batch Predictions
+
+```python
+# Predict for multiple configurations efficiently
+features_list = [
+    {'stream_count': 2, 'bitrate_mbps': 2.5, ...},
+    {'stream_count': 4, 'bitrate_mbps': 2.5, ...},
+    {'stream_count': 8, 'bitrate_mbps': 5.0, ...},
+]
+
+predictions = predictor.predict_batch(features_list, return_confidence=True)
+
+for i, pred in enumerate(predictions):
+    print(f"Config {i+1}: {pred['mean']:.2f} ± {pred['ci_width']/2:.2f} W")
+```
+
+### CLI Integration
+
+The multivariate predictor is integrated into `analyze_results.py`:
+
+```bash
+# Use multivariate predictor for analysis
+python3 analyze_results.py --multivariate
+
+# Generate predictions for specific stream counts
+python3 analyze_results.py --multivariate --predict-future 1,2,4,8,12,16
+
+# Use simple predictor (backward compatible)
+python3 analyze_results.py --predict-future 1,2,4,8,12
+```
+
+### Prometheus Metrics
+
+The results_exporter automatically trains the multivariate predictor and exposes metrics:
+
+```promql
+# Predicted power consumption
+results_scenario_predicted_power_watts{run_id="test_results_20231215_143022"}
+
+# Predicted energy consumption
+results_scenario_predicted_energy_joules{run_id="test_results_20231215_143022"}
+
+# Confidence interval bounds
+results_scenario_prediction_confidence_low{run_id="test_results_20231215_143022"}
+results_scenario_prediction_confidence_high{run_id="test_results_20231215_143022"}
+```
+
+### Grafana Dashboards
+
+Two new dashboards are available:
+
+1. **Future Load Predictions** (`future-load-predictions.json`)
+   - Measured vs Predicted power comparison
+   - Prediction confidence intervals
+   - Prediction accuracy gauge
+   - Confidence interval width
+   - Detailed prediction results table
+
+2. **Efficiency Forecasting** (`efficiency-forecasting.json`)
+   - Energy efficiency scores by scenario
+   - Efficiency rankings table
+   - Top 5 most efficient configurations
+   - Efficiency score distribution
+
+### Model Selection
+
+The predictor automatically selects the best model based on cross-validation R² scores:
+
+```
+Training 5 models on 12 samples...
+  linear: R²=0.9234, RMSE=15.23
+  poly2: R²=0.9567, RMSE=11.45
+  poly3: R²=0.9601, RMSE=10.89
+  rf: R²=0.9823, RMSE=7.34
+  gbm: R²=0.9891, RMSE=5.67
+
+Best model: gbm (R²=0.9891, RMSE=5.67)
+```
+
+### Confidence Intervals
+
+Prediction uncertainty is quantified using bootstrapped confidence intervals:
+
+1. **Training Phase**: Store training data (X, y)
+2. **Bootstrap Resampling**: Create N bootstrap samples (default: 100)
+3. **Model Training**: Train model on each bootstrap sample
+4. **Prediction**: Generate N predictions for the same input
+5. **Confidence Bounds**: Calculate percentiles (e.g., 2.5% and 97.5% for 95% CI)
+
+Example output:
+```
+Predicted Power: 213.7 W
+95% Confidence Interval: [202.3, 225.1] W
+Confidence Width: 22.8 W
+```
+
+**Interpretation:**
+- Narrow CI (< 10 W): High confidence, model is certain
+- Medium CI (10-30 W): Moderate confidence, some uncertainty
+- Wide CI (> 30 W): Low confidence, model is uncertain
+
+---
+
+## PowerPredictor (v0.1) - Simple Univariate Model
+
+The original PowerPredictor remains available for backward compatibility and simple use cases.
+
+### Mathematical Model
+>>>>>>> feature/ml-regression
 
 ### Linear Regression (< 6 unique stream counts)
 
