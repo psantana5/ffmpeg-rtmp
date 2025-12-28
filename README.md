@@ -474,6 +474,29 @@ The legacy helper script `setup.sh` exists and performs basic checks and starts 
   - `make nvidia-up-build`
 - Ensure `nvidia-container-toolkit` is installed.
 
+### Results-exporter shows no data in Grafana
+
+The results-exporter reads test results from the `test_results` directory and exposes them as Prometheus metrics.
+
+**Issue**: New test result files added after container startup are not visible
+
+**Solution**: The fix has been implemented to ensure:
+- The `test_results` directory is automatically created when starting the stack with `make up` or `make up-build`
+- The results-exporter container creates the directory if it doesn't exist on startup
+- Files added after container startup are automatically detected on the next metrics scrape
+
+**Verification**:
+1. Check that the directory exists: `ls -la test_results/`
+2. Check results-exporter logs: `make logs SERVICE=results-exporter`
+3. Look for messages like:
+   - `Results exporter initialized with results_dir=/results`
+   - `Directory exists: True`
+   - `New results file detected: test_results_YYYYMMDD_HHMMSS.json`
+
+**Manual fix** (if needed):
+- Ensure the directory exists: `mkdir -p test_results`
+- Restart the results-exporter: `docker compose restart results-exporter`
+
 ---
 
 ## Project layout

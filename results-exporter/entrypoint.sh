@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Ensure results directory exists and is writable
 RESULTS_DIR=${RESULTS_DIR:-/results}

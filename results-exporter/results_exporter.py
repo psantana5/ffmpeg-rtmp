@@ -462,8 +462,8 @@ class ResultsExporter:
 
         run_id = latest.stem
         
-        # Detect new results file and log it
-        if run_id != self._cached_run_id:
+        # Detect new results file and log it (skip initial empty cache)
+        if run_id != self._cached_run_id and self._cached_run_id != "":
             print(f"New results file detected: {latest.name}")
         
         if (now - self._last_refresh) < self.cache_seconds and run_id == self._cached_run_id:
@@ -472,7 +472,12 @@ class ResultsExporter:
         try:
             data = self._load_results(latest)
             scenarios = data.get("scenarios", [])
-            print(f"Loaded {len(scenarios)} scenarios from {latest.name}")
+            if self._cached_run_id == "":
+                # First time loading
+                print(f"Loaded {len(scenarios)} scenarios from {latest.name}")
+            else:
+                # New file loaded
+                print(f"Loaded {len(scenarios)} scenarios from {latest.name}")
         except Exception:
             return (
                 "# HELP results_exporter_up Results exporter is running\n"
