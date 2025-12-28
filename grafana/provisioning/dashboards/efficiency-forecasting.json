@@ -23,8 +23,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "Prometheus",
+        "uid": "${DS_PROMETHEUS}"
       },
       "description": "Energy efficiency score represents pixels delivered per joule consumed or Mbps per watt, depending on scenario type.",
       "fieldConfig": {

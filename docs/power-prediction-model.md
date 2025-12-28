@@ -2,6 +2,20 @@
 
 ## Overview
 
+<<<<<<< HEAD
+The Power Prediction Model is a machine learning-based system that predicts power consumption for FFmpeg transcoding workloads based on the number of concurrent streams. This enables capacity planning, cost estimation, and energy-aware scaling decisions without requiring exhaustive testing.
+
+**Key Features:**
+- Automatic model selection (linear vs polynomial regression)
+- Robust scenario name parsing
+- Handles missing data gracefully
+- Provides prediction confidence through R² scores
+- Exports predictions to CSV for further analysis
+
+---
+
+## Mathematical Model
+=======
 The Power Prediction Model is a machine learning-based system that predicts power consumption for FFmpeg transcoding workloads. This document covers two predictors:
 
 1. **PowerPredictor** (v0.1): Simple univariate predictor based on stream count
@@ -223,6 +237,7 @@ Confidence Width: 22.8 W
 The original PowerPredictor remains available for backward compatibility and simple use cases.
 
 ### Mathematical Model
+>>>>>>> feature/ml-regression
 
 ### Linear Regression (< 6 unique stream counts)
 

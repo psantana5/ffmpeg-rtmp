@@ -5,11 +5,11 @@ import os
 import re
 import sys
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from statistics import mean, stdev
 from urllib.parse import urlencode
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -127,7 +127,7 @@ class ResultsExporter:
         self._last_refresh = 0.0
         self._cached_metrics = ""
         self._cached_run_id = ""
-        
+
         # ML predictor for future predictions
         self.predictor = None
         self.predictor_trained = False
@@ -162,13 +162,13 @@ class ResultsExporter:
         """Extract labels for a scenario including derived metadata."""
         # Extract stream count from scenario name
         streams = self._extract_stream_count(scenario)
-        
+
         # Determine output ladder identifier
         output_ladder = self._get_output_ladder_id(scenario)
-        
+
         # Detect encoder type (cpu/gpu) from scenario metadata or name
         encoder_type = scenario.get("encoder_type", self._detect_encoder_type(scenario))
-        
+
         return {
             "scenario": str(scenario.get("name", "")),
             "bitrate": str(scenario.get("bitrate", "")),
@@ -178,7 +178,7 @@ class ResultsExporter:
             "output_ladder": output_ladder,
             "encoder_type": encoder_type,
         }
-    
+
     def _extract_stream_count(self, scenario: dict) -> int:
         """
         Extract number of concurrent streams from scenario name.
@@ -200,7 +200,7 @@ class ResultsExporter:
         if match:
             return int(match.group(1))
         return 1
-    
+
     def _get_output_ladder_id(self, scenario: dict) -> str:
         """
         Get output ladder identifier for grouping scenarios.
@@ -225,7 +225,7 @@ class ResultsExporter:
             - Missing outputs field -> Uses single resolution/fps
         """
         outputs = scenario.get("outputs")
-        
+
         if outputs and isinstance(outputs, list) and len(outputs) > 0:
             # Multi-resolution ladder
             ladder_parts = []
@@ -237,22 +237,22 @@ class ResultsExporter:
                     width, height = self._parse_resolution(resolution)
                     if width and height:
                         ladder_parts.append((width, height, fps, resolution))
-            
+
             if ladder_parts:
                 # Sort by width (descending), then height (descending)
                 ladder_parts.sort(key=lambda x: (x[0], x[1]), reverse=True)
                 # Build ladder string
                 formatted = [f"{res}@{fps}" for _, _, fps, res in ladder_parts]
                 return ",".join(formatted)
-        
+
         # Single resolution
         resolution = scenario.get("resolution", "N/A")
         fps = scenario.get("fps", "N/A")
         if resolution != "N/A" and fps != "N/A":
             return f"{resolution}@{fps}"
-        
+
         return "unknown"
-    
+
     def _detect_encoder_type(self, scenario: dict) -> str:
         """
         Detect encoder type (cpu/gpu) from scenario name or metadata.
@@ -278,16 +278,16 @@ class ResultsExporter:
             {"name": "2 streams @ 2500k"} -> "cpu" (default)
         """
         name = scenario.get("name", "").lower()
-        
+
         # Check for explicit mentions
         if "gpu" in name or "nvenc" in name or "qsv" in name or "vaapi" in name:
             return "gpu"
         if "cpu" in name or "x264" in name or "libx264" in name:
             return "cpu"
-        
+
         # Default to CPU for most scenarios
         return "cpu"
-    
+
     def _compute_efficiency_score(self, scenario: dict, stats: dict) -> float | None:
         """
         Compute energy efficiency score for a scenario.
@@ -332,14 +332,14 @@ class ResultsExporter:
         mean_watts = stats.get("mean_power_w", 0)
         total_energy_j = stats.get("total_energy_j", 0)
         duration = stats.get("duration_s", 0)
-        
+
         if mean_watts <= 0 or total_energy_j <= 0 or duration <= 0:
             return None
-        
+
         # Try to compute pixels per joule (preferred for output ladders)
         outputs = scenario.get("outputs")
         total_pixels = 0
-        
+
         if outputs and isinstance(outputs, list):
             # Multi-resolution ladder
             for output in outputs:
@@ -355,21 +355,21 @@ class ResultsExporter:
             width, height = self._parse_resolution(resolution)
             if width and height and fps:
                 total_pixels = width * height * fps * duration
-        
+
         if total_pixels > 0:
             # Pixels per joule
             return total_pixels / total_energy_j
-        
+
         # Fallback: throughput per watt
         bitrate_mbps = _parse_bitrate_to_mbps(scenario.get("bitrate", ""))
         streams = self._extract_stream_count(scenario)
         throughput_mbps = bitrate_mbps * streams
-        
+
         if throughput_mbps > 0:
             return throughput_mbps / mean_watts
-        
+
         return None
-    
+
     def _parse_resolution(self, resolution: str) -> tuple[int | None, int | None]:
         """
         Parse resolution string to (width, height) tuple.
@@ -395,7 +395,7 @@ class ResultsExporter:
         """
         if not resolution or resolution == "N/A":
             return (None, None)
-        
+
         try:
             parts = resolution.lower().split('x')
             if len(parts) == 2:
@@ -404,8 +404,23 @@ class ResultsExporter:
                 return (width, height)
         except (ValueError, AttributeError):
             pass
-        
+
         return (None, None)
+
+    def _is_baseline_scenario(self, scenario: dict, baseline: dict | None) -> bool:
+        """
+        Check if a scenario is the baseline scenario.
+
+        Args:
+            scenario: Scenario to check
+            baseline: Baseline scenario or None
+
+        Returns:
+            True if scenario is the baseline, False otherwise
+        """
+        if baseline is None:
+            return False
+        return scenario.get('name') == baseline.get('name')
 
     def _labels_str(self, labels: dict) -> str:
         parts = [f'{k}="{_escape_label_value(str(v))}"' for k, v in labels.items()]
@@ -483,7 +498,7 @@ class ResultsExporter:
             "prediction_confidence_high": prediction_confidence_high,
             "prediction_confidence_low": prediction_confidence_low,
         }
-    
+
     def _train_predictor(self, scenarios: list[dict]):
         """
         Train multivariate predictor on collected scenario data.
@@ -497,12 +512,12 @@ class ResultsExporter:
         """
         if not PREDICTOR_AVAILABLE:
             return
-        
+
         # Only train if we have enough data
         if len(scenarios) < 3:
             print(f"Insufficient scenarios for ML training: {len(scenarios)} < 3")
             return
-        
+
         try:
             # Initialize predictor if needed
             if self.predictor is None:
@@ -513,7 +528,7 @@ class ResultsExporter:
                     n_bootstrap=50,  # Reduced for performance
                     cv_folds=min(3, len(scenarios))
                 )
-            
+
             # Train on mean_power_watts
             print(f"Training ML predictor on {len(scenarios)} scenarios...")
             success = self.predictor.fit(scenarios, target='mean_power_watts')
@@ -531,7 +546,7 @@ class ResultsExporter:
             import traceback
             traceback.print_exc()
             self.predictor_trained = False
-    
+
     def _predict_for_scenario(self, scenario: dict, stats: dict) -> dict | None:
         """
         Generate predictions for a scenario using trained ML model.
@@ -545,29 +560,29 @@ class ResultsExporter:
         """
         if not self.predictor_trained or self.predictor is None:
             return None
-        
+
         try:
             # Extract features for prediction
             features = self.predictor._extract_features(scenario)
             if features is None:
                 return None
-            
+
             # Make prediction with confidence intervals
             prediction = self.predictor.predict(features, return_confidence=True)
-            
+
             # Predict energy (power * duration)
             if prediction['mean'] and stats.get('duration_s'):
                 predicted_energy = prediction['mean'] * stats['duration_s']
             else:
                 predicted_energy = None
-            
+
             return {
                 'power_watts': prediction.get('mean'),
                 'energy_joules': predicted_energy,
                 'ci_low': prediction.get('ci_low'),
                 'ci_high': prediction.get('ci_high'),
             }
-        
+
         except Exception:
             return None
 
@@ -582,11 +597,11 @@ class ResultsExporter:
             )
 
         run_id = latest.stem
-        
+
         # Detect new results file and log it (skip initial empty cache)
         if run_id != self._cached_run_id and self._cached_run_id != "":
             print(f"New results file detected: {latest.name}")
-        
+
         if (now - self._last_refresh) < self.cache_seconds and run_id == self._cached_run_id:
             return self._cached_metrics
 
@@ -664,7 +679,7 @@ class ResultsExporter:
         baseline_stats = None
         if baseline and baseline.get("start_time") and baseline.get("end_time"):
             baseline_stats = self._compute_scenario_stats(baseline["start_time"], baseline["end_time"], baseline)
-        
+
         # Collect scenarios with stats for predictor training
         scenarios_with_stats = []
         for scenario in scenarios:
@@ -687,7 +702,7 @@ class ResultsExporter:
             }
             scenario_copy['duration'] = stats['duration_s']
             scenarios_with_stats.append((scenario_copy, stats))
-        
+
         # Train predictor on scenarios with valid data
         # Retrain if we have a new run_id or if predictor hasn't been trained yet
         if PREDICTOR_AVAILABLE:
@@ -703,7 +718,7 @@ class ResultsExporter:
         for scenario_copy, stats in scenarios_with_stats:
             # Use original scenario for labels
             scenario = next((s for s in scenarios if s.get('name') == scenario_copy.get('name')), scenario_copy)
-            
+
             labels = {"run_id": run_id}
             labels.update(self._scenario_labels(scenario))
             lbl = self._labels_str(labels)
@@ -723,17 +738,17 @@ class ResultsExporter:
                 output.append(f"results_scenario_energy_wh_per_mbps{lbl} {stats['energy_wh_per_mbps']:.6f}")
             if stats["energy_mj_per_frame"] is not None:
                 output.append(f"results_scenario_energy_mj_per_frame{lbl} {stats['energy_mj_per_frame']:.4f}")
-            
+
             # Compute and export efficiency score
             efficiency_score = self._compute_efficiency_score(scenario, stats)
             if efficiency_score is not None:
                 output.append(f"results_scenario_efficiency_score{lbl} {efficiency_score:.4e}")
-            
+
             # Compute and export total pixels
             outputs = scenario.get("outputs")
             total_pixels = 0
             duration = stats.get("duration_s", 0)
-            
+
             if outputs and isinstance(outputs, list):
                 for output_item in outputs:
                     resolution = output_item.get("resolution", "")
@@ -747,7 +762,7 @@ class ResultsExporter:
                 width, height = self._parse_resolution(resolution)
                 if width and height and fps and duration:
                     total_pixels = width * height * fps * duration
-            
+
             if total_pixels > 0:
                 output.append(f"results_scenario_total_pixels{lbl} {total_pixels:.0f}")
             
@@ -772,7 +787,7 @@ class ResultsExporter:
                 output.append(f"results_scenario_predicted_power_watts{lbl} NaN")
                 output.append(f"results_scenario_predicted_energy_joules{lbl} NaN")
 
-            if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
+            if baseline_stats and not self._is_baseline_scenario(scenario, baseline):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
                 d_energy = stats["total_energy_wh"] - baseline_stats["total_energy_wh"]
                 d_cpu = stats["container_cpu_percent"] - baseline_stats["container_cpu_percent"]
