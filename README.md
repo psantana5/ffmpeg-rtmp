@@ -609,3 +609,228 @@ The results-exporter reads test results from the `test_results` directory and ex
 - Add Parquet/JSON exports for analysis workflows.
 - Add statistical tests (t-test) across scenario groups.
 - Add AMD GPU support (ROCm exporter).
+
+---
+
+## Scripts & ML Diagnostics Tools
+
+The `scripts/` directory provides utilities for data validation, exporter diagnostics, and detailed observability of the machine learning stack used for power prediction.
+
+### ML Diagnostics
+
+#### ml_overview.py - Model Overview
+
+Display information about trained ML models:
+
+```bash
+# Show all trained models
+make ml-info
+# or
+python3 scripts/queries/ml_overview.py
+
+# Show specific model
+python3 scripts/queries/ml_overview.py --model models/multivariate_predictor.pkl
+
+# JSON output
+python3 scripts/queries/ml_overview.py --json
+```
+
+**Output includes:**
+- Model name, version, and type (Linear, Polynomial, RandomForest, GradientBoosting)
+- Feature list used for prediction (e.g., bitrate_mbps, total_pixels, stream_count)
+- Training sample count
+- Performance metrics (R², RMSE, MAE)
+- Hardware profile associated with the model
+- Model comparison across ensemble
+
+**Example output:**
+```
+======================================================================
+Model: multivariate_predictor.pkl
+======================================================================
+Path:           models/multivariate_predictor.pkl
+Type:           MultivariatePredictor
+Trained:        Yes
+Best Model:     Gradient Boosting
+
+Training:
+  Samples:      12
+  
+Features (7):
+  stream_count, bitrate_mbps, total_pixels, cpu_usage_pct, ...
+
+Target:         mean_power_watts
+
+Performance:
+  R²:           0.9891
+  RMSE:         5.67
+
+  Model Comparison:
+    Linear Regression              R²=0.9234  RMSE=15.23
+    Polynomial Regression (deg 2)  R²=0.9567  RMSE=11.45
+    Random Forest                  R²=0.9823  RMSE=7.34
+    Gradient Boosting              R²=0.9891  RMSE=5.67
+
+Hardware:       Intel(R) Core i7-8700K
+Version:        1.0
+Confidence:     95%
+```
+
+#### ml_debug.py - Model Debugging
+
+Evaluate internal behavior of prediction models:
+
+```bash
+# Full analysis (residuals + feature importance)
+make ml-debug
+# or
+python3 scripts/queries/ml_debug.py
+
+# Deep dive into specific scenario
+python3 scripts/queries/ml_debug.py --scenario "4 Streams @ 2500k"
+
+# Adjust outlier detection threshold
+python3 scripts/queries/ml_debug.py --outlier-threshold 3.0
+
+# JSON output
+python3 scripts/queries/ml_debug.py --json
+```
+
+**Features:**
+- **Per-sample residual analysis:** Measured vs predicted power consumption
+- **Outlier detection:** Identifies scenarios with prediction errors > N standard deviations
+- **Feature importance:** Shows which features most influence predictions (for tree-based models)
+- **Confidence intervals:** Displays prediction uncertainty (for multivariate models)
+- **Scenario deep dive:** Detailed analysis of a specific test scenario
+
+**Example output:**
+```
+======================================================================
+RESIDUAL ANALYSIS (Measured - Predicted)
+======================================================================
+
+Scenario                                   Measured  Predicted   Residual
+----------------------------------------------------------------------
+1 Stream @ 2500k                              45.00      45.23      -0.23
+2 Streams @ 2500k                             80.00      78.45       1.55
+4 Streams @ 2500k                            150.00     145.12       4.88
+8 streams @ 1080p                            280.00     278.67       1.33
+
+======================================================================
+FEATURE IMPORTANCE (Sorted by Impact)
+======================================================================
+
+Feature                                      Importance
+----------------------------------------------------------------------
+stream_count                                   0.452301
+total_pixels                                   0.283145
+bitrate_mbps                                   0.154782
+cpu_usage_pct                                  0.089234
+container_cpu_pct                              0.020538
+```
+
+### Data Validation & Diagnostics
+
+#### list_exporters.py - List Prometheus Exporters
+
+```bash
+python3 scripts/queries/list_exporters.py
+python3 scripts/queries/list_exporters.py --json
+```
+
+Shows all configured Prometheus scrape targets with health status.
+
+#### query_metrics.py - Query Prometheus Metrics
+
+```bash
+# Instant query
+python3 scripts/queries/query_metrics.py --query 'rapl_power_watts'
+
+# Range query (last hour)
+python3 scripts/queries/query_metrics.py --query 'rapl_power_watts' --range 1h
+
+# With statistics
+python3 scripts/queries/query_metrics.py --query 'up' --stats
+```
+
+#### hardware_info.py - Display Hardware Information
+
+```bash
+python3 scripts/queries/hardware_info.py
+python3 scripts/queries/hardware_info.py --json
+```
+
+Shows CPU model, frequency, core count, memory, and Intel RAPL support.
+
+#### validate_results.py - Validate Test Results
+
+```bash
+# Validate latest results
+python3 scripts/queries/validate_results.py
+
+# Validate specific file
+python3 scripts/queries/validate_results.py --file test_results/test_results_20240101_120000.json
+
+# Validate all files
+python3 scripts/queries/validate_results.py --all
+```
+
+Checks test results for:
+- Required fields
+- Data consistency
+- Power measurement validity
+- Timestamp ordering
+
+#### compare_runs.py - Compare Test Runs
+
+```bash
+# Compare two specific runs
+python3 scripts/queries/compare_runs.py --file1 test_results/test_results_20240101_120000.json \
+                                        --file2 test_results/test_results_20240102_120000.json
+
+# Compare latest two runs
+python3 scripts/queries/compare_runs.py --latest 2
+```
+
+Compares scenarios across different test runs to identify:
+- Performance differences
+- Power consumption changes
+- Efficiency improvements/regressions
+
+### Typical Workflow
+
+1. **After running tests**, analyze results:
+   ```bash
+   make analyze
+   ```
+
+2. **Inspect trained models**:
+   ```bash
+   make ml-info
+   ```
+
+3. **Debug model predictions**:
+   ```bash
+   make ml-debug
+   ```
+
+4. **Validate test data quality**:
+   ```bash
+   python3 scripts/queries/validate_results.py --all
+   ```
+
+5. **Compare before/after optimization**:
+   ```bash
+   python3 scripts/queries/compare_runs.py --latest 2
+   ```
+
+### Design Principles
+
+All scripts follow project conventions:
+- **Python 3** with standard library and minimal dependencies
+- **argparse CLI** with comprehensive help text
+- **Human-readable output** by default
+- **--json flag** for machine-readable output
+- **Logging + error handling** aligned with project style
+- **Graceful degradation** when data is missing or incomplete
+
