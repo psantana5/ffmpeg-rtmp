@@ -241,7 +241,7 @@ class CostMetricsExporter:
             if cpu_values:
                 scenario['cpu_usage_cores'] = cpu_values
                 scenario['step_seconds'] = step_seconds
-                logger.info(
+                logger.debug(
                     f"Scenario '{scenario_name}': "
                     f"Enriched with {len(cpu_values)} CPU measurements"
                 )
@@ -253,7 +253,7 @@ class CostMetricsExporter:
             
             if power_values:
                 scenario['power_watts'] = power_values
-                logger.info(
+                logger.debug(
                     f"Scenario '{scenario_name}': "
                     f"Enriched with {len(power_values)} power measurements"
                 )
@@ -392,7 +392,7 @@ class CostMetricsExporter:
                     metrics_emitted += 1
             else:
                 scenarios_without_data += 1
-                logger.info(
+                logger.debug(
                     f"Scenario '{scenario_name}': No load-aware data available, "
                     f"emitting metrics with value 0"
                 )

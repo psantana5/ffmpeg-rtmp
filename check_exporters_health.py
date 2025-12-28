@@ -144,16 +144,18 @@ class HealthCheckResult:
 class ExporterHealthChecker:
     """Checks health of Prometheus exporters."""
     
-    def __init__(self, exporters: List[ExporterConfig], timeout: int = 10):
+    def __init__(self, exporters: List[ExporterConfig], timeout: int = 10, use_unicode: bool = True):
         """
         Initialize health checker.
         
         Args:
             exporters: List of exporters to check
             timeout: Request timeout in seconds
+            use_unicode: Use Unicode characters in output (default: True)
         """
         self.exporters = exporters
         self.timeout = timeout
+        self.use_unicode = use_unicode
         self.results: Dict[str, HealthCheckResult] = {}
     
     def fetch_metrics(self, url: str) -> Optional[str]:
@@ -292,7 +294,8 @@ class ExporterHealthChecker:
         
         if metrics_text is None:
             result.error_message = f"Failed to reach {config.url}"
-            logger.warning(f"❌ {config.name}: Not reachable")
+            status_icon = "X" if not self.use_unicode else "❌"
+            logger.warning(f"{status_icon} {config.name}: Not reachable")
             return result
         
         result.is_reachable = True
@@ -305,7 +308,8 @@ class ExporterHealthChecker:
         
         if not result.has_metrics:
             result.error_message = "No metrics found"
-            logger.warning(f"⚠️  {config.name}: No metrics found")
+            status_icon = "!" if not self.use_unicode else "⚠️"
+            logger.warning(f"{status_icon}  {config.name}: No metrics found")
             return result
         
         # Check for expected metrics
@@ -317,8 +321,9 @@ class ExporterHealthChecker:
         
         if not has_expected:
             result.error_message = f"Missing metrics: {', '.join(missing)}"
+            status_icon = "!" if not self.use_unicode else "⚠️"
             logger.warning(
-                f"⚠️  {config.name}: Missing expected metrics: {', '.join(missing)}"
+                f"{status_icon}  {config.name}: Missing expected metrics: {', '.join(missing)}"
             )
         
         # Check for data
@@ -326,12 +331,14 @@ class ExporterHealthChecker:
         
         if not result.has_data:
             result.error_message = "No data in metrics"
-            logger.warning(f"⚠️  {config.name}: No data in metrics")
+            status_icon = "!" if not self.use_unicode else "⚠️"
+            logger.warning(f"{status_icon}  {config.name}: No data in metrics")
         
         # Log success
         if result.is_healthy:
+            status_icon = "OK" if not self.use_unicode else "✓"
             logger.info(
-                f"✓ {config.name}: OK ({metric_count} metrics, {sample_count} samples)"
+                f"{status_icon} {config.name}: OK ({metric_count} metrics, {sample_count} samples)"
             )
         
         return result
@@ -414,6 +421,9 @@ class ExporterHealthChecker:
     
     def print_summary(self):
         """Print a human-readable summary."""
+        ok_icon = "OK" if not self.use_unicode else "✓ OK"
+        fail_icon = "FAIL" if not self.use_unicode else "✗ FAIL"
+        
         print()
         print("=" * 80)
         print("EXPORTER HEALTH SUMMARY")
@@ -422,7 +432,7 @@ class ExporterHealthChecker:
         print("-" * 80)
         
         for name, result in sorted(self.results.items()):
-            status = "✓ OK" if result.is_healthy else "✗ FAIL"
+            status = ok_icon if result.is_healthy else fail_icon
             notes = result.error_message or ""
             
             print(
@@ -505,6 +515,11 @@ def main():
         action='store_true',
         help='Enable debug logging'
     )
+    parser.add_argument(
+        '--no-unicode',
+        action='store_true',
+        help='Disable Unicode characters in output'
+    )
     
     args = parser.parse_args()
     
@@ -512,7 +527,11 @@ def main():
         logger.setLevel(logging.DEBUG)
     
     # Create checker
-    checker = ExporterHealthChecker(EXPORTERS, timeout=args.timeout)
+    checker = ExporterHealthChecker(
+        EXPORTERS, 
+        timeout=args.timeout,
+        use_unicode=not args.no_unicode
+    )
     
     # Server mode
     if args.port > 0:
