@@ -49,7 +49,10 @@ This document tracks the integration status of all exporters in the ffmpeg-rtmp 
   - `qoe_quality_per_watt` - Quality per watt efficiency
   - `qoe_efficiency_score` - QoE efficiency score
   - `qoe_computation_duration_seconds` - Metric computation time
-- **Grafana Dashboards**: ❌ **TODO**: Create QoE dashboard
+- **Grafana Dashboards**: ✅ **CREATED** as `grafana/provisioning/dashboards/qoe-dashboard.json`
+  - 7 panels: VMAF timeseries, PSNR timeseries, Quality/Watt efficiency, QoE efficiency score
+  - Gauges for average VMAF and PSNR scores
+  - Pie chart for computation time distribution
 
 #### 5. Cost Exporter (Port 9504)
 - **Status**: ⚠️ **NEWLY INTEGRATED** (requires testing)
@@ -69,7 +72,96 @@ This document tracks the integration status of all exporters in the ffmpeg-rtmp 
   - Energy cost: $0.12/kWh (configurable via ENV)
   - CPU cost: $0.50/hour (configurable via ENV)
   - Currency: USD (configurable via ENV)
-- **Grafana Dashboards**: ❌ **TODO**: Create cost analysis dashboard
+- **Grafana Dashboards**: ✅ **CREATED** as `grafana/provisioning/dashboards/cost-dashboard.json`
+  - 8 panels: Cost breakdown (stacked), total cost timeseries, cost per pixel, cost per watch hour
+  - Gauges for total and energy cost
+  - Donut chart for cost distribution
+  - Comparison table with all cost metrics
+
+## Testing Instructions
+
+### End-to-End Testing Procedure
+
+#### 1. Build and Start All Services
+```bash
+# Build the new exporters
+docker-compose build qoe-exporter cost-exporter
+
+# Start all services
+docker-compose up -d
+
+# Verify all containers are running
+docker-compose ps
+```
+
+#### 2. Verify Exporter Health
+```bash
+# Check QoE exporter
+curl http://localhost:9503/health
+# Expected: OK
+
+# Check cost exporter  
+curl http://localhost:9504/health
+# Expected: OK
+
+# Check metrics endpoints
+curl http://localhost:9503/metrics | grep qoe_
+curl http://localhost:9504/metrics | grep cost_
+```
+
+#### 3. Verify Prometheus Scraping
+1. Open Prometheus UI: http://localhost:9090
+2. Navigate to Status → Targets
+3. Verify `qoe-exporter` target is UP
+4. Verify `cost-exporter` target is UP
+5. Check for any scrape errors
+
+#### 4. Query Metrics in Prometheus
+```promql
+# QoE metrics
+qoe_vmaf_score
+qoe_psnr_score
+qoe_quality_per_watt
+qoe_efficiency_score
+
+# Cost metrics
+cost_total
+cost_energy
+cost_compute
+cost_per_pixel
+cost_per_watch_hour
+```
+
+#### 5. Verify Grafana Dashboards
+1. Open Grafana: http://localhost:3000 (admin/admin)
+2. Navigate to Dashboards
+3. Open "QoE (Quality of Experience) Dashboard"
+   - Verify all 7 panels render without errors
+   - Check that metrics are displayed (may show "No data" if no tests run yet)
+4. Open "Cost Analysis Dashboard"
+   - Verify all 8 panels render without errors
+   - Check that metrics are displayed
+
+#### 6. Run Test Workload
+```bash
+# Run a test scenario to generate data
+python3 run_tests.py --duration 60
+
+# Wait for test to complete and metrics to be scraped
+sleep 30
+
+# Refresh Grafana dashboards to see data
+```
+
+#### 7. Verify Data Flow
+1. Check that test results are written to `./test_results/`
+2. Verify exporters pick up the new test results (check logs)
+   ```bash
+   docker-compose logs qoe-exporter
+   docker-compose logs cost-exporter
+   ```
+3. Confirm metrics update in Prometheus
+4. Confirm dashboards display new data
 
 ## Testing Checklist
 
@@ -110,28 +202,21 @@ This document tracks the integration status of all exporters in the ffmpeg-rtmp 
 
 ## Future Work
 
-### Priority 1: Dashboard Creation
-- [ ] Create `grafana/provisioning/dashboards/qoe-dashboard.json`
-  - VMAF score timeseries
-  - PSNR score timeseries
-  - Quality per watt efficiency
-  - QoE efficiency score trends
+### Priority 1: Performance Tuning (Optional)
+- [ ] Tune cache TTL based on production load patterns
+- [ ] Optimize metric computation frequency
+- [ ] Add metric caching layer for high-traffic scenarios
 
-- [ ] Create `grafana/provisioning/dashboards/cost-dashboard.json`
-  - Total cost breakdown (energy vs compute)
-  - Cost per pixel trends
-  - Cost per watch hour analysis
-  - TCO projections
+### Priority 2: Advanced Features (Optional)
+- [ ] Add multi-currency support to cost exporter
+- [ ] Implement quality metric webhooks for alerts
+- [ ] Add cost forecasting and budgeting features
+- [ ] Create combined QoE+Cost optimization dashboard
 
-### Priority 2: Integration Testing
-- [ ] End-to-end test with real transcoding workloads
-- [ ] Verify metric accuracy against manual calculations
-- [ ] Performance testing under high load
-
-### Priority 3: Documentation
-- [ ] Add QoE exporter usage guide
+### Priority 3: Documentation Enhancement (Optional)
+- [ ] Add QoE exporter API documentation
 - [ ] Add cost exporter configuration guide
-- [ ] Update main README with new exporters
+- [ ] Create video tutorials for dashboard usage
 
 ## Related Files
 - `qoe_exporter.py` - QoE metrics exporter implementation
