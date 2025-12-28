@@ -5,6 +5,7 @@ Queries Prometheus and generates comprehensive reports
 Includes energy-aware transcoding recommendations
 """
 
+import argparse
 import csv
 import json
 import logging
@@ -15,7 +16,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from advisor import PowerPredictor, TranscodingRecommender
+from advisor import MultivariatePredictor, PowerPredictor, TranscodingRecommender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -695,10 +696,141 @@ class ResultsAnalyzer:
                 writer.writerow(row)
 
         logger.info(f"CSV exported to {output_file}")
+    
+    def print_multivariate_predictions(self, results: List[Dict], predictor: MultivariatePredictor, stream_counts: List[int]):
+        """
+        Print multivariate model predictions for specified stream counts.
+        
+        Args:
+            results: List of analyzed scenario dicts
+            predictor: Trained MultivariatePredictor instance
+            stream_counts: List of stream counts to predict for
+        """
+        print(f"\n{'=' * 100}")
+        print("MULTIVARIATE MODEL PREDICTIONS")
+        print("=" * 100)
+        
+        info = predictor.get_model_info()
+        
+        if not info['trained']:
+            print("\nMultivariate predictor could not be trained (insufficient data)")
+            return
+        
+        print(f"\nModel: {info['best_model'].upper()}")
+        print(f"Training Samples: {info['n_samples']}")
+        print(f"Features: {', '.join(info['feature_names'])}")
+        print(f"R² Score: {info['best_score']['r2']:.4f}")
+        print(f"RMSE: {info['best_score']['rmse']:.2f} W")
+        print(f"Confidence Level: {info['confidence_level']*100:.0f}%")
+        
+        # Generate predictions for each stream count
+        print(f"\n{'─' * 100}")
+        print("Predicted Power Consumption with Confidence Intervals:")
+        print("─" * 100)
+        print(f"{'Streams':<10} {'Mean Power (W)':<18} {'CI Low (W)':<15} {'CI High (W)':<15} {'CI Width (W)':<15}")
+        print("─" * 100)
+        
+        # Use representative scenario for base features
+        if not results:
+            print("No results available for feature extraction")
+            return
+        
+        # Find a typical scenario (exclude baseline)
+        typical_scenario = next(
+            (r for r in results if 'baseline' not in r['name'].lower()),
+            results[0]
+        )
+        
+        for stream_count in stream_counts:
+            # Create feature dict based on typical scenario scaled to stream count
+            features = {
+                'stream_count': stream_count,
+                'bitrate_mbps': 2.5,  # Default bitrate
+                'total_pixels': 1920 * 1080 * 30 * 60,  # 1080p30 for 60s
+                'cpu_usage_pct': min(95.0, 20.0 + stream_count * 10),  # Estimated
+                'encoder_type': typical_scenario.get('encoder_type', 'x264'),
+                'hardware_cpu_model': typical_scenario.get('hardware', {}).get('cpu_model', 'unknown'),
+                'container_cpu_pct': min(10.0, 2.0 + stream_count * 0.5),  # Estimated
+            }
+            
+            prediction = predictor.predict(features, return_confidence=True)
+            
+            mean_power = prediction.get('mean', 0)
+            ci_low = prediction.get('ci_low', 0)
+            ci_high = prediction.get('ci_high', 0)
+            ci_width = prediction.get('ci_width', 0)
+            
+            print(
+                f"{stream_count:<10} {mean_power:>16.2f} "
+                f"{ci_low:>13.2f} {ci_high:>13.2f} {ci_width:>13.2f}"
+            )
+        
+        print("─" * 100)
+        
+        # Model comparison table
+        print(f"\n{'─' * 100}")
+        print("Model Performance Comparison:")
+        print("─" * 100)
+        print(f"{'Model':<20} {'R² Score':<15} {'RMSE (W)':<15}")
+        print("─" * 100)
+        
+        for model_name, scores in info['models'].items():
+            print(f"{model_name:<20} {scores['r2']:>13.4f} {scores['rmse']:>13.2f}")
+        
+        print("─" * 100)
+        print(f"\nBest Model: {info['best_model']} (highest R²)")
+        print("=" * 100 + "\n")
 
 
 def main():
-    if len(sys.argv) < 2:
+    parser = argparse.ArgumentParser(
+        description='Analyze FFmpeg power test results and generate predictions',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Analyze latest test results
+  python3 analyze_results.py
+  
+  # Analyze specific test file
+  python3 analyze_results.py test_results/test_results_20231215_143022.json
+  
+  # Generate predictions for future stream counts
+  python3 analyze_results.py --predict-future 1,2,4,8,12
+  
+  # Use multivariate predictor instead of simple linear model
+  python3 analyze_results.py --multivariate --predict-future 1,2,4,8,12,16
+        """
+    )
+    
+    parser.add_argument(
+        'results_file',
+        nargs='?',
+        type=Path,
+        help='Path to test results JSON file (default: latest in ./test_results/)'
+    )
+    
+    parser.add_argument(
+        '--predict-future',
+        type=str,
+        metavar='STREAMS',
+        help='Comma-separated list of stream counts to predict (e.g., "1,2,4,8,12")'
+    )
+    
+    parser.add_argument(
+        '--multivariate',
+        action='store_true',
+        help='Use multivariate ML predictor (more features, ensemble models)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Determine results file
+    if args.results_file:
+        results_file = args.results_file
+        if not results_file.exists():
+            logger.error(f"Results file not found: {results_file}")
+            return 1
+    else:
         # Find most recent results file
         results_dir = Path('./test_results')
         if results_dir.exists():
@@ -708,32 +840,63 @@ def main():
                 logger.info(f"Using most recent results file: {results_file}")
             else:
                 logger.error("No results files found in ./test_results")
-                print("Usage: python3 analyze_results.py [results_file.json]")
+                parser.print_help()
                 return 1
         else:
             logger.error("No results directory found")
-            print("Usage: python3 analyze_results.py [results_file.json]")
+            parser.print_help()
             return 1
-    else:
-        results_file = Path(sys.argv[1])
-        if not results_file.exists():
-            logger.error(f"Results file not found: {results_file}")
+    
+    # Parse prediction stream counts
+    predict_streams = None
+    if args.predict_future:
+        try:
+            predict_streams = [int(s.strip()) for s in args.predict_future.split(',')]
+            logger.info(f"Will predict for stream counts: {predict_streams}")
+        except ValueError:
+            logger.error(f"Invalid stream counts: {args.predict_future}")
             return 1
     
     try:
         analyzer = ResultsAnalyzer(results_file)
         results = analyzer.generate_report()
         
-        # Train PowerPredictor on the results
-        predictor = PowerPredictor()
-        predictor.fit(results)
-        
-        # Print summary with power predictions
+        # Print summary
         analyzer.print_summary(results)
-        analyzer.print_power_predictions(results, predictor)
         
-        # Export CSV with predictions
-        analyzer.export_csv(predictor=predictor)
+        # Train and use predictor
+        if args.multivariate:
+            # Use advanced multivariate predictor
+            logger.info("Training multivariate ML predictor...")
+            mv_predictor = MultivariatePredictor(
+                models=['linear', 'poly2', 'poly3', 'rf', 'gbm'],
+                confidence_level=0.95,
+                n_bootstrap=100,
+                cv_folds=5
+            )
+            
+            success = mv_predictor.fit(results, target='mean_power_watts')
+            
+            if success:
+                if predict_streams:
+                    analyzer.print_multivariate_predictions(results, mv_predictor, predict_streams)
+                else:
+                    # Default predictions
+                    analyzer.print_multivariate_predictions(results, mv_predictor, [1, 2, 4, 8, 12])
+            else:
+                logger.warning("Multivariate predictor training failed, falling back to simple predictor")
+                args.multivariate = False
+        
+        if not args.multivariate:
+            # Use simple PowerPredictor (backward compatible)
+            predictor = PowerPredictor()
+            predictor.fit(results)
+            
+            # Print power predictions
+            analyzer.print_power_predictions(results, predictor)
+            
+            # Export CSV with predictions
+            analyzer.export_csv(predictor=predictor)
         
         return 0
     except Exception as e:

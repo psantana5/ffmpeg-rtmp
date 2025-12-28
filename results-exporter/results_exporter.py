@@ -3,12 +3,22 @@
 import json
 import os
 import re
+import sys
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from statistics import mean
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from advisor import MultivariatePredictor
+    PREDICTOR_AVAILABLE = True
+except ImportError:
+    PREDICTOR_AVAILABLE = False
 
 
 def _escape_label_value(value: str) -> str:
@@ -118,9 +128,14 @@ class ResultsExporter:
         self._cached_metrics = ""
         self._cached_run_id = ""
         
+        # ML predictor for future predictions
+        self.predictor = None
+        self.predictor_trained = False
+        
         # Log initialization
         print(f"Results exporter initialized with results_dir={self.results_dir}")
         print(f"Directory exists: {self.results_dir.exists()}")
+        print(f"ML Predictor available: {PREDICTOR_AVAILABLE}")
         if self.results_dir.exists():
             files = list(self.results_dir.glob("test_results_*.json"))
             print(f"Found {len(files)} result file(s) at startup")
@@ -449,6 +464,85 @@ class ResultsExporter:
             "energy_wh_per_mbps": energy_wh_per_mbps,
             "energy_mj_per_frame": energy_mj_per_frame,
         }
+    
+    def _train_predictor(self, scenarios: list[dict]):
+        """
+        Train multivariate predictor on collected scenario data.
+        
+        This method trains ML models for power prediction on the available
+        scenario data. The predictor can then be used to generate predictions
+        for untested configurations.
+        
+        Args:
+            scenarios: List of scenario dicts with computed stats
+        """
+        if not PREDICTOR_AVAILABLE:
+            return
+        
+        # Only train if we have enough data
+        if len(scenarios) < 3:
+            return
+        
+        try:
+            # Initialize predictor if needed
+            if self.predictor is None:
+                self.predictor = MultivariatePredictor(
+                    models=['linear', 'poly2', 'rf'],  # Skip poly3 and gbm for speed
+                    confidence_level=0.95,
+                    n_bootstrap=50,  # Reduced for performance
+                    cv_folds=min(3, len(scenarios))
+                )
+            
+            # Train on mean_power_watts
+            success = self.predictor.fit(scenarios, target='mean_power_watts')
+            if success:
+                self.predictor_trained = True
+                print(f"ML predictor trained on {len(scenarios)} scenarios")
+                info = self.predictor.get_model_info()
+                print(f"  Best model: {info['best_model']} (R²={info['best_score']['r2']:.4f})")
+            
+        except Exception as e:
+            print(f"Failed to train predictor: {e}")
+            self.predictor_trained = False
+    
+    def _predict_for_scenario(self, scenario: dict, stats: dict) -> dict | None:
+        """
+        Generate predictions for a scenario using trained ML model.
+        
+        Args:
+            scenario: Scenario dict
+            stats: Computed stats for the scenario
+            
+        Returns:
+            Dict with prediction results or None if predictor not available
+        """
+        if not self.predictor_trained or self.predictor is None:
+            return None
+        
+        try:
+            # Extract features for prediction
+            features = self.predictor._extract_features(scenario)
+            if features is None:
+                return None
+            
+            # Make prediction with confidence intervals
+            prediction = self.predictor.predict(features, return_confidence=True)
+            
+            # Predict energy (power * duration)
+            if prediction['mean'] and stats.get('duration_s'):
+                predicted_energy = prediction['mean'] * stats['duration_s']
+            else:
+                predicted_energy = None
+            
+            return {
+                'power_watts': prediction.get('mean'),
+                'energy_joules': predicted_energy,
+                'ci_low': prediction.get('ci_low'),
+                'ci_high': prediction.get('ci_high'),
+            }
+        
+        except Exception:
+            return None
 
     def build_metrics(self) -> str:
         now = time.time()
@@ -526,19 +620,55 @@ class ResultsExporter:
         output.append("# TYPE results_scenario_efficiency_score gauge")
         output.append("# HELP results_scenario_total_pixels Total pixels delivered across all outputs")
         output.append("# TYPE results_scenario_total_pixels gauge")
+        output.append("# HELP results_scenario_predicted_power_watts Predicted power consumption (W) from ML model")
+        output.append("# TYPE results_scenario_predicted_power_watts gauge")
+        output.append("# HELP results_scenario_predicted_energy_joules Predicted total energy (J) from ML model")
+        output.append("# TYPE results_scenario_predicted_energy_joules gauge")
+        output.append("# HELP results_scenario_predicted_efficiency_score Predicted efficiency score from ML model")
+        output.append("# TYPE results_scenario_predicted_efficiency_score gauge")
+        output.append("# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval")
+        output.append("# TYPE results_scenario_prediction_confidence_low gauge")
+        output.append("# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval")
+        output.append("# TYPE results_scenario_prediction_confidence_high gauge")
 
         baseline = self._find_baseline(scenarios)
         baseline_stats = None
         if baseline and baseline.get("start_time") and baseline.get("end_time"):
             baseline_stats = self._compute_scenario_stats(baseline["start_time"], baseline["end_time"], baseline)
-
+        
+        # Collect scenarios with stats for predictor training
+        scenarios_with_stats = []
         for scenario in scenarios:
             start = scenario.get("start_time")
             end = scenario.get("end_time")
             if not start or not end:
                 continue
-
             stats = self._compute_scenario_stats(start, end, scenario)
+            # Merge stats into scenario for predictor
+            scenario_copy = dict(scenario)
+            scenario_copy['power'] = {
+                'mean_watts': stats['mean_power_w'],
+                'total_energy_joules': stats['total_energy_j']
+            }
+            scenario_copy['container_usage'] = {
+                'cpu_percent': stats['container_cpu_percent']
+            }
+            scenario_copy['docker_overhead'] = {
+                'cpu_percent': 0.0  # Not directly available from stats
+            }
+            scenario_copy['duration'] = stats['duration_s']
+            scenarios_with_stats.append((scenario_copy, stats))
+        
+        # Train predictor on scenarios with valid data
+        if PREDICTOR_AVAILABLE and not self.predictor_trained:
+            valid_scenarios = [s for s, _ in scenarios_with_stats if s.get('power', {}).get('mean_watts')]
+            if len(valid_scenarios) >= 3:
+                self._train_predictor(valid_scenarios)
+
+        for scenario_copy, stats in scenarios_with_stats:
+            # Use original scenario for labels
+            scenario = next((s for s in scenarios if s.get('name') == scenario_copy.get('name')), scenario_copy)
+            
             labels = {"run_id": run_id}
             labels.update(self._scenario_labels(scenario))
             lbl = self._labels_str(labels)
@@ -585,8 +715,20 @@ class ResultsExporter:
             
             if total_pixels > 0:
                 output.append(f"results_scenario_total_pixels{lbl} {total_pixels:.0f}")
+            
+            # Generate ML predictions if predictor is trained
+            predictions = self._predict_for_scenario(scenario_copy, stats)
+            if predictions:
+                if predictions['power_watts'] is not None:
+                    output.append(f"results_scenario_predicted_power_watts{lbl} {predictions['power_watts']:.4f}")
+                if predictions['energy_joules'] is not None:
+                    output.append(f"results_scenario_predicted_energy_joules{lbl} {predictions['energy_joules']:.4f}")
+                if predictions['ci_low'] is not None:
+                    output.append(f"results_scenario_prediction_confidence_low{lbl} {predictions['ci_low']:.4f}")
+                if predictions['ci_high'] is not None:
+                    output.append(f"results_scenario_prediction_confidence_high{lbl} {predictions['ci_high']:.4f}")
 
-            if baseline_stats and scenario is not baseline:
+            if baseline_stats and scenario.get('name') != (baseline.get('name') if baseline else None):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]
                 d_energy = stats["total_energy_wh"] - baseline_stats["total_energy_wh"]
                 d_cpu = stats["container_cpu_percent"] - baseline_stats["container_cpu_percent"]
