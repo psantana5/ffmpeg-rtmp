@@ -464,7 +464,128 @@ The advisor is designed to be extended with:
 advisor/
 ├── __init__.py          # Public API
 ├── scoring.py           # Energy efficiency scoring algorithms
-└── recommender.py       # Ranking and recommendation logic
+├── recommender.py       # Ranking and recommendation logic
+└── cost.py              # Load-aware cost modeling
+```
+
+---
+
+## Load-Aware Cost Model
+
+### Overview
+
+The cost model provides realistic, production-grade cost analysis for video transcoding pipelines. Instead of using fixed wall-clock duration, costs are calculated based on **actual resource usage** from Prometheus metrics.
+
+### Cost Formulas
+
+**Compute Cost** (scales with CPU usage):
+```
+compute_cost_usd = sum_over_time(cpu_usage_cores[scenario]) × PRICE_PER_CORE_SECOND
+```
+
+**Energy Cost** (from integrated power measurements):
+```
+energy_joules = sum_over_time(power_watts × step_seconds)
+energy_cost_usd = energy_joules × PRICE_PER_JOULE
+```
+
+**Total Cost**:
+```
+total_cost = compute_cost + energy_cost
+```
+
+### Derived KPIs
+
+**Cost per Megapixel Delivered**:
+```python
+cost_per_megapixel = total_cost / total_pixels_encoded
+```
+
+**Cost per Viewer Watch Hour**:
+```python
+cost_per_watch_hour = total_cost / (viewer_count × watch_hours)
+```
+
+### Cost Scaling Behavior
+
+The load-aware model ensures costs reflect actual workload intensity:
+
+- ✅ **More streams** → Higher CPU usage → Higher cost
+- ✅ **Higher bitrate** → More processing → Higher cost
+- ✅ **Multi-resolution ladders** → More pixels encoded → Higher cost
+- ✅ **Idle baseline** → Minimal CPU usage → Lowest cost
+
+### Configuration
+
+**Pricing Constants** (not hardcoded):
+```bash
+# docker-compose.yml
+environment:
+  - ENERGY_COST_PER_KWH=0.12    # $/kWh
+  - CPU_COST_PER_HOUR=0.50      # $/hour per instance
+  - CURRENCY=USD
+```
+
+**Prometheus Integration**:
+```bash
+environment:
+  - PROMETHEUS_URL=http://prometheus:9090  # Enable load-aware mode
+```
+
+### Python API
+
+```python
+from advisor.cost import CostModel
+
+# Initialize with pricing
+model = CostModel(
+    energy_cost_per_kwh=0.12,
+    cpu_cost_per_hour=0.50,
+    currency='USD'
+)
+
+# Load-aware calculation (with Prometheus data)
+scenario = {
+    'name': '4 streams @ 5000k',
+    'cpu_usage_cores': [2.5, 2.8, 3.0, 2.9],  # From Prometheus
+    'power_watts': [150.0, 155.0, 160.0, 158.0],  # From Prometheus
+    'step_seconds': 5,  # Measurement interval
+    'duration': 20,  # Total duration
+    'resolution': '1920x1080',
+    'fps': 30,
+    'viewers': 100
+}
+
+total_cost = model.compute_total_cost_load_aware(scenario)
+compute_cost = model.compute_compute_cost_load_aware(scenario)
+energy_cost = model.compute_energy_cost_load_aware(scenario)
+cost_per_pixel = model.compute_cost_per_pixel_load_aware(scenario)
+cost_per_watch_hour = model.compute_cost_per_watch_hour_load_aware(scenario)
+
+print(f"Total Cost: ${total_cost:.4f}")
+print(f"  Compute: ${compute_cost:.4f}")
+print(f"  Energy:  ${energy_cost:.4f}")
+print(f"Cost per Megapixel: ${cost_per_pixel * 1e6:.2e}")
+print(f"Cost per Watch Hour: ${cost_per_watch_hour:.4f}")
+```
+
+### Grafana Dashboard
+
+The cost dashboard (`cost-dashboard.json`) shows:
+- Stacked energy + compute costs per scenario
+- Total cost breakdown
+- Cost per megapixel trends
+- Cost per watch hour comparison
+- Cost distribution pie charts
+
+All metrics include labels for scenario, streams, bitrate, and encoder type.
+
+### Legacy Mode
+
+The exporter supports legacy (duration-based) calculations when Prometheus data is unavailable:
+
+```bash
+python3 cost_exporter.py --disable-load-aware
 ```
 
 ---
