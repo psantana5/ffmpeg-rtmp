@@ -112,6 +112,9 @@ Exported by `results-exporter` service (port 9502):
 |--------|-------------|
 | `results_scenario_efficiency_score` | Energy efficiency (pixels/J or Mbps/W) |
 | `results_scenario_mean_power_watts` | Mean CPU power (W) |
+| `results_scenario_power_stdev` | Standard deviation of power measurements (W) |
+| `results_scenario_prediction_confidence_high` | Upper bound of prediction confidence interval (W) |
+| `results_scenario_prediction_confidence_low` | Lower bound of prediction confidence interval (W) |
 | `results_scenario_total_energy_joules` | Total energy (J) |
 | `results_scenario_total_energy_wh` | Total energy (Wh) |
 | `results_scenario_total_pixels` | Total pixels delivered |
@@ -129,6 +132,30 @@ Exported by `results-exporter` service (port 9502):
 - `output_ladder` - Output resolution ladder
 - `encoder_type` - Encoder type (cpu/gpu)
 - `run_id` - Test run identifier
+
+#### Prediction Confidence Metrics
+
+The prediction confidence metrics provide a statistical measure of the reliability of power predictions:
+
+- **`prediction_confidence_high`**: Upper bound of the 95% confidence interval (mean + 2×stdev)
+- **`prediction_confidence_low`**: Lower bound of the 95% confidence interval (mean - 2×stdev, minimum 0)
+- **`power_stdev`**: Standard deviation of power measurements during the scenario
+
+**Interpretation:**
+- **Narrow interval** (small stdev): High confidence - stable, consistent power consumption
+- **Wide interval** (large stdev): Low confidence - variable power consumption, less predictable
+
+**Example Queries:**
+```promql
+# Confidence interval width (measure of prediction reliability)
+results_scenario_prediction_confidence_high{run_id=~"$run_id"} - results_scenario_prediction_confidence_low{run_id=~"$run_id"}
+
+# Scenarios with high confidence (stable power consumption)
+results_scenario_power_stdev{run_id=~"$run_id"} < 5
+
+# Efficiency with confidence bounds
+results_scenario_efficiency_score{run_id=~"$run_id"}
+```
 
 ### RAPL Power Metrics
 Exported by `rapl-exporter` service (port 9500):
@@ -271,6 +298,47 @@ Optimize PromQL queries:
 - Limit time ranges for range queries
 - Add rate limiters if needed
 - Consider increasing Prometheus retention
+
+### Query Returns "Empty query result"
+
+**Symptom:** Query shows "Empty query result" or "Result series: 0"
+
+**Common Causes:**
+
+1. **Non-existent metrics:** The metric name is not exported by any exporter
+   - Verify metric exists: `curl http://localhost:9502/metrics | grep <metric_name>`
+   - Check available metrics in the "Metrics Reference" section above
+   - Note: Prediction confidence metrics (`results_scenario_prediction_confidence_high/low`) are now available
+
+2. **No data in time range:** Metric exists but has no data points in selected time range
+   - Adjust time range picker in Grafana
+   - Verify tests have been run: `ls -lh test_results/`
+
+3. **Label filter doesn't match:** Label selectors exclude all series
+   - Check label values: `curl http://localhost:9090/api/v1/label/<label>/values`
+   - Simplify query to test: remove label filters one by one
+
+4. **Datasource not configured:** Dashboard cannot reach Prometheus
+   - See "Datasource Issues" section below
+
+### Datasource Issues
+
+**Symptom:** "Cannot find datasource" or datasource errors
+
+**Common Causes:**
+
+1. **Dashboard file in wrong directory:**
+   - ✅ Dashboards belong in: `grafana/provisioning/dashboards/`
+   - ❌ **NOT** in: `grafana/provisioning/datasources/`
+   - Only `prometheus.yml` should be in datasources directory
+
+2. **Datasource variable not defined:**
+   - Verify dashboard has `DS_PROMETHEUS` variable in `templating.list`
+   - Check panels use `"uid": "${DS_PROMETHEUS}"`
+
+3. **Prometheus not running:**
+   - Check: `curl http://localhost:9090/-/healthy`
+   - View logs: `docker logs prometheus`
 
 ## Best Practices
 
