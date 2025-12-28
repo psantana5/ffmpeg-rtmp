@@ -61,6 +61,13 @@ You can:
   - Extensible for future quality metrics (VMAF/PSNR).
   - See [Power Prediction Documentation](docs/power-prediction-model.md) for details.
 
+- **Exporter Health Checker** (`exporter-health-checker`)
+  - Periodically monitors all exporters for health and data availability.
+  - Verifies exporters are reachable and returning expected metrics.
+  - Exposes health status as Prometheus metrics for alerting.
+  - Provides detailed logs for debugging exporter issues.
+  - See [Exporter Health Check Documentation](docs/exporter-health-check.md) for details.
+
 - **Prometheus** (`prometheus`)
   - Scrapes all exporters.
   - Loads alert rules from `prometheus-alerts.yml`.

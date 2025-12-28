@@ -236,6 +236,25 @@ services:
       timeout: 5s
       retries: 3
 
+  exporter-health-checker:
+    build:
+      context: .
+      dockerfile: Dockerfile.health-checker
+    container_name: exporter-health-checker
+    ports:
+      - "9600:9600"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - HEALTH_CHECK_PORT=9600
+    command: ["--port", "9600"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   streaming-net:
     driver: bridge
