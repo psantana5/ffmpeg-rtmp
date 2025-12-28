@@ -4,24 +4,32 @@ Cost Metrics Prometheus Exporter
 
 Exports cost analysis metrics as Prometheus metrics for Grafana visualization.
 
-Supports two modes:
-1. Legacy mode: Load costs from test_results JSON files (duration-based)
-2. Load-aware mode (recommended): Query Prometheus for real-time CPU/power metrics
+Exports two sets of metrics to avoid Prometheus time series conflicts:
+1. Legacy metrics (duration-based): cost_compute, cost_energy, cost_total
+2. Load-aware metrics: cost_compute_load_aware, cost_energy_load_aware, cost_total_load_aware
+
+Legacy metrics use wall-clock duration and hourly pricing.
+Load-aware metrics use actual CPU usage and power measurements from Prometheus.
 
 Metrics exported:
-- cost_total: Total cost per scenario (energy + compute)
-- cost_energy: Energy cost per scenario
-- cost_compute: Compute cost per scenario (CPU + GPU)
+- cost_total: Total cost per scenario (legacy, duration-based)
+- cost_energy: Energy cost per scenario (legacy, duration-based)
+- cost_compute: Compute cost per scenario (legacy, duration-based)
+- cost_total_load_aware: Total cost (load-aware, scales with actual usage)
+- cost_energy_load_aware: Energy cost (load-aware, scales with actual power)
+- cost_compute_load_aware: Compute cost (load-aware, scales with actual CPU)
 - cost_per_pixel: Cost per pixel delivered
 - cost_per_watch_hour: Cost per viewer watch hour
 
+All metrics include labels: scenario, streams, bitrate, encoder, currency, service
+
 Usage:
-    # Legacy mode (from test results)
-    python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
-    
-    # Load-aware mode (query Prometheus)
+    # With Prometheus for load-aware metrics
     python3 cost_exporter.py --port 9504 --prometheus-url http://prometheus:9090 \
         --energy-cost 0.12 --cpu-cost 0.50
+    
+    # Without Prometheus (legacy metrics only)
+    python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
 """
 
 import argparse
@@ -252,8 +260,9 @@ class CostMetricsExporter:
         """
         Generate Prometheus metrics in text format.
         
-        Uses load-aware calculations if Prometheus data is available,
-        otherwise falls back to legacy duration-based calculations.
+        Exports both legacy (duration-based) and load-aware metrics with different names:
+        - Legacy: cost_total, cost_energy, cost_compute (duration-based)
+        - Load-aware: cost_total_load_aware, cost_energy_load_aware, cost_compute_load_aware
         
         Returns:
             Prometheus metrics text
@@ -276,16 +285,24 @@ class CostMetricsExporter:
         
         # Metrics definitions
         currency = self.cost_model.currency
-        output.append(f"# HELP cost_total Total cost ({currency})")
+        # Legacy metrics (duration-based)
+        output.append(f"# HELP cost_total Total cost ({currency}) - legacy duration-based")
         output.append("# TYPE cost_total gauge")
-        output.append(f"# HELP cost_energy Energy cost ({currency})")
+        output.append(f"# HELP cost_energy Energy cost ({currency}) - legacy duration-based")
         output.append("# TYPE cost_energy gauge")
-        output.append(f"# HELP cost_compute Compute cost ({currency})")
+        output.append(f"# HELP cost_compute Compute cost ({currency}) - legacy duration-based")
         output.append("# TYPE cost_compute gauge")
         output.append(f"# HELP cost_per_pixel Cost per pixel ({currency})")
         output.append("# TYPE cost_per_pixel gauge")
         output.append(f"# HELP cost_per_watch_hour Cost per watch hour ({currency})")
         output.append("# TYPE cost_per_watch_hour gauge")
+        # Load-aware metrics
+        output.append(f"# HELP cost_total_load_aware Total cost ({currency}) - load-aware")
+        output.append("# TYPE cost_total_load_aware gauge")
+        output.append(f"# HELP cost_energy_load_aware Energy cost ({currency}) - load-aware")
+        output.append("# TYPE cost_energy_load_aware gauge")
+        output.append(f"# HELP cost_compute_load_aware Compute cost ({currency}) - load-aware")
+        output.append("# TYPE cost_compute_load_aware gauge")
         
         # Export metrics for each scenario
         for scenario in scenarios:
@@ -295,69 +312,69 @@ class CostMetricsExporter:
             safe_name = scenario_name.replace(' ', '_').replace('"', '')
             
             # Extract additional labels
-            streams = scenario.get('streams', 1)
+            streams = scenario.get('streams')
             bitrate = scenario.get('bitrate', '')
             encoder = scenario.get('encoder_type', 'unknown')
             
-            # Build labels
+            # Skip metrics without required labels (streams or bitrate)
+            if streams is None or not bitrate:
+                logger.debug(
+                    f"Skipping scenario '{scenario_name}': "
+                    f"missing streams or bitrate labels"
+                )
+                continue
+            
+            # Build labels with service label
             labels = (
                 f'scenario="{safe_name}",'
                 f'currency="{currency}",'
                 f'streams="{streams}",'
                 f'bitrate="{bitrate}",'
-                f'encoder="{encoder}"'
+                f'encoder="{encoder}",'
+                f'service="cost-analysis"'
             )
             
-            # Decide which cost calculation method to use
-            use_load_aware = (
-                self.use_load_aware and 
+            # Always compute legacy costs (duration-based)
+            legacy_total_cost = self.cost_model.compute_total_cost(scenario)
+            legacy_energy_cost = self.cost_model.compute_energy_cost(scenario)
+            legacy_compute_cost = self.cost_model.compute_compute_cost(scenario)
+            legacy_cost_per_pixel = self.cost_model.compute_cost_per_pixel(scenario)
+            legacy_cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour(
+                scenario, viewers=1
+            )
+            
+            # Export legacy metrics
+            if legacy_total_cost is not None:
+                output.append(f"cost_total{{{labels}}} {legacy_total_cost:.8f}")
+            if legacy_energy_cost is not None:
+                output.append(f"cost_energy{{{labels}}} {legacy_energy_cost:.8f}")
+            if legacy_compute_cost is not None:
+                output.append(f"cost_compute{{{labels}}} {legacy_compute_cost:.8f}")
+            if legacy_cost_per_pixel is not None:
+                output.append(f"cost_per_pixel{{{labels}}} {legacy_cost_per_pixel:.4e}")
+            if legacy_cost_per_watch_hour is not None:
+                output.append(
+                    f"cost_per_watch_hour{{{labels}}} {legacy_cost_per_watch_hour:.8f}"
+                )
+            
+            # Compute and export load-aware costs if data is available
+            has_load_aware_data = (
                 'cpu_usage_cores' in scenario and 
                 'power_watts' in scenario
             )
             
-            if use_load_aware:
-                # Load-aware calculations
-                total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
-                energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
-                compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
-                cost_per_pixel = self.cost_model.compute_cost_per_pixel_load_aware(scenario)
+            if has_load_aware_data:
+                load_aware_total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
+                load_aware_energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
+                load_aware_compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
                 
-                # For watch hour, try to get viewer count from scenario
-                viewers = scenario.get('viewers', 1)  # Default to 1 if not specified
-                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour_load_aware(
-                    scenario, viewers=viewers
-                )
-            else:
-                # Legacy calculations (duration-based)
-                total_cost = self.cost_model.compute_total_cost(scenario)
-                energy_cost = self.cost_model.compute_energy_cost(scenario)
-                compute_cost = self.cost_model.compute_compute_cost(scenario)
-                cost_per_pixel = self.cost_model.compute_cost_per_pixel(scenario)
-                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour(
-                    scenario, viewers=1
-                )
-            
-            # Export total cost
-            if total_cost is not None:
-                output.append(f"cost_total{{{labels}}} {total_cost:.8f}")
-            
-            # Export energy cost
-            if energy_cost is not None:
-                output.append(f"cost_energy{{{labels}}} {energy_cost:.8f}")
-            
-            # Export compute cost
-            if compute_cost is not None:
-                output.append(f"cost_compute{{{labels}}} {compute_cost:.8f}")
-            
-            # Export cost per pixel
-            if cost_per_pixel is not None:
-                output.append(f"cost_per_pixel{{{labels}}} {cost_per_pixel:.4e}")
-            
-            # Export cost per watch hour
-            if cost_per_watch_hour is not None:
-                output.append(
-                    f"cost_per_watch_hour{{{labels}}} {cost_per_watch_hour:.8f}"
-                )
+                # Export load-aware metrics
+                if load_aware_total_cost is not None:
+                    output.append(f"cost_total_load_aware{{{labels}}} {load_aware_total_cost:.8f}")
+                if load_aware_energy_cost is not None:
+                    output.append(f"cost_energy_load_aware{{{labels}}} {load_aware_energy_cost:.8f}")
+                if load_aware_compute_cost is not None:
+                    output.append(f"cost_compute_load_aware{{{labels}}} {load_aware_compute_cost:.8f}")
         
         result = '\n'.join(output) + '\n'
         
