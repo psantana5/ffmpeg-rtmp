@@ -9,6 +9,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import statistics
 import subprocess
 from pathlib import Path
@@ -86,7 +87,6 @@ def get_hardware_metadata() -> Dict:
     
     # CPU count
     try:
-        import os
         metadata['cpu_count'] = os.cpu_count()
     except Exception:
         metadata['cpu_count'] = None
