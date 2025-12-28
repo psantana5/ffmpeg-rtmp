@@ -319,9 +319,9 @@
           "refId": "A"
         }
       ],
-      "title": "Cost per Megapixel Delivered",
+      "title": "Total Cost by Scenario",
       "type": "timeseries",
-      "description": "Cost efficiency: dollars per million pixels delivered"
+      "description": "Total load-aware cost for each transcoding scenario"
     },
     {
       "datasource": {
@@ -413,9 +413,9 @@
           "refId": "A"
         }
       ],
-      "title": "Cost per Viewer Watch Hour",
+      "title": "Total Cost by Scenario (Time Series)",
       "type": "timeseries",
-      "description": "Cost per hour of video watched by viewers"
+      "description": "Total load-aware cost over time for each scenario"
     },
     {
       "datasource": {
