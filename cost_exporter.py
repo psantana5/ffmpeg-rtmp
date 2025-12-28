@@ -4,6 +4,10 @@ Cost Metrics Prometheus Exporter
 
 Exports cost analysis metrics as Prometheus metrics for Grafana visualization.
 
+Supports two modes:
+1. Legacy mode: Load costs from test_results JSON files (duration-based)
+2. Load-aware mode (recommended): Query Prometheus for real-time CPU/power metrics
+
 Metrics exported:
 - cost_total: Total cost per scenario (energy + compute)
 - cost_energy: Energy cost per scenario
@@ -12,8 +16,12 @@ Metrics exported:
 - cost_per_watch_hour: Cost per viewer watch hour
 
 Usage:
+    # Legacy mode (from test results)
     python3 cost_exporter.py --port 9504 --energy-cost 0.12 --cpu-cost 0.50
-    python3 cost_exporter.py --port 9503 --energy-cost 0.12 --cpu-cost 0.50
+    
+    # Load-aware mode (query Prometheus)
+    python3 cost_exporter.py --port 9504 --prometheus-url http://prometheus:9090 \
+        --energy-cost 0.12 --cpu-cost 0.50
 """
 
 import argparse
@@ -22,7 +30,9 @@ import logging
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from advisor.cost import CostModel
 
@@ -33,11 +43,77 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class PrometheusClient:
+    """Simple Prometheus client for querying metrics."""
+    
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip('/')
+    
+    def query_range(
+        self, query: str, start: float, end: float, step: str = '5s'
+    ) -> Optional[Dict]:
+        """
+        Query Prometheus for a range of values.
+        
+        Args:
+            query: PromQL query string
+            start: Start timestamp (unix seconds)
+            end: End timestamp (unix seconds)
+            step: Query resolution (e.g., '5s', '15s')
+        
+        Returns:
+            Query response dict or None on error
+        """
+        params = {
+            'query': query,
+            'start': int(start),
+            'end': int(end),
+            'step': step
+        }
+        url = f"{self.base_url}/api/v1/query_range?{urlencode(params)}"
+        req = Request(url, headers={'Accept': 'application/json'})
+        
+        try:
+            with urlopen(req, timeout=30) as resp:
+                return json.load(resp)
+        except Exception as e:
+            logger.error(f"Prometheus query failed: {e}")
+            return None
+    
+    def extract_values(self, query_response: Optional[Dict]) -> List[float]:
+        """
+        Extract values from Prometheus query response.
+        
+        Args:
+            query_response: Response from query_range
+        
+        Returns:
+            List of values
+        """
+        if not query_response:
+            return []
+        
+        data = query_response.get('data', {})
+        results = data.get('result', [])
+        values = []
+        
+        for result in results:
+            for ts, val in result.get('values', []):
+                try:
+                    values.append(float(val))
+                except (ValueError, TypeError):
+                    continue
+        
+        return values
+
+
 class CostMetricsExporter:
     """
     Exports cost metrics as Prometheus metrics.
     
-    Tracks cost analysis for transcoding scenarios.
+    Supports two modes:
+    1. Legacy: Read from test results JSON (duration-based costs)
+    2. Load-aware: Query Prometheus for real CPU/power metrics
     """
     
     def __init__(
@@ -46,7 +122,9 @@ class CostMetricsExporter:
         energy_cost_per_kwh: float = 0.0,
         cpu_cost_per_hour: float = 0.0,
         gpu_cost_per_hour: float = 0.0,
-        currency: str = 'USD'
+        currency: str = 'USD',
+        prometheus_url: Optional[str] = None,
+        use_load_aware: bool = True
     ):
         """
         Initialize cost metrics exporter.
@@ -57,6 +135,8 @@ class CostMetricsExporter:
             cpu_cost_per_hour: CPU/instance cost ($/h or €/h)
             gpu_cost_per_hour: GPU cost ($/h or €/h)
             currency: Currency code
+            prometheus_url: Prometheus URL for load-aware mode
+            use_load_aware: Use load-aware calculations if Prometheus available
         """
         self.results_dir = results_dir
         self.cost_model = CostModel(
@@ -68,6 +148,19 @@ class CostMetricsExporter:
         self.metrics_cache = {}
         self.last_update = 0
         self.cache_ttl = 60  # Cache for 60 seconds
+        
+        # Prometheus integration
+        self.prometheus_client = None
+        self.use_load_aware = use_load_aware
+        if prometheus_url and use_load_aware:
+            try:
+                self.prometheus_client = PrometheusClient(prometheus_url)
+                logger.info(f"Load-aware mode enabled (Prometheus: {prometheus_url})")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Prometheus client: {e}")
+                logger.info("Falling back to legacy mode")
+        else:
+            logger.info("Using legacy mode (duration-based costs)")
     
     def load_latest_results(self) -> List[Dict]:
         """Load scenarios from most recent test results file."""
@@ -89,9 +182,78 @@ class CostMetricsExporter:
             logger.error(f"Error loading results: {e}")
             return []
     
+    def enrich_scenario_with_prometheus(self, scenario: Dict) -> Dict:
+        """
+        Enrich scenario with real-time metrics from Prometheus.
+        
+        Queries Prometheus for:
+        - CPU usage (container_cpu_usage_seconds_total rate)
+        - Power consumption (rapl_power_watts)
+        
+        Args:
+            scenario: Scenario dict with start_time, end_time, duration
+        
+        Returns:
+            Enriched scenario with cpu_usage_cores, power_watts, step_seconds
+        """
+        if not self.prometheus_client:
+            return scenario
+        
+        start_time = scenario.get('start_time')
+        end_time = scenario.get('end_time')
+        
+        if not start_time or not end_time:
+            logger.warning(f"Scenario '{scenario.get('name')}': Missing timestamps")
+            return scenario
+        
+        step_seconds = 5  # 5 second resolution
+        
+        try:
+            # Query CPU usage
+            # Use rate() to get cores per second, then average over step interval
+            cpu_query = 'rate(container_cpu_usage_seconds_total{name!~".*POD.*"}[30s])'
+            cpu_response = self.prometheus_client.query_range(
+                cpu_query, start_time, end_time, f'{step_seconds}s'
+            )
+            cpu_values = self.prometheus_client.extract_values(cpu_response)
+            
+            # Query power consumption
+            # Sum all RAPL zones for total system power
+            power_query = 'sum(rapl_power_watts)'
+            power_response = self.prometheus_client.query_range(
+                power_query, start_time, end_time, f'{step_seconds}s'
+            )
+            power_values = self.prometheus_client.extract_values(power_response)
+            
+            # Add to scenario
+            if cpu_values:
+                scenario['cpu_usage_cores'] = cpu_values
+                scenario['step_seconds'] = step_seconds
+                logger.debug(
+                    f"Scenario '{scenario.get('name')}': "
+                    f"Enriched with {len(cpu_values)} CPU measurements"
+                )
+            
+            if power_values:
+                scenario['power_watts'] = power_values
+                logger.debug(
+                    f"Scenario '{scenario.get('name')}': "
+                    f"Enriched with {len(power_values)} power measurements"
+                )
+        
+        except Exception as e:
+            logger.error(
+                f"Failed to enrich scenario '{scenario.get('name')}': {e}"
+            )
+        
+        return scenario
+    
     def generate_prometheus_metrics(self) -> str:
         """
         Generate Prometheus metrics in text format.
+        
+        Uses load-aware calculations if Prometheus data is available,
+        otherwise falls back to legacy duration-based calculations.
         
         Returns:
             Prometheus metrics text
@@ -103,6 +265,12 @@ class CostMetricsExporter:
         
         # Load scenarios
         scenarios = self.load_latest_results()
+        
+        # Enrich with Prometheus metrics if available
+        if self.prometheus_client and self.use_load_aware:
+            scenarios = [
+                self.enrich_scenario_with_prometheus(s) for s in scenarios
+            ]
         
         output = []
         
@@ -126,17 +294,48 @@ class CostMetricsExporter:
             # Sanitize name for Prometheus labels
             safe_name = scenario_name.replace(' ', '_').replace('"', '')
             
-            # Build labels
-            labels = f'scenario="{safe_name}",currency="{currency}"'
+            # Extract additional labels
+            streams = scenario.get('streams', 1)
+            bitrate = scenario.get('bitrate', '')
+            encoder = scenario.get('encoder_type', 'unknown')
             
-            # Compute cost metrics
-            total_cost = self.cost_model.compute_total_cost(scenario)
-            energy_cost = self.cost_model.compute_energy_cost(scenario)
-            compute_cost = self.cost_model.compute_compute_cost(scenario)
-            cost_per_pixel = self.cost_model.compute_cost_per_pixel(scenario)
-            cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour(
-                scenario, viewers=1
+            # Build labels
+            labels = (
+                f'scenario="{safe_name}",'
+                f'currency="{currency}",'
+                f'streams="{streams}",'
+                f'bitrate="{bitrate}",'
+                f'encoder="{encoder}"'
             )
+            
+            # Decide which cost calculation method to use
+            use_load_aware = (
+                self.use_load_aware and 
+                'cpu_usage_cores' in scenario and 
+                'power_watts' in scenario
+            )
+            
+            if use_load_aware:
+                # Load-aware calculations
+                total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
+                energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
+                compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
+                cost_per_pixel = self.cost_model.compute_cost_per_pixel_load_aware(scenario)
+                
+                # For watch hour, try to get viewer count from scenario
+                viewers = scenario.get('viewers', 1)  # Default to 1 if not specified
+                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour_load_aware(
+                    scenario, viewers=viewers
+                )
+            else:
+                # Legacy calculations (duration-based)
+                total_cost = self.cost_model.compute_total_cost(scenario)
+                energy_cost = self.cost_model.compute_energy_cost(scenario)
+                compute_cost = self.cost_model.compute_compute_cost(scenario)
+                cost_per_pixel = self.cost_model.compute_cost_per_pixel(scenario)
+                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour(
+                    scenario, viewers=1
+                )
             
             # Export total cost
             if total_cost is not None:
@@ -248,6 +447,17 @@ def main():
         default='USD',
         help='Currency code (default: USD)'
     )
+    parser.add_argument(
+        '--prometheus-url',
+        type=str,
+        default=None,
+        help='Prometheus URL for load-aware mode (e.g., http://prometheus:9090)'
+    )
+    parser.add_argument(
+        '--disable-load-aware',
+        action='store_true',
+        help='Disable load-aware calculations (use legacy duration-based)'
+    )
     
     args = parser.parse_args()
     
@@ -262,7 +472,9 @@ def main():
         energy_cost_per_kwh=args.energy_cost,
         cpu_cost_per_hour=args.cpu_cost,
         gpu_cost_per_hour=args.gpu_cost,
-        currency=args.currency
+        currency=args.currency,
+        prometheus_url=args.prometheus_url,
+        use_load_aware=not args.disable_load_aware
     )
     MetricsHandler.exporter = exporter
     
@@ -273,6 +485,8 @@ def main():
     logger.info(f"Pricing: {args.energy_cost} {args.currency}/kWh")
     logger.info(f"         {args.cpu_cost} {args.currency}/h (CPU)")
     logger.info(f"         {args.gpu_cost} {args.currency}/h (GPU)")
+    if args.prometheus_url:
+        logger.info(f"Prometheus: {args.prometheus_url} (load-aware mode)")
     logger.info(f"Metrics endpoint: http://localhost:{args.port}/metrics")
     logger.info(f"Health endpoint: http://localhost:{args.port}/health")
     
