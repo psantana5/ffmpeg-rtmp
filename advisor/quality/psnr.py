@@ -105,7 +105,8 @@ def compute_psnr(input_path: str, output_path: str) -> Optional[float]:
         
         # Parse PSNR score from output
         # PSNR filter outputs to stderr in format:
-        # n:1 mse_avg:123.45 mse_y:120.00 mse_u:125.00 mse_v:125.00 psnr_avg:28.21 psnr_y:28.34 psnr_u:28.16 psnr_v:28.16
+        # n:1 mse_avg:123.45 mse_y:120.00 mse_u:125.00 mse_v:125.00
+        # psnr_avg:28.21 psnr_y:28.34 psnr_u:28.16 psnr_v:28.16
         # We want the final average PSNR value
         
         output = result.stderr  # PSNR stats go to stderr

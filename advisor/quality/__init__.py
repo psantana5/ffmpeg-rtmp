@@ -8,7 +8,7 @@ Provides video quality metrics for QoE-aware transcoding optimization:
 These metrics enable quality-per-watt analysis and QoE efficiency scoring.
 """
 
-from .vmaf_integration import compute_vmaf
 from .psnr import compute_psnr
+from .vmaf_integration import compute_vmaf
 
 __all__ = ['compute_vmaf', 'compute_psnr']
