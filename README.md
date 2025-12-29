@@ -2,7 +2,7 @@
 
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Perfect for optimizing FFmpeg configurations for energy efficiency.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -37,7 +37,7 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 python3 scripts/analyze_results.py
 ```
 
-## 📊 What This Project Does
+## What This Project Does
 
 This project helps you:
 
@@ -48,7 +48,7 @@ This project helps you:
 5. **Visualize results** in Grafana dashboards
 6. **Set up alerts** for power thresholds
 
-## 🏗️ Architecture
+## Architecture
 
 The stack includes:
 
@@ -58,7 +58,7 @@ The stack includes:
 - **Custom Exporters**: Power (RAPL), Docker stats, QoE metrics, Cost analysis
 - **Energy Advisor**: ML-based recommendations for optimal configurations
 
-## 📖 Documentation
+## Documentation
 
 Detailed documentation is organized by topic:
 
@@ -69,7 +69,7 @@ Detailed documentation is organized by topic:
 - **[Architecture](docs/architecture.md)** - System design and data flow
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
-## 🔧 Common Commands
+## Common Commands
 
 ```bash
 # Stack management
@@ -89,7 +89,7 @@ make format            # Format code
 make test              # Run test suite
 ```
 
-## 🎯 Example Use Cases
+## Example Use Cases
 
 ### Find the Most Energy-Efficient Bitrate
 
@@ -108,15 +108,15 @@ Create a batch configuration testing both codecs at the same bitrates, run the t
 
 Set up the stack on your streaming server and configure Prometheus alerts to notify you when power consumption exceeds thresholds.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! See the detailed documentation for development guidelines.
 
-## 📝 License
+## License
 
 See [LICENSE](LICENSE) file for details.
 
-## 🔗 Quick Links
+## Quick Links
 
 - [Full Documentation](docs/)
 - [Test Runner Guide](scripts/README.md)
