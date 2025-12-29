@@ -24,7 +24,6 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import re
 import sys
@@ -33,8 +32,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -144,7 +143,9 @@ class HealthCheckResult:
 class ExporterHealthChecker:
     """Checks health of Prometheus exporters."""
     
-    def __init__(self, exporters: List[ExporterConfig], timeout: int = 10, use_unicode: bool = True):
+    def __init__(
+        self, exporters: List[ExporterConfig], timeout: int = 10, use_unicode: bool = True
+    ):
         """
         Initialize health checker.
         
@@ -380,7 +381,10 @@ class ExporterHealthChecker:
         output = []
         
         # Health status metrics
-        output.append("# HELP exporter_health_status Health status of exporter (1=healthy, 0=unhealthy)")
+        output.append(
+            "# HELP exporter_health_status "
+            "Health status of exporter (1=healthy, 0=unhealthy)"
+        )
         output.append("# TYPE exporter_health_status gauge")
         
         for name, result in self.results.items():

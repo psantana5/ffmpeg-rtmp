@@ -22,7 +22,8 @@ class RAPLReader:
 
         if not self.base_path.exists():
             print(
-                "ERROR: RAPL interface not found. Are you running on Intel CPU with root/privileged access?"
+                "ERROR: RAPL interface not found. "
+                "Are you running on Intel CPU with root/privileged access?"
             )
             return zones
 

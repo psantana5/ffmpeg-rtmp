@@ -260,7 +260,9 @@ class CostMetricsExporter:
             # Use rate() to get CPU cores per second, aggregated across all containers
             # Exclude POD containers and aggregate by container name
             # This gives us the instantaneous CPU usage in cores at each sample point
-            cpu_query = 'sum(rate(container_cpu_usage_seconds_total{name!~".*POD.*",name!=""}[30s]))'
+            cpu_query = (
+                'sum(rate(container_cpu_usage_seconds_total{name!~".*POD.*",name!=""}[30s]))'
+            )
             logger.debug(f"Scenario '{scenario_name}': Querying CPU usage")
             cpu_response = self.prometheus_client.query_range(
                 cpu_query, start_time, end_time, f'{step_seconds}s'
@@ -357,7 +359,10 @@ class CostMetricsExporter:
         output.append("# TYPE cost_compute_load_aware gauge")
         output.append(f"# HELP cost_per_pixel Cost per pixel ({currency}/pixel) - load-aware")
         output.append("# TYPE cost_per_pixel gauge")
-        output.append(f"# HELP cost_per_watch_hour Cost per viewer watch hour ({currency}/hour) - load-aware")
+        output.append(
+            f"# HELP cost_per_watch_hour "
+            f"Cost per viewer watch hour ({currency}/hour) - load-aware"
+        )
         output.append("# TYPE cost_per_watch_hour gauge")
         
         # Track metrics emission statistics
@@ -409,7 +414,9 @@ class CostMetricsExporter:
                 load_aware_energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
                 load_aware_compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
                 cost_per_pixel = self.cost_model.compute_cost_per_pixel_load_aware(scenario)
-                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour_load_aware(scenario)
+                cost_per_watch_hour = (
+                    self.cost_model.compute_cost_per_watch_hour_load_aware(scenario)
+                )
                 
                 # Export load-aware metrics
                 if load_aware_total_cost is not None:

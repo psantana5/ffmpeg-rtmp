@@ -20,7 +20,7 @@ class DockerStatsCollector:
         try:
             with open('/proc/cpuinfo', 'r') as f:
                 return len([line for line in f if line.startswith('processor')])
-        except:
+        except Exception:
             return os.cpu_count() or 4
     
     def _run_command(self, cmd):
@@ -123,35 +123,60 @@ class MetricsHandler(BaseHTTPRequestHandler):
                 # Docker engine stats
                 engine_stats = self.collector.get_docker_engine_stats()
                 if engine_stats:
-                    output.append("# HELP docker_engine_cpu_percent CPU percentage used by Docker engine")
+                    output.append(
+                        "# HELP docker_engine_cpu_percent "
+                        "CPU percentage used by Docker engine"
+                    )
                     output.append("# TYPE docker_engine_cpu_percent gauge")
                     output.append(f"docker_engine_cpu_percent {engine_stats['cpu_percent']:.2f}")
                     
-                    output.append("# HELP docker_engine_memory_percent Memory percentage used by Docker engine")
+                    output.append(
+                        "# HELP docker_engine_memory_percent "
+                        "Memory percentage used by Docker engine"
+                    )
                     output.append("# TYPE docker_engine_memory_percent gauge")
-                    output.append(f"docker_engine_memory_percent {engine_stats['memory_percent']:.2f}")
+                    output.append(
+                        f"docker_engine_memory_percent {engine_stats['memory_percent']:.2f}"
+                    )
                     
-                    output.append("# HELP docker_engine_memory_kb Memory in KB used by Docker engine")
+                    output.append(
+                        "# HELP docker_engine_memory_kb Memory in KB used by Docker engine"
+                    )
                     output.append("# TYPE docker_engine_memory_kb gauge")
                     output.append(f"docker_engine_memory_kb {engine_stats['memory_kb']:.0f}")
                 
                 # Container stats
                 containers = self.collector.get_container_stats()
                 if containers:
-                    output.append("# HELP docker_container_cpu_percent CPU percentage used by container")
+                    output.append(
+                        "# HELP docker_container_cpu_percent "
+                        "CPU percentage used by container"
+                    )
                     output.append("# TYPE docker_container_cpu_percent gauge")
                     
-                    output.append("# HELP docker_container_memory_percent Memory percentage used by container")
+                    output.append(
+                        "# HELP docker_container_memory_percent "
+                        "Memory percentage used by container"
+                    )
                     output.append("# TYPE docker_container_memory_percent gauge")
                     
                     for container in containers:
                         name = container['name']
-                        output.append(f'docker_container_cpu_percent{{container="{name}"}} {container["cpu_percent"]:.2f}')
-                        output.append(f'docker_container_memory_percent{{container="{name}"}} {container["memory_percent"]:.2f}')
+                        output.append(
+                            f'docker_container_cpu_percent{{container="{name}"}} '
+                            f'{container["cpu_percent"]:.2f}'
+                        )
+                        output.append(
+                            f'docker_container_memory_percent{{container="{name}"}} '
+                            f'{container["memory_percent"]:.2f}'
+                        )
                     
                     # Total container CPU usage
                     total_container_cpu = sum(c['cpu_percent'] for c in containers)
-                    output.append("# HELP docker_containers_total_cpu_percent Total CPU percentage across all containers")
+                    output.append(
+                        "# HELP docker_containers_total_cpu_percent "
+                        "Total CPU percentage across all containers"
+                    )
                     output.append("# TYPE docker_containers_total_cpu_percent gauge")
                     output.append(f"docker_containers_total_cpu_percent {total_container_cpu:.2f}")
                 
