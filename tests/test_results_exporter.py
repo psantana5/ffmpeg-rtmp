@@ -4,7 +4,6 @@ Tests for results_exporter enhancements
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add parent directory to path for imports

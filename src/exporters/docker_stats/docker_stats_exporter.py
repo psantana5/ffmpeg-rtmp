@@ -4,13 +4,11 @@ Docker Overhead Monitoring Exporter
 Monitors Docker engine and container resource usage for overhead calculation
 """
 
-import time
-import subprocess
 import json
-import re
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import os
 import socket
+import subprocess
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class DockerStatsCollector:
@@ -104,8 +102,6 @@ class DockerStatsCollector:
         Returns:
             Estimated watts consumed by Docker overhead
         """
-        # Rough estimation: Docker overhead watts = (docker_cpu% / 100) * total_watts
-        # This is a simplification; actual relationship may be more complex
         if docker_cpu_percent and total_system_watts:
             overhead_watts = (docker_cpu_percent / 100.0) * total_system_watts
             return overhead_watts
@@ -159,14 +155,19 @@ class MetricsHandler(BaseHTTPRequestHandler):
                     output.append("# TYPE docker_containers_total_cpu_percent gauge")
                     output.append(f"docker_containers_total_cpu_percent {total_container_cpu:.2f}")
                 
-                self.wfile.write('\n'.join(output).encode('utf-8'))
-                self.wfile.write(b'\n')
+                metrics_data = '\n'.join(output) + '\n'
+                self.wfile.write(metrics_data.encode('utf-8'))
+                
             except (BrokenPipeError, ConnectionResetError, socket.error):
+                # Client disconnected early - this is normal, just log and continue
                 pass
+            except Exception as e:
+                print(f"Error handling metrics request: {e}")
+                
         elif self.path == '/health':
             try:
                 self.send_response(200)
-                self.send_header('Content-type', 'text/plain; charset=utf-8')
+                self.send_header('Content-type', 'text/plain')
                 self.end_headers()
                 self.wfile.write(b'OK\n')
             except (BrokenPipeError, ConnectionResetError, socket.error):
@@ -179,6 +180,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
                 pass
     
     def log_message(self, format, *args):
+        # Suppress default logging
         pass
 
 

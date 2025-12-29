@@ -23,7 +23,7 @@ services:
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
     ports:
       - "9093:9093"
     restart: unless-stopped
@@ -36,7 +36,7 @@ services:
       retries: 3
 
   nginx-exporter:
-    image:  mauricioabreu/nginx-rtmp-exporter
+    image: mauricioabreu/nginx-rtmp-exporter
     container_name: nginx-exporter
     environment:
       - NGINX_RTMP_URL=http://nginx-rtmp/stat
@@ -58,10 +58,10 @@ services:
       - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -88,7 +88,7 @@ services:
       - streaming-net
 
   rapl-exporter:
-    build: ./rapl-exporter
+    build: ./src/exporters/rapl
     container_name: rapl-exporter
     privileged: true
     volumes:
@@ -103,7 +103,7 @@ services:
       - RAPL_EXPORTER_PORT=9500
 
   docker-stats-exporter:
-    build: ./docker-stats-exporter
+    build: ./src/exporters/docker_stats
     container_name: docker-stats-exporter
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -141,9 +141,9 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
     ports:
       - "9100:9100"
     restart: unless-stopped
@@ -167,7 +167,7 @@ services:
       - DCGM_EXPORTER_LISTEN=:9400
 
   results-exporter:
-    build: ./results-exporter
+    build: ./src/exporters/results
     container_name: results-exporter
     volumes:
       - ./test_results:/results
@@ -182,6 +182,71 @@ services:
       - PROMETHEUS_URL=http://prometheus:9090
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9502/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  qoe-exporter:
+    build:
+      context: .
+      dockerfile: src/exporters/qoe/Dockerfile
+    container_name: qoe-exporter
+    volumes:
+      - ./test_results:/results:ro
+      - ./advisor:/app/advisor:ro
+    ports:
+      - "9503:9503"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - QOE_EXPORTER_PORT=9503
+      - RESULTS_DIR=/results
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9503/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  cost-exporter:
+    build:
+      context: .
+      dockerfile: src/exporters/cost/Dockerfile
+    container_name: cost-exporter
+    volumes:
+      - ./test_results:/results:ro
+      - ./advisor:/app/advisor:ro
+    ports:
+      - "9504:9504"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - COST_EXPORTER_PORT=9504
+      - RESULTS_DIR=/results
+      - ENERGY_COST_PER_KWH=0.12
+      - CPU_COST_PER_HOUR=0.50
+      - CURRENCY=USD
+      - PROMETHEUS_URL=http://prometheus:9090
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  exporter-health-checker:
+    build: ./src/exporters/health_checker
+    container_name: exporter-health-checker
+    ports:
+      - "9600:9600"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - HEALTH_CHECK_PORT=9600
+    command: ["--port", "9600"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/health"]
       interval: 30s
       timeout: 5s
       retries: 3

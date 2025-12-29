@@ -5,13 +5,14 @@ Provides scoring algorithms to evaluate transcoding configurations based on:
 - Energy consumption (watts, watt-hours)
 - Resource utilization (CPU %, GPU %, cores)
 - Throughput (bitrate, stream count)
-- (Future) Video quality metrics (VMAF, PSNR)
+- Video quality metrics (VMAF, PSNR) for QoE-aware optimization
 
 Design principles:
 - Use measured metrics only (no synthetic/estimated values)
 - Pluggable scoring algorithms for easy extension
 - Production-grade numerical stability
 - Clear documentation of formulas and assumptions
+- Backward compatible - gracefully handles missing quality data
 """
 
 import logging
@@ -32,17 +33,26 @@ class EnergyEfficiencyScorer:
     Higher scores indicate better energy efficiency.
     """
     
-    def __init__(self, algorithm: str = 'throughput_per_watt'):
+    def __init__(self, algorithm: str = 'auto'):
         """
         Initialize the scorer.
         
         Args:
-            algorithm: Scoring algorithm to use. Currently supports:
+            algorithm: Scoring algorithm to use. Supports:
+                - 'auto': Automatically select best algorithm based on available
+                  data
                 - 'throughput_per_watt': efficiency_score = throughput / power
-                - 'pixels_per_joule': efficiency_score = total_pixels / total_energy_joules
+                - 'pixels_per_joule': efficiency_score = total_pixels /
+                  total_energy_joules
+                - 'quality_per_watt': efficiency_score = VMAF / avg_power_watts
+                - 'qoe_efficiency_score': efficiency_score = total_pixels *
+                  (VMAF/100) / energy_joules
         """
         self.algorithm = algorithm
-        self.supported_algorithms = {'throughput_per_watt', 'pixels_per_joule'}
+        self.supported_algorithms = {
+            'auto', 'throughput_per_watt', 'pixels_per_joule', 
+            'quality_per_watt', 'qoe_efficiency_score'
+        }
         
         if algorithm not in self.supported_algorithms:
             raise ValueError(
@@ -61,34 +71,45 @@ class EnergyEfficiencyScorer:
                 - Optional: stream count embedded in scenario name or metadata
                 - Optional: outputs: list of output resolutions/fps for pixel-based scoring
                 - Optional: duration: duration in seconds for pixel calculation
+                - Optional: vmaf_score: VMAF quality metric (0-100)
+                - Optional: psnr_score: PSNR quality metric (dB)
         
         Returns:
             Energy efficiency score (float) or None if insufficient data.
             
-        Formula (v0.1):
-            efficiency_score = throughput_mbps / mean_watts
-            
-            Where:
-                throughput_mbps = parsed_bitrate_mbps * num_streams
-                mean_watts = CPU power + GPU power (if available)
+        Algorithm Selection (when algorithm='auto'):
+            - If QoE data available (vmaf_score): Use 'qoe_efficiency_score'
+            - Elif multiple outputs (ladder): Use 'pixels_per_joule'
+            - Else (single resolution): Use 'throughput_per_watt'
         
-        Formula (v0.2 - pixels_per_joule):
-            efficiency_score = total_pixels_delivered / total_energy_joules
-            
-            Where:
-                total_pixels_delivered = sum(width * height * fps * duration for each output)
-                total_energy_joules = power['total_energy_joules']
+        Formulas:
+            throughput_per_watt: throughput_mbps / mean_watts
+            pixels_per_joule: total_pixels_delivered / total_energy_joules
+            quality_per_watt: VMAF / mean_watts
+            qoe_efficiency_score: total_pixels * (VMAF/100) / total_energy_joules
         
         Design notes:
             - Returns None for baseline/idle scenarios (bitrate = "0k")
             - Returns None if power data is missing or invalid
             - GPU power is automatically included if present in scenario data
-            - Future versions will incorporate video quality metrics
+            - Backward compatible: works without quality metrics
         """
-        if self.algorithm == 'throughput_per_watt':
+        # Determine which algorithm to use
+        algorithm = self.algorithm
+        
+        if algorithm == 'auto':
+            algorithm = self._auto_select_algorithm(scenario)
+            logger.debug(f"Auto-selected algorithm: {algorithm}")
+        
+        # Dispatch to appropriate scoring function
+        if algorithm == 'throughput_per_watt':
             return self._compute_throughput_per_watt(scenario)
-        elif self.algorithm == 'pixels_per_joule':
+        elif algorithm == 'pixels_per_joule':
             return self._compute_pixels_per_joule(scenario)
+        elif algorithm == 'quality_per_watt':
+            return self._compute_quality_per_watt(scenario)
+        elif algorithm == 'qoe_efficiency_score':
+            return self._compute_qoe_efficiency_score(scenario)
         
         return None
     
@@ -184,6 +205,179 @@ class EnergyEfficiencyScorer:
             f"total_pixels={total_pixels:.2e}, "
             f"energy={total_energy_joules:.2f} J, "
             f"score={efficiency_score:.4e} pixels/J"
+        )
+        
+        return efficiency_score
+    
+    def _auto_select_algorithm(self, scenario: Dict) -> str:
+        """
+        Automatically select the best scoring algorithm based on available data.
+        
+        Selection Logic:
+            1. If VMAF score is available → use 'qoe_efficiency_score'
+               (QoE-aware optimization is most valuable)
+            2. Elif multiple outputs (ladder) → use 'pixels_per_joule'
+               (Account for multi-resolution delivery)
+            3. Else → use 'throughput_per_watt'
+               (Simple, single-resolution scenario)
+        
+        Args:
+            scenario: Scenario dict
+            
+        Returns:
+            Algorithm name (str)
+        """
+        # Check if QoE data is available
+        if scenario.get('vmaf_score') is not None:
+            return 'qoe_efficiency_score'
+        
+        # Check if this is a multi-output ladder scenario
+        outputs = scenario.get('outputs')
+        if outputs and isinstance(outputs, list) and len(outputs) > 1:
+            return 'pixels_per_joule'
+        
+        # Default to simple throughput-based scoring
+        return 'throughput_per_watt'
+    
+    def _compute_quality_per_watt(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute quality-per-watt efficiency score.
+        
+        This metric measures video quality delivered per unit of power consumed.
+        It's ideal for comparing different encoder settings or quality presets.
+        
+        Formula:
+            efficiency_score = VMAF / avg_power_watts
+            
+        Where:
+            VMAF = Video quality score (0-100)
+            avg_power_watts = Mean power consumption (CPU + GPU)
+        
+        Higher scores indicate better quality per watt.
+        
+        Args:
+            scenario: Scenario dict with 'vmaf_score' and 'power' keys
+            
+        Returns:
+            Quality-per-watt score or None if insufficient data
+        """
+        # Extract VMAF score
+        vmaf_score = scenario.get('vmaf_score')
+        if vmaf_score is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No VMAF score available")
+            return None
+        
+        if not (0 <= vmaf_score <= 100):
+            logger.warning(
+                f"Scenario '{scenario.get('name')}': "
+                f"Invalid VMAF score {vmaf_score} (expected 0-100)"
+            )
+            return None
+        
+        # Extract power consumption
+        power = scenario.get('power')
+        if not power or power.get('mean_watts') is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No power data available")
+            return None
+        
+        mean_watts = power['mean_watts']
+        
+        # Add GPU power if available
+        gpu_power = scenario.get('gpu_power', {}).get('mean_watts')
+        if gpu_power is not None:
+            mean_watts += gpu_power
+        
+        if mean_watts <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': Invalid power value {mean_watts}")
+            return None
+        
+        # Compute efficiency: VMAF per watt
+        efficiency_score = vmaf_score / mean_watts
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"vmaf={vmaf_score:.2f}, "
+            f"power={mean_watts:.2f} W, "
+            f"score={efficiency_score:.4f} VMAF/W"
+        )
+        
+        return efficiency_score
+    
+    def _compute_qoe_efficiency_score(self, scenario: Dict) -> Optional[float]:
+        """
+        Compute QoE efficiency score combining pixels, quality, and energy.
+        
+        This is the most comprehensive metric, combining:
+        - Output resolution/framerate (pixels delivered)
+        - Perceptual quality (VMAF score)
+        - Energy consumption (joules)
+        
+        Formula:
+            efficiency_score = total_pixels * (VMAF/100) / energy_joules
+            
+        Where:
+            total_pixels = sum(width * height * fps * duration for each output)
+            VMAF = Video quality score (0-100), normalized to 0-1
+            energy_joules = Total energy consumed during transcoding
+        
+        This metric answers: "How many quality-weighted pixels can be delivered
+        per joule of energy?"
+        
+        Higher scores indicate better QoE efficiency.
+        
+        Args:
+            scenario: Scenario dict with 'vmaf_score', 'outputs', 'duration', 'power'
+            
+        Returns:
+            QoE efficiency score or None if insufficient data
+        """
+        # Extract VMAF score
+        vmaf_score = scenario.get('vmaf_score')
+        if vmaf_score is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No VMAF score available")
+            return None
+        
+        if not (0 <= vmaf_score <= 100):
+            logger.warning(
+                f"Scenario '{scenario.get('name')}': "
+                f"Invalid VMAF score {vmaf_score} (expected 0-100)"
+            )
+            return None
+        
+        # Normalize VMAF to 0-1 range
+        vmaf_normalized = vmaf_score / 100.0
+        
+        # Extract energy consumption
+        power = scenario.get('power')
+        if not power or power.get('total_energy_joules') is None:
+            logger.debug(f"Scenario '{scenario.get('name')}': No energy data available")
+            return None
+        
+        total_energy_joules = power['total_energy_joules']
+        
+        if total_energy_joules <= 0:
+            logger.debug(
+                f"Scenario '{scenario.get('name')}': "
+                f"Invalid energy value {total_energy_joules}"
+            )
+            return None
+        
+        # Calculate total pixels delivered
+        total_pixels = self._compute_total_pixels(scenario)
+        
+        if total_pixels is None or total_pixels <= 0:
+            logger.debug(f"Scenario '{scenario.get('name')}': No valid pixel data")
+            return None
+        
+        # Compute QoE efficiency: quality-weighted pixels per joule
+        efficiency_score = (total_pixels * vmaf_normalized) / total_energy_joules
+        
+        logger.debug(
+            f"Scenario '{scenario.get('name')}': "
+            f"pixels={total_pixels:.2e}, "
+            f"vmaf={vmaf_score:.2f}, "
+            f"energy={total_energy_joules:.2f} J, "
+            f"score={efficiency_score:.4e} QoE-pixels/J"
         )
         
         return efficiency_score
@@ -390,27 +584,29 @@ class EnergyEfficiencyScorer:
         self, scenario: Dict, vmaf_score: float, psnr_score: float
     ) -> Optional[float]:
         """
-        PLACEHOLDER: Multi-objective scoring with video quality.
+        IMPLEMENTED: Multi-objective scoring with video quality.
         
-        Future formula:
-            score = (quality_weight * vmaf_normalized + 
-                    efficiency_weight * throughput_per_watt_normalized)
+        This functionality is now available through the 'quality_per_watt' and
+        'qoe_efficiency_score' algorithms. Use compute_score() with appropriate
+        algorithm selection.
         
-        This will enable answering:
-        "Which configuration delivers the best quality per watt?"
+        Example:
+            scorer = EnergyEfficiencyScorer(algorithm='qoe_efficiency_score')
+            scenario['vmaf_score'] = vmaf_score
+            score = scorer.compute_score(scenario)
         
         Args:
             scenario: Scenario dict
             vmaf_score: VMAF quality score (0-100)
-            psnr_score: PSNR quality score (dB)
+            psnr_score: PSNR quality score (dB) - currently unused
             
         Returns:
-            Quality-adjusted efficiency score (not implemented yet)
+            Quality-adjusted efficiency score
         """
-        raise NotImplementedError(
-            "Quality-adjusted scoring (VMAF/PSNR) will be implemented in v0.2. "
-            "Current version uses throughput-only scoring."
-        )
+        # Add VMAF to scenario and compute QoE score
+        scenario_copy = dict(scenario)
+        scenario_copy['vmaf_score'] = vmaf_score
+        return self._compute_qoe_efficiency_score(scenario_copy)
     
     def compute_cost_adjusted_score(
         self, scenario: Dict, cost_per_kwh: float

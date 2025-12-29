@@ -37,6 +37,7 @@ help:
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
+	@echo "  make retrain-models  Retrain ML models from test results"
 	@echo ""
 	@echo "Development"
 	@echo "  make lint            Run ruff checks"
@@ -82,19 +83,22 @@ nvidia-up-build:
 	$(COMPOSE) --profile nvidia up -d --build
 
 test-suite:
-	$(PYTHON) run_tests.py suite
+	$(PYTHON) scripts/run_tests.py suite
 
 test-single:
-	$(PYTHON) run_tests.py --output-dir ./test_results single --name $(NAME) --bitrate $(BITRATE) --resolution $(RESOLUTION) --fps $(FPS) --duration $(DURATION) --stabilization $(STABILIZATION) --cooldown $(COOLDOWN)
+	$(PYTHON) scripts/run_tests.py --output-dir ./test_results single --name $(NAME) --bitrate $(BITRATE) --resolution $(RESOLUTION) --fps $(FPS) --duration $(DURATION) --stabilization $(STABILIZATION) --cooldown $(COOLDOWN)
 
 test-multi:
-	$(PYTHON) run_tests.py --output-dir ./test_results multi --count $(COUNT) --bitrate $(BITRATE) --resolution $(RESOLUTION) --fps $(FPS) --duration $(DURATION) --stabilization $(STABILIZATION) --cooldown $(COOLDOWN)
+	$(PYTHON) scripts/run_tests.py --output-dir ./test_results multi --count $(COUNT) --bitrate $(BITRATE) --resolution $(RESOLUTION) --fps $(FPS) --duration $(DURATION) --stabilization $(STABILIZATION) --cooldown $(COOLDOWN)
 
 test-batch:
-	$(PYTHON) run_tests.py --output-dir ./test_results batch --file batch_stress_matrix.json
+	$(PYTHON) scripts/run_tests.py --output-dir ./test_results batch --file batch_stress_matrix.json
 
 analyze:
-	$(PYTHON) analyze_results.py
+	$(PYTHON) scripts/analyze_results.py
+
+retrain-models:
+	$(PYTHON) scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
 
 lint:
 	$(PYTHON) -m ruff check .
