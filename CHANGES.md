@@ -30,6 +30,24 @@ curl localhost:9504/metrics
 - **Currency support**: SEK, USD, and EUR
 - **Grafana dashboards**: Added currency dropdown selector
 
+### Load-Aware Cost Calculations
+The cost exporter uses **load-aware pricing** that calculates costs based on actual resource usage:
+- **CPU costs**: Based on actual CPU core usage over time (from Prometheus metrics)
+- **Energy costs**: Based on actual power consumption in watts (from RAPL metrics)
+
+For testing, test results must include:
+- `cpu_usage_cores`: Array of CPU measurements (cores used at each interval)
+- `power_watts`: Array of power measurements (watts at each interval)  
+- `step_seconds`: Measurement interval (e.g., 5 seconds)
+
+Example cost output:
+```
+# 2.5 Mbps stream costs ~0.11 SEK/min (~6.44 SEK/hour)
+cost_total_load_aware{scenario="2.5_Mbps_Stream",currency="SEK",...} 0.10731556
+cost_energy_load_aware{scenario="2.5_Mbps_Stream",currency="SEK",...} 0.00176000
+cost_compute_load_aware{scenario="2.5_Mbps_Stream",currency="SEK",...} 0.10555556
+```
+
 ### Configuration
 You can now configure pricing using environment variables:
 
@@ -119,6 +137,37 @@ docker ps | grep nginx-rtmp
 curl localhost:8080/health
 # Should return "healthy"
 ```
+
+## Troubleshooting
+
+### Cost Metrics Show All Zeros
+
+**Problem**: Cost metrics display `0` for all scenarios.
+
+**Cause**: The cost exporter requires load-aware data (CPU usage and power measurements) to calculate costs. If test results don't include these measurements, metrics default to `0`.
+
+**Solution**: Ensure your test results include:
+- `cpu_usage_cores`: Array of CPU measurements
+- `power_watts`: Array of power measurements
+- `step_seconds`: Measurement interval
+
+Example test result format:
+```json
+{
+  "scenarios": [{
+    "name": "2.5_Mbps_Stream",
+    "streams": 1,
+    "bitrate": "2500k",
+    "encoder_type": "x264",
+    "duration": 60,
+    "cpu_usage_cores": [1.25, 1.28, 1.26, ...],
+    "power_watts": [52.1, 52.8, 53.4, ...],
+    "step_seconds": 5
+  }]
+}
+```
+
+In production, these metrics are automatically collected from Prometheus when the cost exporter runs with `--prometheus-url` flag.
 
 ## Files Modified
 - `src/exporters/qoe/qoe_exporter.py` - Fixed default port to 9503
