@@ -22,6 +22,9 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 ### Start the Stack
 
 ```bash
+# IMPORTANT: If upgrading from v1.x, clean up old containers first
+docker compose down -v
+
 # Build and start all services (Go exporters build automatically)
 make up-build
 
@@ -29,11 +32,12 @@ make up-build
 docker compose up -d --build
 ```
 
+**Note for v2.0 upgrade**: The `docker compose down -v` command removes old containers (prometheus, rapl-exporter) and volumes. This is required for a clean migration to VictoriaMetrics.
+
 ### Access the Dashboards
 
 - **Grafana**: http://localhost:3000 (admin/admin)
-- **VictoriaMetrics**: http://localhost:8428 (high-performance TSDB)
-- **Prometheus**: http://localhost:9090 (for comparison)
+- **VictoriaMetrics**: http://localhost:8428 (primary TSDB with 30-day retention)
 - **Alertmanager**: http://localhost:9093
 
 ### Run Your First Test
@@ -46,18 +50,20 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 python3 scripts/analyze_results.py
 ```
 
-## 🚀 What's New: Go Exporters + VictoriaMetrics
+## 🚀 What's New: Go Exporters + VictoriaMetrics (v2.0)
 
-This project now features **high-performance Go exporters** that replace Python exporters for critical telemetry:
+This project now features **production-ready Go exporters** that have replaced Python exporters for all critical telemetry:
 
 - **70%+ CPU reduction** vs Python exporters
 - **1-second scrape granularity** with minimal jitter
-- **VictoriaMetrics** for 10x storage efficiency vs Prometheus
+- **VictoriaMetrics** as primary TSDB for 10x storage efficiency
 - **30-day retention** by default (vs 7 days)
 - **Zero missing metrics** under high load
 - **ARM64 support** for edge deployment
+- **FFmpeg stats exporter** for real-time encoding metrics
+- **Automated benchmarking** with 4 workload profiles
 
-See [Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md) for details.
+See [CHANGELOG.md](CHANGELOG.md) for full v2.0 release notes.
 
 ## What This Project Does
 
@@ -75,12 +81,15 @@ This project helps you:
 The stack includes:
 
 - **Nginx RTMP**: Streaming server for RTMP ingest
-- **VictoriaMetrics**: High-performance time-series database (30-day retention)
-- **Prometheus**: Legacy metrics storage (7-day retention, for comparison)
-- **Grafana**: Visualization dashboards with dual datasources
-- **Go Exporters**: CPU power (RAPL), GPU metrics (NVML/nvidia-smi)
+- **VictoriaMetrics**: Production-grade time-series database (30-day retention, primary TSDB)
+- **Grafana**: Visualization dashboards including Benchmark History
+- **Go Exporters**: 
+  - CPU power monitoring (RAPL)
+  - GPU metrics (NVML/nvidia-smi)
+  - FFmpeg encoding stats (encoder load, dropped frames, bitrate, latency)
 - **Python Exporters**: QoE metrics, Cost analysis, Results tracking
 - **Energy Advisor**: ML-based recommendations for optimal configurations
+- **Benchmark Automation**: 4 workload profiles for performance testing
 
 ## Documentation
 
@@ -108,6 +117,7 @@ make logs SERVICE=prometheus  # View logs
 # Testing
 make test-single       # Run single stream test
 make test-batch        # Run batch test matrix
+make run-benchmarks    # Run automated benchmark suite
 make analyze           # Analyze latest results
 
 # Development

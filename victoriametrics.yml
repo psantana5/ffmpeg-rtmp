@@ -12,13 +12,6 @@ scrape_configs:
         labels:
           service: 'nginx-rtmp'
 
-  - job_name: 'rapl-power-python'
-    static_configs:
-      - targets: ['rapl-exporter:9500']
-        labels:
-          service: 'power-monitoring'
-          exporter: 'python'
-
   - job_name: 'cpu-power-go'
     static_configs:
       - targets: ['cpu-exporter-go:9500']
@@ -81,3 +74,10 @@ scrape_configs:
       - targets: ['exporter-health-checker:9600']
         labels:
           service: 'monitoring'
+
+  - job_name: 'ffmpeg-stats'
+    static_configs:
+      - targets: ['ffmpeg-exporter:9506']
+        labels:
+          service: 'encoding'
+          exporter: 'ffmpeg'

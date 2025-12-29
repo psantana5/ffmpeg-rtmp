@@ -31,7 +31,7 @@ jobs:
         run: |
           echo "Waiting for services to be ready..."
           for i in {1..30}; do
-            if curl -sf http://localhost:9090/-/healthy >/dev/null 2>&1; then
+            if curl -sf http://localhost:8428/health >/dev/null 2>&1; then
               echo "✓ Services are ready after ${i} seconds"
               break
             fi
@@ -42,10 +42,10 @@ jobs:
             sleep 1
           done
       
-      - name: Check Prometheus is up
+      - name: Check VictoriaMetrics is up
         run: |
-          curl -sf http://localhost:9090/-/healthy || exit 1
-          echo "✓ Prometheus is healthy"
+          curl -sf http://localhost:8428/health || exit 1
+          echo "✓ VictoriaMetrics is healthy"
       
       - name: Check Grafana is up
         run: |
@@ -64,12 +64,7 @@ jobs:
       
       - name: Check exporters are responding
         run: |
-          # RAPL exporter requires privileged access to /sys/class/powercap
-          # which is not available in GitHub Actions, so we don't fail on it
-          # Note: RAPL uses /metrics endpoint (standard Prometheus exporter pattern)
-          curl -sf http://localhost:9500/metrics || echo "⚠ RAPL exporter requires privileged access (expected in CI)"
-          
-          # Go CPU exporter also requires privileged RAPL access
+          # Go CPU exporter requires privileged RAPL access
           curl -sf http://localhost:9510/health || echo "⚠ Go CPU exporter requires privileged access (expected in CI)"
           
           # These exporters should work in CI environment
@@ -84,6 +79,8 @@ jobs:
           echo "✓ QoE exporter is healthy"
           curl -sf http://localhost:9504/health || exit 1
           echo "✓ Cost exporter is healthy"
+          curl -sf http://localhost:9506/health || exit 1
+          echo "✓ FFmpeg exporter is healthy"
       
       - name: Show running containers
         if: always()
@@ -96,3 +93,62 @@ jobs:
       - name: Tear down services
         if: always()
         run: docker compose down -v
+
+  multi-arch-build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build multi-arch CPU exporter
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./src/exporters/cpu_exporter/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ffmpeg-rtmp/cpu-exporter:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build multi-arch GPU exporter
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./src/exporters/gpu_exporter/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ffmpeg-rtmp/gpu-exporter:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build multi-arch FFmpeg exporter
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./src/exporters/ffmpeg_exporter/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ffmpeg-rtmp/ffmpeg-exporter:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Summary
+        run: |
+          echo "✓ Successfully built multi-arch images for:"
+          echo "  - CPU Exporter (linux/amd64, linux/arm64)"
+          echo "  - GPU Exporter (linux/amd64, linux/arm64)"
+          echo "  - FFmpeg Exporter (linux/amd64, linux/arm64)"

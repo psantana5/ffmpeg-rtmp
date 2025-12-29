@@ -6,7 +6,7 @@ datasources:
     uid: DS_PROMETHEUS
     access: proxy
     url: http://prometheus:9090
-    isDefault: true
+    isDefault: false
     editable: false
     jsonData:
       timeInterval: 5s
@@ -18,7 +18,7 @@ datasources:
     uid: DS_VICTORIAMETRICS
     access: proxy
     url: http://victoriametrics:8428
-    isDefault: false
+    isDefault: true
     editable: false
     jsonData:
       timeInterval: 1s
