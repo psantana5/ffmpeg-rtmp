@@ -107,7 +107,7 @@ This document describes the architecture and data flow of the FFmpeg RTMP Power 
 #### Docker Stats Exporter (Port 9501)
 - **Purpose**: Docker daemon and container resource usage
 - **Access**: Docker socket (`/var/run/docker.sock`)
-- **Metrics**: 
+- **Metrics**:
   - `docker_cpu_percentage`
   - `container_cpu_percentage{name="..."}`
   - `container_memory_percentage{name="..."}`
@@ -139,7 +139,7 @@ This document describes the architecture and data flow of the FFmpeg RTMP Power 
 #### QoE Exporter (Port 9503)
 - **Purpose**: Quality of Experience and efficiency metrics
 - **Dependencies**: Advisor module
-- **Metrics**: 
+- **Metrics**:
   - `qoe_efficiency_score`
   - `qoe_throughput_per_watt`
   - `qoe_pixels_per_joule`
@@ -147,7 +147,7 @@ This document describes the architecture and data flow of the FFmpeg RTMP Power 
 #### Cost Exporter (Port 9504)
 - **Purpose**: Economic analysis
 - **Configuration**: Energy and CPU pricing
-- **Metrics**: 
+- **Metrics**:
   - `cost_total_usd`
   - `cost_energy_usd`
   - `cost_compute_usd`

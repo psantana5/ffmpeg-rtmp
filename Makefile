@@ -107,7 +107,7 @@ format:
 	$(PYTHON) -m ruff format .
 
 test:
-	$(PYTHON) -m pytest -q
+	$(PYTHON) -m pytest
 
 pre-commit:
 	$(PYTHON) -m pre_commit run --all-files

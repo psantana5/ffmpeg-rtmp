@@ -72,33 +72,33 @@
 ## Key Metrics Explained
 
 ### 🎯 Efficiency Score
-**What:** Pixels delivered per joule of energy consumed  
-**Unit:** pixels/J (e.g., 1,200,000 pixels/J)  
-**Better:** Higher values  
+**What:** Pixels delivered per joule of energy consumed
+**Unit:** pixels/J (e.g., 1,200,000 pixels/J)
+**Better:** Higher values
 **Use:** Compare overall efficiency across scenarios
 
 ### ⚡ Power Consumption
-**What:** Average electrical power during transcoding  
-**Unit:** Watts (W)  
-**Better:** Lower values (but consider throughput)  
+**What:** Average electrical power during transcoding
+**Unit:** Watts (W)
+**Better:** Lower values (but consider throughput)
 **Use:** Capacity planning, cost estimation
 
 ### 🔋 Total Energy
-**What:** Total energy consumed during scenario  
-**Unit:** Joules (J) or Watt-hours (Wh)  
-**Better:** Lower values (per unit of work)  
+**What:** Total energy consumed during scenario
+**Unit:** Joules (J) or Watt-hours (Wh)
+**Better:** Lower values (per unit of work)
 **Use:** Compare energy efficiency of different configs
 
 ### 📊 Wasted Energy
-**What:** Extra energy vs optimal config (same ladder)  
-**Unit:** Joules (J)  
-**Better:** Zero (means you're using optimal config)  
+**What:** Extra energy vs optimal config (same ladder)
+**Unit:** Joules (J)
+**Better:** Zero (means you're using optimal config)
 **Use:** Quantify cost of suboptimal choices
 
 ### 🎚️ Stability (CV)
-**What:** Coefficient of variation in efficiency  
-**Unit:** Dimensionless ratio (0-1+)  
-**Better:** Lower values (more stable)  
+**What:** Coefficient of variation in efficiency
+**Unit:** Dimensionless ratio (0-1+)
+**Better:** Lower values (more stable)
 **Use:** Select reliable configs for production
 
 ## Color Coding
@@ -256,6 +256,6 @@ Energy Waste:
 
 ---
 
-**Version:** 1.0  
-**Created:** 2024-12-27  
+**Version:** 1.0
+**Created:** 2024-12-27
 **Dashboard UID:** energy-efficiency-dashboard

@@ -83,7 +83,7 @@ if success:
         'hardware_cpu_model': 'Intel_i7_9700K',
         'container_cpu_pct': 7.0
     }, return_confidence=True)
-    
+
     print(f"Predicted power: {prediction['mean']:.2f} W")
     print(f"Confidence interval: [{prediction['ci_low']:.2f}, {prediction['ci_high']:.2f}] W")
     print(f"Confidence width: {prediction['ci_width']:.2f} W")
@@ -563,7 +563,7 @@ Predicted Power Consumption:
 MEASURED vs PREDICTED COMPARISON
 ──────────────────────────────────────────────────────────────────────────────────────────────────
 (Shows model fit quality on training data)
-Streams    Measured (W)    Predicted (W)   Diff (W)    
+Streams    Measured (W)    Predicted (W)   Diff (W)
 ──────────────────────────────────────────────────────────────────────────────────────────────────
 1          45.00           45.23           +0.23
 2          80.00           78.45           -1.55
@@ -668,7 +668,7 @@ print(f"{streams} streams: {kwh_per_month:.2f} kWh/month = ${cost_per_month:.2f}
 for streams in [4, 8, 12, 16]:
     power = predictor.predict(streams)
     print(f"{streams} streams → {power:.0f}W")
-    
+
     if power > 250:  # Server cooling limit
         print(f"  ⚠️  Exceeds thermal capacity")
 ```
@@ -714,7 +714,7 @@ print(f"Required PDU capacity: {total_rack_power * 1.2:.0f}W (20% headroom)")
    # Train on subset
    train_scenarios = scenarios[:-2]
    predictor.fit(train_scenarios)
-   
+
    # Test on held-out data
    test_scenarios = scenarios[-2:]
    for scenario in test_scenarios:

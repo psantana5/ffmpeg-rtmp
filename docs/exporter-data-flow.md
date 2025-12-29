@@ -22,16 +22,16 @@ The system consists of multiple exporters that collect metrics from different so
    - rapl-exporter (Power consumption)
    - node-exporter (System metrics)
    - cadvisor (Container metrics)
-   
+
 2. **Application Metrics Exporters**: Monitor running services
    - nginx-rtmp-exporter (RTMP streaming)
    - docker-stats-exporter (Docker overhead)
-   
+
 3. **Analysis Exporters**: Process test results and calculate derived metrics
    - results-exporter (Test results analysis)
    - qoe-exporter (Quality of Experience)
    - cost-exporter (Cost analysis)
-   
+
 4. **Health Monitoring**:
    - exporter-health-checker (Monitors all exporters)
 
@@ -41,7 +41,7 @@ The system consists of multiple exporters that collect metrics from different so
 
 ### 1. RAPL Exporter (rapl-exporter)
 
-**Port**: 9500  
+**Port**: 9500
 **Data Source**: Linux kernel RAPL interface (`/sys/class/powercap`)
 
 #### How It Gets Data
@@ -101,7 +101,7 @@ rapl-exporter:
 
 ### 2. Docker Stats Exporter (docker-stats-exporter)
 
-**Port**: 9501  
+**Port**: 9501
 **Data Source**: Docker daemon API via `/var/run/docker.sock`
 
 #### How It Gets Data
@@ -162,7 +162,7 @@ docker-stats-exporter:
 
 ### 3. Node Exporter (node-exporter)
 
-**Port**: 9100  
+**Port**: 9100
 **Data Source**: Host system metrics from `/proc`, `/sys`
 
 #### How It Gets Data
@@ -228,7 +228,7 @@ node-exporter:
 
 ### 4. cAdvisor (cadvisor)
 
-**Port**: 8080  
+**Port**: 8080
 **Data Source**: Docker daemon + cgroup filesystem
 
 #### How It Gets Data
@@ -291,7 +291,7 @@ cadvisor:
 
 ### 5. Nginx RTMP Exporter (nginx-rtmp-exporter)
 
-**Port**: 9728  
+**Port**: 9728
 **Data Source**: Nginx RTMP stat endpoint
 
 #### How It Gets Data
@@ -365,7 +365,7 @@ http {
 
 ### 6. Results Exporter (results-exporter)
 
-**Port**: 9502  
+**Port**: 9502
 **Data Source**: Test result JSON files + Prometheus historical data
 
 #### How It Gets Data
@@ -431,7 +431,7 @@ results-exporter:
 
 ### 7. QoE Exporter (qoe-exporter)
 
-**Port**: 9503  
+**Port**: 9503
 **Data Source**: Test result JSON files
 
 #### How It Gets Data
@@ -494,7 +494,7 @@ qoe-exporter:
 
 ### 8. Cost Exporter (cost-exporter)
 
-**Port**: 9504  
+**Port**: 9504
 **Data Source**: Test result JSON files + Prometheus historical data
 
 #### How It Gets Data
@@ -567,8 +567,8 @@ cost-exporter:
 
 ### 9. DCGM Exporter (dcgm-exporter) - NVIDIA GPU
 
-**Port**: 9400  
-**Profile**: nvidia (optional)  
+**Port**: 9400
+**Profile**: nvidia (optional)
 **Data Source**: NVIDIA GPU via DCGM library
 
 #### How It Gets Data
@@ -649,7 +649,7 @@ dcgm-exporter:
 
 ### 10. Exporter Health Checker (exporter-health-checker)
 
-**Port**: 9600  
+**Port**: 9600
 **Data Source**: All other exporters' /metrics endpoints
 
 #### How It Gets Data
@@ -811,7 +811,7 @@ exporter-health-checker:
    curl -fsSL https://get.docker.com -o get-docker.sh
    sudo sh get-docker.sh
    sudo usermod -aG docker $USER
-   
+
    # Install Docker Compose
    sudo apt-get install docker-compose-plugin
    ```
@@ -908,7 +908,7 @@ Navigate to pre-provisioned dashboards:
    ```bash
    # Run health checker
    python3 check_exporters_health.py
-   
+
    # Or check via container
    docker exec exporter-health-checker python3 /app/check_exporters_health.py
    ```
@@ -917,7 +917,7 @@ Navigate to pre-provisioned dashboards:
    ```bash
    # View Prometheus logs
    docker logs prometheus
-   
+
    # Check targets page
    curl http://localhost:9090/api/v1/targets
    ```
@@ -926,7 +926,7 @@ Navigate to pre-provisioned dashboards:
    ```bash
    # For cost-exporter
    docker logs cost-exporter --follow
-   
+
    # Restart with debug logging
    docker compose stop cost-exporter
    docker compose up cost-exporter
@@ -1110,10 +1110,10 @@ If issues persist:
    ```bash
    # Stop everything
    docker compose down
-   
+
    # Start only essentials
    docker compose up -d prometheus rapl-exporter
-   
+
    # Test minimal setup
    curl http://localhost:9500/metrics
    curl http://localhost:9090/api/v1/query?query=rapl_power_watts

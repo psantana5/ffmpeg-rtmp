@@ -187,7 +187,7 @@ Starting test: my_first_test
   Bitrate: 2000k
   Resolution: 1280x720
   Duration: 60s
-  
+
 [========================================] 60/60s
 Test complete!
 Results saved to: test_results/test_results_20231215_143022.json

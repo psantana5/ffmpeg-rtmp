@@ -141,7 +141,7 @@ echo "Checking service health..."
 check_service() {
     local name=$1
     local url=$2
-    
+
     if curl -sf "$url" > /dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} $name is healthy"
         return 0

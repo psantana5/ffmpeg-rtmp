@@ -22,7 +22,8 @@ class RAPLReader:
 
         if not self.base_path.exists():
             print(
-                "ERROR: RAPL interface not found. Are you running on Intel CPU with root/privileged access?"
+                "ERROR: RAPL interface not found. "
+                "Are you running on Intel CPU with root/privileged access?"
             )
             return zones
 
@@ -55,9 +56,7 @@ class RAPLReader:
                                     if sub_energy_file.exists():
                                         zones[zone_name]["subzones"][subzone_name] = {
                                             "path": sub_energy_file,
-                                            "max_range": int(
-                                                sub_max_file.read_text().strip()
-                                            )
+                                            "max_range": int(sub_max_file.read_text().strip())
                                             if sub_max_file.exists()
                                             else None,
                                         }
@@ -137,9 +136,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
             # Generate Prometheus metrics
             output = []
-            output.append(
-                "# HELP rapl_power_watts Current power consumption in watts from RAPL"
-            )
+            output.append("# HELP rapl_power_watts Current power consumption in watts from RAPL")
             output.append("# TYPE rapl_power_watts gauge")
 
             for zone, watts in power_data.items():
