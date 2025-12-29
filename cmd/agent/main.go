@@ -96,7 +96,7 @@ func main() {
 			caps.Labels = make(map[string]string)
 		}
 		caps.Labels["node_type"] = string(nodeType)
-		
+
 		// Add label if master is also a worker
 		if *allowMasterAsWorker {
 			caps.Labels["master_as_worker"] = "true"
@@ -191,7 +191,7 @@ func isMasterAsWorker(masterURL, hostname string) bool {
 func confirmMasterAsWorker() bool {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you want to continue? (yes/no): ")
-	
+
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		log.Printf("Error reading input: %v", err)
@@ -225,7 +225,7 @@ func executeJob(job *models.Job, nodeID string) *models.JobResult {
 			"duration":     5.0,
 		},
 		AnalyzerOutput: map[string]interface{}{
-			"scenario":      job.Scenario,
+			"scenario":       job.Scenario,
 			"recommendation": "optimal",
 		},
 	}

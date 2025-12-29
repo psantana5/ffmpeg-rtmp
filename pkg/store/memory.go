@@ -15,12 +15,12 @@ var (
 
 // MemoryStore is an in-memory implementation of the data store
 type MemoryStore struct {
-	nodes      map[string]*models.Node
-	jobs       map[string]*models.Job
-	jobQueue   []string // FIFO queue of job IDs
-	nodesMu    sync.RWMutex
-	jobsMu     sync.RWMutex
-	queueMu    sync.Mutex
+	nodes    map[string]*models.Node
+	jobs     map[string]*models.Job
+	jobQueue []string // FIFO queue of job IDs
+	nodesMu  sync.RWMutex
+	jobsMu   sync.RWMutex
+	queueMu  sync.Mutex
 }
 
 // NewMemoryStore creates a new in-memory store
@@ -38,7 +38,7 @@ func NewMemoryStore() *MemoryStore {
 func (s *MemoryStore) RegisterNode(node *models.Node) error {
 	s.nodesMu.Lock()
 	defer s.nodesMu.Unlock()
-	
+
 	s.nodes[node.ID] = node
 	return nil
 }
@@ -47,7 +47,7 @@ func (s *MemoryStore) RegisterNode(node *models.Node) error {
 func (s *MemoryStore) GetNode(id string) (*models.Node, error) {
 	s.nodesMu.RLock()
 	defer s.nodesMu.RUnlock()
-	
+
 	node, ok := s.nodes[id]
 	if !ok {
 		return nil, ErrNodeNotFound
@@ -59,7 +59,7 @@ func (s *MemoryStore) GetNode(id string) (*models.Node, error) {
 func (s *MemoryStore) GetAllNodes() []*models.Node {
 	s.nodesMu.RLock()
 	defer s.nodesMu.RUnlock()
-	
+
 	nodes := make([]*models.Node, 0, len(s.nodes))
 	for _, node := range s.nodes {
 		nodes = append(nodes, node)
@@ -71,12 +71,12 @@ func (s *MemoryStore) GetAllNodes() []*models.Node {
 func (s *MemoryStore) UpdateNodeStatus(id, status string) error {
 	s.nodesMu.Lock()
 	defer s.nodesMu.Unlock()
-	
+
 	node, ok := s.nodes[id]
 	if !ok {
 		return ErrNodeNotFound
 	}
-	
+
 	node.Status = status
 	node.LastHeartbeat = time.Now()
 	return nil
@@ -86,12 +86,12 @@ func (s *MemoryStore) UpdateNodeStatus(id, status string) error {
 func (s *MemoryStore) UpdateNodeHeartbeat(id string) error {
 	s.nodesMu.Lock()
 	defer s.nodesMu.Unlock()
-	
+
 	node, ok := s.nodes[id]
 	if !ok {
 		return ErrNodeNotFound
 	}
-	
+
 	node.LastHeartbeat = time.Now()
 	return nil
 }
@@ -103,12 +103,12 @@ func (s *MemoryStore) CreateJob(job *models.Job) error {
 	s.jobsMu.Lock()
 	s.jobs[job.ID] = job
 	s.jobsMu.Unlock()
-	
+
 	// Add to queue
 	s.queueMu.Lock()
 	s.jobQueue = append(s.jobQueue, job.ID)
 	s.queueMu.Unlock()
-	
+
 	return nil
 }
 
@@ -116,7 +116,7 @@ func (s *MemoryStore) CreateJob(job *models.Job) error {
 func (s *MemoryStore) GetJob(id string) (*models.Job, error) {
 	s.jobsMu.RLock()
 	defer s.jobsMu.RUnlock()
-	
+
 	job, ok := s.jobs[id]
 	if !ok {
 		return nil, ErrJobNotFound
@@ -128,7 +128,7 @@ func (s *MemoryStore) GetJob(id string) (*models.Job, error) {
 func (s *MemoryStore) GetAllJobs() []*models.Job {
 	s.jobsMu.RLock()
 	defer s.jobsMu.RUnlock()
-	
+
 	jobs := make([]*models.Job, 0, len(s.jobs))
 	for _, job := range s.jobs {
 		jobs = append(jobs, job)
@@ -140,17 +140,17 @@ func (s *MemoryStore) GetAllJobs() []*models.Job {
 func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 	s.queueMu.Lock()
 	defer s.queueMu.Unlock()
-	
+
 	// Find first pending job
 	for i, jobID := range s.jobQueue {
 		s.jobsMu.RLock()
 		job, ok := s.jobs[jobID]
 		s.jobsMu.RUnlock()
-		
+
 		if !ok || job.Status != models.JobStatusPending {
 			continue
 		}
-		
+
 		// Mark job as running and assign to node
 		s.jobsMu.Lock()
 		now := time.Now()
@@ -158,10 +158,10 @@ func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 		job.NodeID = nodeID
 		job.StartedAt = &now
 		s.jobsMu.Unlock()
-		
+
 		// Remove from queue
 		s.jobQueue = append(s.jobQueue[:i], s.jobQueue[i+1:]...)
-		
+
 		// Update node status
 		s.nodesMu.Lock()
 		if node, ok := s.nodes[nodeID]; ok {
@@ -169,10 +169,10 @@ func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 			node.CurrentJobID = jobID
 		}
 		s.nodesMu.Unlock()
-		
+
 		return job, nil
 	}
-	
+
 	return nil, ErrJobNotFound
 }
 
@@ -180,21 +180,21 @@ func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 func (s *MemoryStore) UpdateJobStatus(id string, status models.JobStatus, errorMsg string) error {
 	s.jobsMu.Lock()
 	defer s.jobsMu.Unlock()
-	
+
 	job, ok := s.jobs[id]
 	if !ok {
 		return ErrJobNotFound
 	}
-	
+
 	job.Status = status
 	if errorMsg != "" {
 		job.Error = errorMsg
 	}
-	
+
 	if status == models.JobStatusCompleted || status == models.JobStatusFailed {
 		now := time.Now()
 		job.CompletedAt = &now
-		
+
 		// Update node status back to available
 		if job.NodeID != "" {
 			s.nodesMu.Lock()
@@ -205,6 +205,6 @@ func (s *MemoryStore) UpdateJobStatus(id string, status models.JobStatus, errorM
 			s.nodesMu.Unlock()
 		}
 	}
-	
+
 	return nil
 }
