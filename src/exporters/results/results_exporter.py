@@ -455,9 +455,9 @@ class ResultsExporter:
 
         total_energy_wh = (energy_j / 3600) if duration > 0 else 0.0
 
-        # Docker overhead is estimated: docker_engine_cpu_percent × total power
+        # Docker overhead is estimated: docker_containers_total_cpu_percent × total power
         estimated_docker_overhead_w = 0.0
-        docker_engine_query = "docker_engine_cpu_percent"
+        docker_engine_query = "docker_containers_total_cpu_percent"
         docker_engine_data = self.client.query_range(docker_engine_query, start, end, step="5s")
         docker_engine_values = _extract_values(docker_engine_data)
         mean_docker_engine_cpu = mean(docker_engine_values) if docker_engine_values else 0.0
