@@ -285,7 +285,6 @@ class TestRunner:
             "Nginx RTMP": "http://localhost:8080/health",
             "VictoriaMetrics": "http://localhost:8428/health",
             "RAPL Exporter": "http://localhost:9510/health",
-            "Docker Stats": "http://localhost:9501/health",
         }
 
         start_time = time.time()
