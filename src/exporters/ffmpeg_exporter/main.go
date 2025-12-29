@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -138,24 +137,17 @@ func parseFFmpegLine(line string) {
 	}
 }
 
-// monitorFFmpegProcess simulates monitoring an FFmpeg process
-// In production, this would monitor actual FFmpeg processes via logs or stdout
+// monitorFFmpegProcess monitors stream activity based on last update time
 func monitorFFmpegProcess() {
-	// Check for FFmpeg processes
+	// Monitor stream activity based on metrics updates
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	
 	for range ticker.C {
-		// Check if any FFmpeg processes are running
-		cmd := exec.Command("pgrep", "-f", "ffmpeg")
-		output, err := cmd.Output()
-		
 		stats.mu.Lock()
-		if err != nil || len(output) == 0 {
-			// No FFmpeg processes running
-			if stats.StreamActive && time.Since(stats.LastUpdateTime) > 5*time.Second {
-				stats.StreamActive = false
-			}
+		// Mark stream as inactive if no updates for 5 seconds
+		if stats.StreamActive && time.Since(stats.LastUpdateTime) > 5*time.Second {
+			stats.StreamActive = false
 		}
 		stats.mu.Unlock()
 	}

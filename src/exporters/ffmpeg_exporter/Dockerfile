@@ -16,11 +16,8 @@ COPY src/exporters/ffmpeg_exporter/ ./src/exporters/ffmpeg_exporter/
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" \
     -o ffmpeg_exporter ./src/exporters/ffmpeg_exporter/
 
-# Runtime stage - use alpine for process monitoring tools
-FROM alpine:latest
-
-# Install procps for pgrep command
-RUN apk add --no-cache procps
+# Runtime stage - use scratch for minimal image
+FROM scratch
 
 WORKDIR /app
 
