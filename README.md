@@ -1,5 +1,15 @@
 # FFmpeg RTMP Power Monitoring
 
+[![Lint](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/lint.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/lint.yml)
+[![Test](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/test.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/test.yml)
+[![Pre-commit](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/pre-commit.yml)
+[![Docker Build](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/docker-build.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/docker-build.yml)
+[![PromQL Validation](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/promql-validate.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/promql-validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Perfect for optimizing FFmpeg configurations for energy efficiency.
 
 ## Quick Start

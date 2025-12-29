@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/psantana5/ffmpeg-rtmp/tree/main/docs
+    about: Please check the documentation first
+  - name: Discussions
+    url: https://github.com/psantana5/ffmpeg-rtmp/discussions
+    about: Ask questions and discuss ideas with the community
