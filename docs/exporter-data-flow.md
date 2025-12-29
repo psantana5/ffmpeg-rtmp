@@ -422,7 +422,7 @@ results-exporter:
 
 | Problem | Solution |
 |---------|----------|
-| No scenarios found | Run tests: `python3 run_tests.py` |
+| No scenarios found | Run tests: `python3 scripts/run_tests.py` |
 | No test results | Check mount: `docker exec results-exporter ls /results` |
 | Stale metrics | Results exporter caches for 60s; wait or restart |
 | Prometheus errors | Verify PROMETHEUS_URL is correct and Prometheus is accessible |
@@ -770,7 +770,7 @@ exporter-health-checker:
 ### Test Execution Flow
 
 ```
-1. User runs: python3 run_tests.py
+1. User runs: python3 scripts/run_tests.py
 
 2. Test runner:
    ├─ Records start_time = current timestamp
@@ -871,7 +871,7 @@ All targets should show `health: "up"`.
 
 ```bash
 # Run a quick single-stream test
-python3 run_tests.py --name quick --streams 1 --duration 60
+python3 scripts/run_tests.py --name quick --streams 1 --duration 60
 
 # Check results were created
 ls -lh test_results/
@@ -977,7 +977,7 @@ Navigate to pre-provisioned dashboards:
    ```
 
 **Solutions**:
-- Run tests to generate data: `python3 run_tests.py`
+- Run tests to generate data: `python3 scripts/run_tests.py`
 - Verify PROMETHEUS_URL environment variable
 - Check that test results have start_time and end_time
 - Verify Prometheus has data for the test time window

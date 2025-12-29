@@ -4,9 +4,14 @@ Creates sample test data and verifies the integration.
 """
 
 import json
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
+# Add scripts directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from analyze_results import ResultsAnalyzer
 
