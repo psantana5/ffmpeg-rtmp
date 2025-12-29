@@ -31,7 +31,7 @@ def get_cpu_info() -> Dict[str, any]:
         # Try to get physical cores (works on Linux and macOS)
         if hasattr(os, "sched_getaffinity"):
             cpu_info["threads"] = len(os.sched_getaffinity(0))
-        
+
         # Get CPU model name
         if platform.system() == "Linux":
             try:
@@ -141,7 +141,7 @@ def get_total_ram_gb() -> float:
             )
             if result.returncode == 0:
                 bytes_mem = int(result.stdout.strip())
-                return bytes_mem / (1024 ** 3)
+                return bytes_mem / (1024**3)
         elif platform.system() == "Windows":
             result = subprocess.run(
                 ["wmic", "computersystem", "get", "totalphysicalmemory"],
@@ -153,7 +153,7 @@ def get_total_ram_gb() -> float:
                 lines = result.stdout.strip().split("\n")
                 if len(lines) > 1:
                     bytes_mem = int(lines[1].strip())
-                    return bytes_mem / (1024 ** 3)
+                    return bytes_mem / (1024**3)
     except Exception:
         pass
     return 8.0  # Default assumption
@@ -169,7 +169,7 @@ def is_laptop() -> bool:
                 for item in power_supply_path.iterdir():
                     if "BAT" in item.name.upper():
                         return True
-        
+
         # macOS: Check battery using system_profiler
         elif platform.system() == "Darwin":
             result = subprocess.run(
@@ -180,7 +180,7 @@ def is_laptop() -> bool:
             )
             if "Battery" in result.stdout:
                 return True
-        
+
         # Windows: Check using WMIC
         elif platform.system() == "Windows":
             result = subprocess.run(
@@ -194,14 +194,14 @@ def is_laptop() -> bool:
                 return True
     except Exception:
         pass
-    
+
     return False
 
 
 def detect_system_type(cpu_threads: int, ram_gb: float, has_battery: bool) -> str:
     """
     Classify system as laptop, desktop, or server.
-    
+
     Logic:
     - Laptop: Has battery
     - Server: >16 threads AND >32GB RAM AND no battery
@@ -223,7 +223,7 @@ def recommend_config(
 ) -> Dict[str, any]:
     """
     Recommend optimal test configuration based on hardware.
-    
+
     Logic:
     - If NVIDIA GPU exists → prioritize NVENC benchmarks
     - If CPU has > 12 threads → test 4K 30/60fps
@@ -231,7 +231,7 @@ def recommend_config(
     - If < 8 threads → test 1080p30 or 720p
     - If laptop + high temps → shorter duration (120s)
     - Servers → full duration (300s) & multi-output ABR ladder if possible
-    
+
     Returns recommended configuration dict.
     """
     config = {
@@ -243,17 +243,15 @@ def recommend_config(
         "fps": 30,
         "duration": 300,
     }
-    
+
     reasons = []
-    
+
     # 1. Encoder selection: GPU first, then CPU
     if has_gpu:
         config["encoder"] = "h264_nvenc"
         # NVENC supports standard presets (medium is balanced quality/speed)
         config["preset"] = "medium"
-        reasons.append(
-            "NVIDIA GPU detected → Using hardware-accelerated NVENC encoder"
-        )
+        reasons.append("NVIDIA GPU detected → Using hardware-accelerated NVENC encoder")
     else:
         config["encoder"] = "h264"
         if cpu_threads >= 12:
@@ -264,16 +262,13 @@ def recommend_config(
             )
         elif cpu_threads >= 8:
             config["preset"] = "fast"
-            reasons.append(
-                f"CPU with {cpu_threads} threads → Using x264 'fast' preset"
-            )
+            reasons.append(f"CPU with {cpu_threads} threads → Using x264 'fast' preset")
         else:
             config["preset"] = "veryfast"
             reasons.append(
-                f"CPU with {cpu_threads} threads → "
-                "Using x264 'veryfast' preset for lighter load"
+                f"CPU with {cpu_threads} threads → Using x264 'veryfast' preset for lighter load"
             )
-    
+
     # 2. Resolution and FPS selection based on CPU threads
     if cpu_threads > 12:
         # High-end system: Test 4K
@@ -281,8 +276,7 @@ def recommend_config(
         config["fps"] = 30
         config["bitrate"] = "15000k"
         reasons.append(
-            f"High thread count ({cpu_threads}) → "
-            "Testing 4K resolution for comprehensive benchmark"
+            f"High thread count ({cpu_threads}) → Testing 4K resolution for comprehensive benchmark"
         )
 
         # If even more powerful, try 60fps
@@ -290,10 +284,9 @@ def recommend_config(
             config["fps"] = 60
             config["bitrate"] = "20000k"
             reasons.append(
-                f"Very high thread count ({cpu_threads}) → "
-                "Testing 4K@60fps for maximum stress"
+                f"Very high thread count ({cpu_threads}) → Testing 4K@60fps for maximum stress"
             )
-    
+
     elif 8 <= cpu_threads <= 12:
         # Mid-range system: Test 1440p or 1080p60
         if has_gpu:
@@ -306,7 +299,7 @@ def recommend_config(
             config["fps"] = 60
             config["bitrate"] = "8000k"
             reasons.append(f"Mid-range CPU ({cpu_threads} threads) → Testing 1080p@60fps")
-    
+
     else:
         # Lower-end system: Test 1080p30 or 720p
         if cpu_threads >= 4:
@@ -318,24 +311,15 @@ def recommend_config(
             config["resolution"] = "1280x720"
             config["fps"] = 30
             config["bitrate"] = "3000k"
-            reasons.append(
-                f"Limited threads ({cpu_threads}) → "
-                "Testing 720p@30fps for stability"
-            )
+            reasons.append(f"Limited threads ({cpu_threads}) → Testing 720p@30fps for stability")
 
     # 3. Duration adjustment based on system type
     if system_type == "laptop":
         config["duration"] = 120
-        reasons.append(
-            "Laptop detected → "
-            "Reduced test duration (120s) to minimize thermal impact"
-        )
+        reasons.append("Laptop detected → Reduced test duration (120s) to minimize thermal impact")
     elif system_type == "server":
         config["duration"] = 300
-        reasons.append(
-            "Server environment → "
-            "Extended test duration (300s) for thorough analysis"
-        )
+        reasons.append("Server environment → Extended test duration (300s) for thorough analysis")
     else:  # desktop
         config["duration"] = 180
         reasons.append("Desktop system → Standard test duration (180s)")
@@ -345,7 +329,7 @@ def recommend_config(
         f"Selected bitrate {config['bitrate']} appropriate for "
         f"{config['resolution']}@{config['fps']}fps"
     )
-    
+
     config["reasons"] = reasons
     return config
 
@@ -369,17 +353,17 @@ def main():
     print("Hardware-Aware Benchmark Recommendation Tool")
     print("=" * 70)
     print()
-    
+
     # Detect hardware
-    print("🔍 Detecting hardware configuration...")
+    print("Detecting hardware configuration...")
     print()
-    
+
     cpu_info = get_cpu_info()
     gpu_info = detect_nvidia_gpu()
     ram_gb = get_total_ram_gb()
     has_battery = is_laptop()
     system_type = detect_system_type(cpu_info["threads"], ram_gb, has_battery)
-    
+
     # Print detected hardware
     print(f"CPU: {cpu_info['model']}")
     print(f"Threads: {cpu_info['threads']} (Physical cores: {cpu_info['physical_cores']})")
@@ -390,30 +374,30 @@ def main():
         print("GPU: Not detected")
     print(f"System Type: {system_type.upper()}")
     if has_battery:
-        print("⚡ Battery detected - mobile system")
+        print("Battery detected - mobile system")
     print()
-    
+
     # Generate recommendation
     print("-" * 70)
-    print("🎯 Generating optimal benchmark configuration...")
+    print("Generating optimal benchmark configuration...")
     print()
-    
+
     config = recommend_config(
         cpu_threads=cpu_info["threads"],
         has_gpu=gpu_info is not None,
         system_type=system_type,
         ram_gb=ram_gb,
     )
-    
+
     # Print reasoning
-    print("💡 Configuration Rationale:")
+    print("Configuration Rationale:")
     for i, reason in enumerate(config["reasons"], 1):
         print(f"  {i}. {reason}")
     print()
-    
+
     # Print recommended command
     print("-" * 70)
-    print("✅ Recommended Command:")
+    print("Recommended Command:")
     print()
     print(format_command(config))
     print()
@@ -422,7 +406,7 @@ def main():
     print("Note: This recommendation prioritizes comprehensive benchmarking over speed.")
     print("You can adjust parameters based on your specific needs.")
     print()
-    
+
     return 0
 
 

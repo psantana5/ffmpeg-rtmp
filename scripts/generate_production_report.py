@@ -27,7 +27,7 @@ def load_benchmark_results(results_dir: Path) -> Dict:
     json_files = sorted(results_dir.glob('test_results_*.json'), reverse=True)
     
     if not json_files:
-        print(f"❌ No test results found in {results_dir}")
+        print(f"No test results found in {results_dir}")
         return {}
     
     with open(json_files[0]) as f:
@@ -89,7 +89,7 @@ def generate_markdown_report(
     
     scenarios = results.get('scenarios', [])
     if not scenarios:
-        print("❌ No scenarios found in results")
+        print("No scenarios found in results")
         return
     
     # Find baseline for savings calculations
@@ -249,7 +249,7 @@ def generate_markdown_report(
     with open(output_file, 'w') as f:
         f.write('\n'.join(report))
     
-    print(f"✅ Report generated: {output_file}")
+    print(f"Report generated: {output_file}")
 
 
 def main():
