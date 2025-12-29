@@ -187,7 +187,9 @@ services:
       retries: 3
 
   qoe-exporter:
-    build: ./src/exporters/qoe
+    build:
+      context: .
+      dockerfile: src/exporters/qoe/Dockerfile
     container_name: qoe-exporter
     volumes:
       - ./test_results:/results:ro
@@ -207,7 +209,9 @@ services:
       retries: 3
 
   cost-exporter:
-    build: ./src/exporters/cost
+    build:
+      context: .
+      dockerfile: src/exporters/cost/Dockerfile
     container_name: cost-exporter
     volumes:
       - ./test_results:/results:ro

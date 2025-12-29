@@ -7,13 +7,12 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Python dependencies
-COPY ../../../requirements.txt /app/
+# Install Python dependencies from root
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY qoe_exporter.py /app/
-COPY ../../../advisor /app/advisor
+# Copy application file
+COPY src/exporters/qoe/qoe_exporter.py /app/
 
 RUN chmod +x /app/qoe_exporter.py
 
@@ -24,6 +23,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 ENV QOE_EXPORTER_PORT=9503
 ENV RESULTS_DIR=/results
+
+# Note: advisor module is mounted as volume at runtime
 
 # Use shell form to allow environment variable expansion
 CMD python3 /app/qoe_exporter.py --port ${QOE_EXPORTER_PORT} --results-dir ${RESULTS_DIR}

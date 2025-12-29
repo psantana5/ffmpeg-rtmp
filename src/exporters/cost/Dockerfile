@@ -7,13 +7,12 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Python dependencies
-COPY ../../../requirements.txt /app/
+# Install Python dependencies from root
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY cost_exporter.py /app/
-COPY ../../../advisor /app/advisor
+# Copy application file
+COPY src/exporters/cost/cost_exporter.py /app/
 
 RUN chmod +x /app/cost_exporter.py
 
@@ -28,6 +27,8 @@ ENV ENERGY_COST_PER_KWH=0.12
 ENV CPU_COST_PER_HOUR=0.50
 ENV CURRENCY=USD
 ENV PROMETHEUS_URL=http://prometheus:9090
+
+# Note: advisor module is mounted as volume at runtime
 
 # Use shell form to allow environment variable expansion
 CMD python3 /app/cost_exporter.py \
