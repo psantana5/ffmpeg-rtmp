@@ -6,8 +6,8 @@ Tests for results_exporter enhancements
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "results-exporter"))
+# Add src/exporters/results directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "exporters" / "results"))
 
 from results_exporter import ResultsExporter
 

@@ -193,10 +193,10 @@ Automated model retraining from test results with versioning and hardware-specif
 make retrain-models
 
 # Or directly
-python3 retrain_models.py --results-dir ./test_results --models-dir ./models
+python3 scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
 
 # With custom hardware ID
-python3 retrain_models.py --hardware-id my_server_01
+python3 scripts/retrain_models.py --hardware-id my_server_01
 ```
 
 ### Model Storage Structure

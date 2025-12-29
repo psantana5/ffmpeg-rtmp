@@ -22,11 +22,13 @@ import pickle
 import platform
 import shutil
 import statistics
-import platform
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# Add parent directory to path to allow imports from advisor package
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import requests
 
@@ -379,7 +381,6 @@ class ModelRetrainer:
         self, predictor: PowerPredictor, path: Path, info: Dict
     ):
         """Save PowerPredictor with metadata."""
-        import pickle
         
         model_data = {
             'model': predictor.model,

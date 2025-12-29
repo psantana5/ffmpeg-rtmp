@@ -137,13 +137,13 @@ The multivariate predictor is integrated into `analyze_results.py`:
 
 ```bash
 # Use multivariate predictor for analysis
-python3 analyze_results.py --multivariate
+python3 scripts/analyze_results.py --multivariate
 
 # Generate predictions for specific stream counts
-python3 analyze_results.py --multivariate --predict-future 1,2,4,8,12,16
+python3 scripts/analyze_results.py --multivariate --predict-future 1,2,4,8,12,16
 
 # Use simple predictor (backward compatible)
-python3 analyze_results.py --predict-future 1,2,4,8,12
+python3 scripts/analyze_results.py --predict-future 1,2,4,8,12
 ```
 
 ### Prometheus Metrics
@@ -527,7 +527,7 @@ The model is automatically integrated when running analysis:
 
 ```bash
 # Run analysis (includes power predictions)
-python3 analyze_results.py test_results/test_results_20231215_143022.json
+python3 scripts/analyze_results.py test_results/test_results_20231215_143022.json
 
 # Output includes:
 # 1. Standard analysis report

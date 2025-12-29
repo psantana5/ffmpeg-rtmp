@@ -195,13 +195,13 @@ curl -s http://localhost:3000/api/health | jq .
 ### 3. Run Tests
 ```bash
 # Single stream test
-python3 run_tests.py single --bitrate 2500k --resolution 1280x720 --fps 30
+python3 scripts/run_tests.py single --bitrate 2500k --resolution 1280x720 --fps 30
 
 # Multiple streams test
-python3 run_tests.py multi --count 4 --bitrate 2500k
+python3 scripts/run_tests.py multi --count 4 --bitrate 2500k
 
 # Batch tests
-python3 run_tests.py batch --file batch_stress_matrix.json
+python3 scripts/run_tests.py batch --file batch_stress_matrix.json
 ```
 
 ### 4. View Results

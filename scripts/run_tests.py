@@ -552,7 +552,7 @@ def main():
         logger.info(f"Results saved to: {results_file}")
         logger.info("=" * 60)
         logger.info("\nNext steps:")
-        logger.info("1. Run: python3 analyze_results.py")
+        logger.info("1. Run: python3 scripts/analyze_results.py")
         logger.info("2. View Grafana dashboards at http://localhost:3000")
 
         return 0
