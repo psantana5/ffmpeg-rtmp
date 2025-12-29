@@ -28,6 +28,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+# Add parent directory to path to allow imports from advisor package
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import requests
 
 from advisor import MultivariatePredictor, PowerPredictor

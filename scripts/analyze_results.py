@@ -10,8 +10,12 @@ import csv
 import json
 import logging
 import statistics
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# Add parent directory to path to allow imports from advisor package
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import requests
 
