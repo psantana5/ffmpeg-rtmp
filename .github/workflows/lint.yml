@@ -1,0 +1,75 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  python-lint:
+    name: Python Linting (ruff)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      
+      - name: Run ruff check
+        run: |
+          python -m ruff check .
+      
+      - name: Run ruff format check
+        run: |
+          python -m ruff format --check .
+
+  dockerfile-lint:
+    name: Dockerfile Linting (hadolint)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run hadolint on all Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          dockerfile: "src/exporters/*/Dockerfile"
+          failure-threshold: warning
+
+  json-validation:
+    name: JSON Dashboard Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Validate JSON dashboards
+        run: |
+          for file in grafana/provisioning/dashboards/*.json; do
+            echo "Validating $file"
+            if ! python -m json.tool "$file" > /dev/null; then
+              echo "❌ Invalid JSON: $file"
+              exit 1
+            fi
+            echo "✅ Valid JSON: $file"
+          done
