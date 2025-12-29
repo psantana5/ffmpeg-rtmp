@@ -40,6 +40,7 @@ help:
 	@echo "Tests"
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
+	@echo "  make run-benchmarks  Run automated performance benchmarks"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
 	@echo "  make retrain-models  Retrain ML models from test results"
 	@echo ""
@@ -117,6 +118,11 @@ analyze:
 
 retrain-models:
 	$(PYTHON) scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
+
+run-benchmarks:
+	@mkdir -p test_results
+	@echo "Running automated benchmark suite..."
+	@bash scripts/run_benchmarks.sh
 
 lint:
 	$(PYTHON) -m ruff check .

@@ -49,25 +49,6 @@ services:
     networks:
       - streaming-net
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    user: root
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=7d"
-      - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-    networks:
-      - streaming-net
-
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
     container_name: victoriametrics
@@ -104,26 +85,10 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      - prometheus
       - victoriametrics
     restart: unless-stopped
     networks:
       - streaming-net
-
-  rapl-exporter:
-    build: ./src/exporters/rapl
-    container_name: rapl-exporter
-    privileged: true
-    volumes:
-      - /sys/class/powercap:/sys/class/powercap:ro
-      - /sys/devices:/sys/devices:ro
-    ports:
-      - "9500:9500"
-    restart: unless-stopped
-    networks:
-      - streaming-net
-    environment:
-      - RAPL_EXPORTER_PORT=9500
 
   cpu-exporter-go:
     build: 
@@ -313,11 +278,28 @@ services:
       timeout: 5s
       retries: 3
 
+  ffmpeg-exporter:
+    build:
+      context: .
+      dockerfile: src/exporters/ffmpeg_exporter/Dockerfile
+    container_name: ffmpeg-exporter
+    ports:
+      - "9506:9506"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - FFMPEG_EXPORTER_PORT=9506
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9506/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   streaming-net:
     driver: bridge
 
 volumes:
-  prometheus-data:
   victoriametrics-data:
   grafana-data:
