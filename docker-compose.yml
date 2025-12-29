@@ -224,9 +224,9 @@ services:
     environment:
       - COST_EXPORTER_PORT=9504
       - RESULTS_DIR=/results
-      - ENERGY_COST_PER_KWH=0.12
-      - CPU_COST_PER_HOUR=0.50
-      - CURRENCY=USD
+      - ENERGY_COST_PER_KWH=${ENERGY_COST_PER_KWH:-2.0}
+      - CPU_COST_PER_HOUR=${CPU_COST_PER_HOUR:-5.0}
+      - CURRENCY=${CURRENCY:-SEK}
       - PROMETHEUS_URL=http://prometheus:9090
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
