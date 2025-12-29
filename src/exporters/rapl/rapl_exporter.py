@@ -149,6 +149,12 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
             self.wfile.write("\n".join(output).encode("utf-8"))
             self.wfile.write(b"\n")
+        elif self.path == "/health":
+            # Health check endpoint
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK\n")
         else:
             self.send_response(404)
             self.end_headers()
