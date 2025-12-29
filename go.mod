@@ -1,3 +1,8 @@
 module github.com/psantana5/ffmpeg-rtmp
 
-go 1.24.11
+go 1.21
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/gorilla/mux v1.8.1
+)
