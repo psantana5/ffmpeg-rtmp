@@ -173,8 +173,9 @@ Exported by `docker-stats-exporter` service (port 9501):
 
 | Metric | Description |
 |--------|-------------|
-| `docker_containers_total_cpu_percent` | Total container CPU % |
-| `docker_engine_cpu_percent` | Docker engine CPU % |
+| `docker_container_cpu_percent` | CPU percentage per container |
+| `docker_container_memory_percent` | Memory percentage per container |
+| `docker_containers_total_cpu_percent` | Total CPU % across all containers |
 
 ## Quick Start Guide
 
