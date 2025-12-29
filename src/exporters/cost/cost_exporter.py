@@ -315,6 +315,10 @@ class CostMetricsExporter:
         output.append("# TYPE cost_energy_load_aware gauge")
         output.append(f"# HELP cost_compute_load_aware Compute cost ({currency}) - load-aware")
         output.append("# TYPE cost_compute_load_aware gauge")
+        output.append(f"# HELP cost_per_pixel Cost per pixel ({currency}/pixel) - load-aware")
+        output.append("# TYPE cost_per_pixel gauge")
+        output.append(f"# HELP cost_per_watch_hour Cost per viewer watch hour ({currency}/hour) - load-aware")
+        output.append("# TYPE cost_per_watch_hour gauge")
         
         # Track metrics emission statistics
         metrics_emitted = 0
@@ -364,6 +368,8 @@ class CostMetricsExporter:
                 load_aware_total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
                 load_aware_energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
                 load_aware_compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
+                cost_per_pixel = self.cost_model.compute_cost_per_pixel_load_aware(scenario)
+                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour_load_aware(scenario)
                 
                 # Export load-aware metrics
                 if load_aware_total_cost is not None:
@@ -390,6 +396,22 @@ class CostMetricsExporter:
                         f"Set cost_compute_load_aware{{{safe_name}}}={load_aware_compute_cost:.8f}"
                     )
                     metrics_emitted += 1
+                if cost_per_pixel is not None:
+                    output.append(
+                        f"cost_per_pixel{{{labels}}} {cost_per_pixel:.12f}"
+                    )
+                    logger.debug(
+                        f"Set cost_per_pixel{{{safe_name}}}={cost_per_pixel:.12f}"
+                    )
+                    metrics_emitted += 1
+                if cost_per_watch_hour is not None:
+                    output.append(
+                        f"cost_per_watch_hour{{{labels}}} {cost_per_watch_hour:.8f}"
+                    )
+                    logger.debug(
+                        f"Set cost_per_watch_hour{{{safe_name}}}={cost_per_watch_hour:.8f}"
+                    )
+                    metrics_emitted += 1
             else:
                 scenarios_without_data += 1
                 logger.debug(
@@ -408,6 +430,14 @@ class CostMetricsExporter:
                 
                 output.append(f"cost_compute_load_aware{{{labels}}} 0")
                 logger.debug(f"Set cost_compute_load_aware{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_per_pixel{{{labels}}} 0")
+                logger.debug(f"Set cost_per_pixel{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_per_watch_hour{{{labels}}} 0")
+                logger.debug(f"Set cost_per_watch_hour{{{safe_name}}}=0 (no data)")
                 metrics_emitted += 1
         
         logger.info(
