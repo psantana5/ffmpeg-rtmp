@@ -398,9 +398,9 @@ class TestCostModelLoadAware:
         
         cost = model.compute_compute_cost_load_aware(scenario)
         
-        # Expected: (2.0 + 2.5 + 3.0 + 2.8 + 2.2) * 10 * 0.0001 = 12.5 * 10 * 0.0001 = 0.0125
+        # Expected (trapezoidal): (10/2) * [2.0 + 2*(2.5+3.0+2.8) + 2.2] * 0.0001 = 5 * 20.8 * 0.0001 = 0.0104
         assert cost is not None
-        assert pytest.approx(cost, rel=1e-6) == 0.0125
+        assert pytest.approx(cost, rel=1e-6) == 0.0104
     
     def test_compute_cost_load_aware_with_gpu(self):
         """Test load-aware compute cost with GPU usage."""
@@ -417,9 +417,9 @@ class TestCostModelLoadAware:
         
         cost = model.compute_compute_cost_load_aware(scenario)
         
-        # Expected: (2.0+2.0+2.0 + 1.0+1.0+1.0) * 10 * 0.0001 = 9.0 * 10 * 0.0001 = 0.009
+        # Expected (trapezoidal): CPU: (10/2)*[2+2*2+2]=40, GPU: (10/2)*[1+2*1+1]=20, Total: 60*0.0001 = 0.006
         assert cost is not None
-        assert pytest.approx(cost, rel=1e-6) == 0.009
+        assert pytest.approx(cost, rel=1e-6) == 0.006
     
     def test_energy_cost_load_aware(self):
         """Test load-aware energy cost calculation from integrated power."""
@@ -435,9 +435,9 @@ class TestCostModelLoadAware:
         
         cost = model.compute_energy_cost_load_aware(scenario)
         
-        # Expected: (100 + 150 + 200 + 180 + 120) * 10 * 1e-7 = 750 * 10 * 1e-7 = 0.00075
+        # Expected (trapezoidal): (10/2) * [100 + 2*(150+200+180) + 120] * 1e-7 = 5 * 1280 * 1e-7 = 0.00064
         assert cost is not None
-        assert pytest.approx(cost, rel=1e-6) == 0.00075
+        assert pytest.approx(cost, rel=1e-6) == 0.00064
     
     def test_total_cost_load_aware(self):
         """Test total cost using load-aware calculation."""
@@ -455,11 +455,11 @@ class TestCostModelLoadAware:
         
         cost = model.compute_total_cost_load_aware(scenario)
         
-        # Compute: (2.0 + 2.5 + 3.0) * 10 * 0.0001 = 0.0075
-        # Energy: (100 + 150 + 200) * 10 * 1e-7 = 0.00045
-        # Total: 0.0075 + 0.00045 = 0.00795
+        # Compute (trapezoidal): (10/2) * [2.0 + 2*2.5 + 3.0] * 0.0001 = 5 * 10.0 * 0.0001 = 0.005
+        # Energy (trapezoidal): (10/2) * [100 + 2*150 + 200] * 1e-7 = 5 * 600 * 1e-7 = 0.0003
+        # Total: 0.005 + 0.0003 = 0.0053
         assert cost is not None
-        assert pytest.approx(cost, rel=1e-6) == 0.00795
+        assert pytest.approx(cost, rel=1e-6) == 0.0053
     
     def test_load_aware_scales_with_streams(self):
         """Test that cost increases with more streams (higher CPU usage)."""
