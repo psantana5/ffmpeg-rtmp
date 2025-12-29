@@ -4,6 +4,44 @@ This directory contains all the utility scripts for running tests, analyzing res
 
 ## Main Scripts
 
+### `recommend_test.py`
+
+**Purpose**: Hardware-aware benchmark recommendation tool
+
+**Usage**:
+
+```bash
+# Get recommended test configuration for your hardware
+python3 scripts/recommend_test.py
+```
+
+**Features**:
+- Auto-detects CPU cores/threads, GPU, RAM, and system type
+- Recommends optimal encoder (NVENC for GPU, x264/x265 for CPU)
+- Suggests appropriate resolution and FPS based on hardware
+- Adjusts test duration for laptops vs servers
+- Outputs ready-to-run command with optimal settings
+
+**Example Output**:
+```
+CPU: AMD Ryzen 9 5950X 16-Core Processor
+Threads: 32
+GPU: NVIDIA RTX 3080 (Driver: 525.147)
+System Type: DESKTOP
+
+✅ Recommended Command:
+python3 scripts/run_tests.py single \
+  --name recommended_test \
+  --encoder h264_nvenc \
+  --preset medium \
+  --bitrate 20000k \
+  --resolution 3840x2160 \
+  --fps 60 \
+  --duration 300
+```
+
+---
+
 ### `run_tests.py`
 
 **Purpose**: Main test runner for FFmpeg streaming scenarios
@@ -11,12 +49,31 @@ This directory contains all the utility scripts for running tests, analyzing res
 **Usage**:
 
 ```bash
-# Single stream test
+# Single stream test with default encoder (h264)
 python3 scripts/run_tests.py single \
   --name "2Mbps_720p" \
   --bitrate 2000k \
   --resolution 1280x720 \
   --duration 120
+
+# Single stream test with NVENC GPU encoder
+python3 scripts/run_tests.py single \
+  --name "4K_NVENC" \
+  --encoder h264_nvenc \
+  --preset medium \
+  --bitrate 15000k \
+  --resolution 3840x2160 \
+  --fps 30 \
+  --duration 180
+
+# Single stream test with H.265 CPU encoder
+python3 scripts/run_tests.py single \
+  --name "1440p_H265" \
+  --encoder h265 \
+  --preset slow \
+  --bitrate 8000k \
+  --resolution 2560x1440 \
+  --duration 240
 
 # Multi-stream test
 python3 scripts/run_tests.py multi \
@@ -31,9 +88,12 @@ python3 scripts/run_tests.py batch \
 
 **Features**:
 - Single, multi-stream, and batch test modes
+- **NEW**: Support for multiple encoders (h264, h264_nvenc, h265, hevc_nvenc)
+- **NEW**: Configurable encoder presets (ultrafast, veryfast, fast, medium, slow, slower)
 - Baseline comparison support
 - Configurable bitrate, resolution, FPS, duration
 - Automatic results collection and JSON export
+- **NEW**: Encoder and preset metadata exported to Grafana dashboards
 
 [Full test runner documentation →](./run_tests.md)
 
@@ -194,10 +254,31 @@ Create a JSON file with multiple scenarios:
   "scenarios": [
     {
       "type": "single",
-      "name": "1080p @ 5M",
+      "name": "1080p @ 5M (H.264 CPU)",
       "bitrate": "5M",
       "resolution": "1920x1080",
-      "duration": 120
+      "duration": 120,
+      "encoder": "h264",
+      "preset": "fast"
+    },
+    {
+      "type": "single",
+      "name": "1080p @ 5M (H.264 NVENC)",
+      "bitrate": "5M",
+      "resolution": "1920x1080",
+      "duration": 120,
+      "encoder": "h264_nvenc",
+      "preset": "medium"
+    },
+    {
+      "type": "single",
+      "name": "4K @ 15M (H.265)",
+      "bitrate": "15M",
+      "resolution": "3840x2160",
+      "fps": 30,
+      "duration": 180,
+      "encoder": "h265",
+      "preset": "slow"
     },
     {
       "type": "multi",
@@ -209,6 +290,30 @@ Create a JSON file with multiple scenarios:
   ]
 }
 ```
+
+**Note**: The `encoder` and `preset` fields are optional and default to `h264` and `veryfast` respectively.
+
+## Encoder and Preset Options
+
+### Supported Encoders
+
+- **h264** (libx264) - CPU-based H.264 encoder, good quality, widely compatible
+- **h264_nvenc** - NVIDIA GPU hardware H.264 encoder, fast, lower CPU usage
+- **h265** (libx265) - CPU-based H.265/HEVC encoder, better compression than H.264
+- **hevc_nvenc** - NVIDIA GPU hardware H.265/HEVC encoder
+
+### Supported Presets
+
+Presets control the speed/quality tradeoff:
+
+- **ultrafast** - Fastest encoding, lowest quality
+- **veryfast** - Very fast, lower quality (default)
+- **fast** - Fast, good quality
+- **medium** - Balanced speed/quality
+- **slow** - Slower, better quality
+- **slower** - Very slow, best quality
+
+**Recommendation**: Use `fast` or `medium` for benchmarks, `slow` for production encoding.
 
 ## Troubleshooting
 
@@ -266,7 +371,29 @@ Start the stack with NVIDIA profile:
 make nvidia-up-build
 ```
 
-The test runner will automatically detect and use GPU encoding if available.
+To use GPU encoding in tests, specify an NVENC encoder:
+
+```bash
+# H.264 with NVENC
+python3 scripts/run_tests.py single \
+  --name "GPU_H264" \
+  --encoder h264_nvenc \
+  --preset medium \
+  --bitrate 8000k \
+  --resolution 1920x1080 \
+  --duration 180
+
+# H.265 with NVENC
+python3 scripts/run_tests.py single \
+  --name "GPU_H265" \
+  --encoder hevc_nvenc \
+  --preset medium \
+  --bitrate 6000k \
+  --resolution 1920x1080 \
+  --duration 180
+```
+
+**Tip**: Use `scripts/recommend_test.py` to automatically detect GPU and generate the optimal command.
 
 ## Integration with CI/CD
 
