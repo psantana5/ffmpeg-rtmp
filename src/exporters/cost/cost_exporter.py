@@ -4,12 +4,25 @@ Cost Metrics Prometheus Exporter
 
 Exports cost analysis metrics as Prometheus metrics for Grafana visualization.
 
-Load-aware metrics use actual CPU usage and power measurements from Prometheus.
+Load-aware metrics use actual CPU usage and power measurements from Prometheus
+with advanced numerical integration (trapezoidal rule) for accurate cost calculation.
+
+Mathematical Approach:
+    - CPU Cost: Integrates CPU usage over time using trapezoidal rule
+      Cost = (∫ cpu(t) dt) × price_per_core_second
+    
+    - Energy Cost: Integrates power consumption using trapezoidal rule
+      Energy = ∫ power(t) dt (Joules)
+      Cost = Energy × price_per_joule
+    
+    - Accuracy: O(h²) convergence vs O(h) for rectangular approximation
 
 Metrics exported:
 - cost_total_load_aware: Total cost (load-aware, scales with actual usage)
 - cost_energy_load_aware: Energy cost (load-aware, scales with actual power)
 - cost_compute_load_aware: Compute cost (load-aware, scales with actual CPU)
+- cost_per_pixel: Cost efficiency metric ($/megapixel delivered)
+- cost_per_watch_hour: Cost per viewer watch hour ($/viewer-hour)
 
 All metrics include labels: scenario, streams, bitrate, encoder, currency, service
 
@@ -220,8 +233,10 @@ class CostMetricsExporter:
         
         try:
             # Query CPU usage
-            # Use rate() to get cores per second, then average over step interval
-            cpu_query = 'rate(container_cpu_usage_seconds_total{name!~".*POD.*"}[30s])'
+            # Use rate() to get CPU cores per second, aggregated across all containers
+            # Exclude POD containers and aggregate by container name
+            # This gives us the instantaneous CPU usage in cores at each sample point
+            cpu_query = 'sum(rate(container_cpu_usage_seconds_total{name!~".*POD.*",name!=""}[30s]))'
             logger.debug(f"Scenario '{scenario_name}': Querying CPU usage")
             cpu_response = self.prometheus_client.query_range(
                 cpu_query, start_time, end_time, f'{step_seconds}s'
@@ -230,6 +245,7 @@ class CostMetricsExporter:
             
             # Query power consumption
             # Sum all RAPL zones for total system power
+            # RAPL provides instantaneous power measurements in watts
             power_query = 'sum(rapl_power_watts)'
             logger.debug(f"Scenario '{scenario_name}': Querying power consumption")
             power_response = self.prometheus_client.query_range(
@@ -315,6 +331,10 @@ class CostMetricsExporter:
         output.append("# TYPE cost_energy_load_aware gauge")
         output.append(f"# HELP cost_compute_load_aware Compute cost ({currency}) - load-aware")
         output.append("# TYPE cost_compute_load_aware gauge")
+        output.append(f"# HELP cost_per_pixel Cost per pixel ({currency}/pixel) - load-aware")
+        output.append("# TYPE cost_per_pixel gauge")
+        output.append(f"# HELP cost_per_watch_hour Cost per viewer watch hour ({currency}/hour) - load-aware")
+        output.append("# TYPE cost_per_watch_hour gauge")
         
         # Track metrics emission statistics
         metrics_emitted = 0
@@ -364,6 +384,8 @@ class CostMetricsExporter:
                 load_aware_total_cost = self.cost_model.compute_total_cost_load_aware(scenario)
                 load_aware_energy_cost = self.cost_model.compute_energy_cost_load_aware(scenario)
                 load_aware_compute_cost = self.cost_model.compute_compute_cost_load_aware(scenario)
+                cost_per_pixel = self.cost_model.compute_cost_per_pixel_load_aware(scenario)
+                cost_per_watch_hour = self.cost_model.compute_cost_per_watch_hour_load_aware(scenario)
                 
                 # Export load-aware metrics
                 if load_aware_total_cost is not None:
@@ -390,6 +412,22 @@ class CostMetricsExporter:
                         f"Set cost_compute_load_aware{{{safe_name}}}={load_aware_compute_cost:.8f}"
                     )
                     metrics_emitted += 1
+                if cost_per_pixel is not None:
+                    output.append(
+                        f"cost_per_pixel{{{labels}}} {cost_per_pixel:.12f}"
+                    )
+                    logger.debug(
+                        f"Set cost_per_pixel{{{safe_name}}}={cost_per_pixel:.12f}"
+                    )
+                    metrics_emitted += 1
+                if cost_per_watch_hour is not None:
+                    output.append(
+                        f"cost_per_watch_hour{{{labels}}} {cost_per_watch_hour:.8f}"
+                    )
+                    logger.debug(
+                        f"Set cost_per_watch_hour{{{safe_name}}}={cost_per_watch_hour:.8f}"
+                    )
+                    metrics_emitted += 1
             else:
                 scenarios_without_data += 1
                 logger.debug(
@@ -408,6 +446,14 @@ class CostMetricsExporter:
                 
                 output.append(f"cost_compute_load_aware{{{labels}}} 0")
                 logger.debug(f"Set cost_compute_load_aware{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_per_pixel{{{labels}}} 0")
+                logger.debug(f"Set cost_per_pixel{{{safe_name}}}=0 (no data)")
+                metrics_emitted += 1
+                
+                output.append(f"cost_per_watch_hour{{{labels}}} 0")
+                logger.debug(f"Set cost_per_watch_hour{{{safe_name}}}=0 (no data)")
                 metrics_emitted += 1
         
         logger.info(
