@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,7 +47,10 @@ func NewRAPLReader() (*RAPLReader, error) {
 	}
 	
 	if len(reader.zones) == 0 {
-		return nil, fmt.Errorf("no RAPL zones found")
+		log.Printf("WARNING: No RAPL zones found - exporter will run in degraded mode")
+		log.Printf("Metrics will be exported but power readings will be unavailable")
+		// Don't return error - allow exporter to start in degraded mode
+		return reader, nil
 	}
 	
 	// Initialize baseline readings
@@ -67,22 +71,70 @@ func (r *RAPLReader) discoverZones() error {
 		return fmt.Errorf("failed to read RAPL directory: %w", err)
 	}
 	
+	log.Printf("Scanning %s for RAPL zones...", raplBasePath)
+	log.Printf("Found %d entries in powercap directory", len(entries))
+	
+	// List all entries for debugging
 	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "intel-rapl:") {
+		entryPath := filepath.Join(raplBasePath, entry.Name())
+		log.Printf("Found entry: %s (isDir: %v)", entry.Name(), entry.IsDir())
+		
+		// Try to read the name file if it exists (only for directories)
+		if entry.IsDir() {
+			namePath := filepath.Join(entryPath, "name")
+			if nameBytes, err := os.ReadFile(namePath); err == nil {
+				log.Printf("  -> name: %s", strings.TrimSpace(string(nameBytes)))
+			} else {
+				log.Printf("  -> no name file or unreadable: %v", err)
+			}
+			
+			// Check for energy_uj
+			energyPath := filepath.Join(entryPath, "energy_uj")
+			if _, err := os.Stat(energyPath); err == nil {
+				log.Printf("  -> has energy_uj file")
+			} else {
+				log.Printf("  -> no energy_uj file: %v", err)
+			}
+		}
+	}
+	
+	for _, entry := range entries {
+		if !entry.IsDir() {
 			continue
 		}
 		
-		zonePath := filepath.Join(raplBasePath, entry.Name())
+		// Accept any directory that starts with intel-rapl, amd-rapl, or contains rapl
+		// This covers: intel-rapl:0, intel-rapl:1, intel-rapl-mmio:0, etc.
+		entryName := entry.Name()
+		isRAPL := strings.HasPrefix(entryName, "intel-rapl") ||
+			strings.HasPrefix(entryName, "amd-rapl") ||
+			strings.Contains(entryName, "rapl")
+		
+		if !isRAPL {
+			log.Printf("Skipping %s: not a recognized RAPL zone pattern", entryName)
+			continue
+		}
+		
+		log.Printf("Attempting to load RAPL zone: %s", entryName)
+		zonePath := filepath.Join(raplBasePath, entryName)
 		zone, err := r.loadZone(zonePath)
 		if err != nil {
-			log.Printf("Warning: failed to load zone %s: %v", entry.Name(), err)
+			log.Printf("Warning: failed to load zone %s: %v", entryName, err)
 			continue
 		}
 		
 		if zone != nil {
 			r.zones[zone.Name] = zone
-			log.Printf("Discovered RAPL zone: %s", zone.Name)
+			log.Printf("✓ Successfully loaded RAPL zone: %s (path: %s)", zone.Name, zonePath)
 		}
+	}
+	
+	if len(r.zones) == 0 {
+		log.Printf("WARNING: No RAPL zones discovered despite finding RAPL entries")
+		log.Printf("This indicates the zone directories exist but couldn't be loaded")
+		log.Printf("Check the detailed logs above for specific errors")
+	} else {
+		log.Printf("Successfully discovered %d RAPL zone(s)", len(r.zones))
 	}
 	
 	return nil
@@ -93,14 +145,20 @@ func (r *RAPLReader) loadZone(zonePath string) (*RAPLZone, error) {
 	namePath := filepath.Join(zonePath, "name")
 	nameBytes, err := os.ReadFile(namePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read name file: %w", err)
 	}
 	
 	name := strings.TrimSpace(string(nameBytes))
 	energyPath := filepath.Join(zonePath, "energy_uj")
 	
+	// Check if energy_uj file exists and is readable
 	if _, err := os.Stat(energyPath); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("energy_uj file not accessible: %w", err)
+	}
+	
+	// Try to read it to verify permissions
+	if _, err := os.ReadFile(energyPath); err != nil {
+		return nil, fmt.Errorf("cannot read energy_uj file: %w", err)
 	}
 	
 	zone := &RAPLZone{
@@ -114,21 +172,30 @@ func (r *RAPLReader) loadZone(zonePath string) (*RAPLZone, error) {
 	maxPath := filepath.Join(zonePath, "max_energy_range_uj")
 	if maxBytes, err := os.ReadFile(maxPath); err == nil {
 		zone.MaxRange, _ = strconv.ParseInt(strings.TrimSpace(string(maxBytes)), 10, 64)
+		log.Printf("Zone %s: max_range=%d", name, zone.MaxRange)
+	} else {
+		log.Printf("Zone %s: no max_energy_range_uj file (error: %v)", name, err)
 	}
 	
-	// Check for subzones
+	// Check for subzones - look for any subdirectory that might be a zone
 	entries, err := os.ReadDir(zonePath)
 	if err == nil {
 		for _, entry := range entries {
-			if !entry.IsDir() || !strings.Contains(entry.Name(), "intel-rapl:") {
+			if !entry.IsDir() {
 				continue
 			}
 			
+			// Check if this subdirectory has a name file (indicates it's a zone)
 			subzonePath := filepath.Join(zonePath, entry.Name())
-			subzone, err := r.loadZone(subzonePath)
-			if err == nil && subzone != nil {
-				zone.Subzones[subzone.Name] = subzone
-				log.Printf("  Discovered subzone: %s", subzone.Name)
+			subNamePath := filepath.Join(subzonePath, "name")
+			if _, err := os.Stat(subNamePath); err == nil {
+				subzone, err := r.loadZone(subzonePath)
+				if err == nil && subzone != nil {
+					zone.Subzones[subzone.Name] = subzone
+					log.Printf("  Discovered subzone: %s under %s", subzone.Name, name)
+				} else if err != nil {
+					log.Printf("  Failed to load subzone %s: %v", entry.Name(), err)
+				}
 			}
 		}
 	}
@@ -228,24 +295,32 @@ func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	h.reader.mu.RLock()
 	defer h.reader.mu.RUnlock()
 	
-	// Write metrics header
-	fmt.Fprintln(w, "# HELP rapl_power_watts Current power consumption in watts from RAPL")
-	fmt.Fprintln(w, "# TYPE rapl_power_watts gauge")
+	// Report number of zones discovered
+	fmt.Fprintln(w, "# HELP rapl_zones_discovered Number of RAPL zones discovered")
+	fmt.Fprintln(w, "# TYPE rapl_zones_discovered gauge")
+	fmt.Fprintf(w, "rapl_zones_discovered %d\n", len(h.reader.zones))
 	
-	// Collect metrics from all zones
-	for zoneName, zone := range h.reader.zones {
-		power, err := zone.getPowerWatts()
-		if err == nil && power >= 0 {
-			safeName := sanitizeMetricName(zoneName)
-			fmt.Fprintf(w, "rapl_power_watts{zone=\"%s\"} %.4f\n", safeName, power)
-		}
+	// Only export power metrics if we have zones
+	if len(h.reader.zones) > 0 {
+		// Write metrics header
+		fmt.Fprintln(w, "# HELP rapl_power_watts Current power consumption in watts from RAPL")
+		fmt.Fprintln(w, "# TYPE rapl_power_watts gauge")
 		
-		// Subzones
-		for subzoneName, subzone := range zone.Subzones {
-			power, err := subzone.getPowerWatts()
+		// Collect metrics from all zones
+		for zoneName, zone := range h.reader.zones {
+			power, err := zone.getPowerWatts()
 			if err == nil && power >= 0 {
-				safeName := sanitizeMetricName(fmt.Sprintf("%s_%s", zoneName, subzoneName))
+				safeName := sanitizeMetricName(zoneName)
 				fmt.Fprintf(w, "rapl_power_watts{zone=\"%s\"} %.4f\n", safeName, power)
+			}
+			
+			// Subzones
+			for subzoneName, subzone := range zone.Subzones {
+				power, err := subzone.getPowerWatts()
+				if err == nil && power >= 0 {
+					safeName := sanitizeMetricName(fmt.Sprintf("%s_%s", zoneName, subzoneName))
+					fmt.Fprintf(w, "rapl_power_watts{zone=\"%s\"} %.4f\n", safeName, power)
+				}
 			}
 		}
 	}
@@ -254,6 +329,15 @@ func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "# HELP cpu_exporter_info CPU exporter information")
 	fmt.Fprintln(w, "# TYPE cpu_exporter_info gauge")
 	fmt.Fprintln(w, "cpu_exporter_info{version=\"1.0.0\",language=\"go\"} 1")
+	
+	// RAPL availability status
+	fmt.Fprintln(w, "# HELP rapl_available RAPL interface availability (1=available, 0=unavailable)")
+	fmt.Fprintln(w, "# TYPE rapl_available gauge")
+	if len(h.reader.zones) > 0 {
+		fmt.Fprintln(w, "rapl_available 1")
+	} else {
+		fmt.Fprintln(w, "rapl_available 0")
+	}
 }
 
 func (h *MetricsHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -282,14 +366,26 @@ func main() {
 	}
 	
 	log.Printf("Starting CPU Power Exporter (Go) on port %d", *port)
+	log.Printf("System: %s", runtime.GOOS)
 	
-	// Initialize RAPL reader
+	// Initialize RAPL reader - don't fail if no zones found
 	reader, err := NewRAPLReader()
 	if err != nil {
-		log.Fatalf("Failed to initialize RAPL reader: %v", err)
+		log.Printf("ERROR: Failed to initialize RAPL reader: %v", err)
+		log.Printf("Exporter will start in degraded mode without power metrics")
+		// Create empty reader to allow exporter to run
+		reader = &RAPLReader{zones: make(map[string]*RAPLZone)}
 	}
 	
-	log.Printf("Successfully initialized %d RAPL zones", len(reader.zones))
+	if len(reader.zones) > 0 {
+		log.Printf("✓ Successfully initialized %d RAPL zone(s)", len(reader.zones))
+		for name := range reader.zones {
+			log.Printf("  - %s", name)
+		}
+	} else {
+		log.Printf("⚠ Running in degraded mode: No RAPL zones available")
+		log.Printf("  Exporter will respond to requests but power metrics will be unavailable")
+	}
 	
 	// Set up HTTP server
 	handler := &MetricsHandler{reader: reader}
