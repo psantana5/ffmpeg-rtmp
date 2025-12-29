@@ -381,7 +381,6 @@ class ModelRetrainer:
         self, predictor: PowerPredictor, path: Path, info: Dict
     ):
         """Save PowerPredictor with metadata."""
-        import pickle
         
         model_data = {
             'model': predictor.model,
