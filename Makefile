@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit exporters exporters-go vm-up vm-up-build build-cpu-exporter build-gpu-exporter
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -26,9 +26,18 @@ help:
 	@echo "  make ps              Show container status"
 	@echo "  make logs SERVICE=prometheus   Tail logs for a service"
 	@echo ""
+	@echo "VictoriaMetrics"
+	@echo "  make vm-up           Start stack with VictoriaMetrics"
+	@echo "  make vm-up-build     Build + start stack with VictoriaMetrics"
+	@echo ""
 	@echo "GPU (NVIDIA)"
 	@echo "  make nvidia-up       Start stack with NVIDIA profile"
 	@echo "  make nvidia-up-build Build + start stack with NVIDIA profile"
+	@echo ""
+	@echo "Go Exporters"
+	@echo "  make exporters       Build all Go exporters"
+	@echo "  make build-cpu-exporter   Build CPU exporter binary"
+	@echo "  make build-gpu-exporter   Build GPU exporter binary"
 	@echo ""
 	@echo "Prometheus/Grafana"
 	@echo "  make prom-reload     Reload Prometheus config"
@@ -81,6 +90,26 @@ nvidia-up:
 nvidia-up-build:
 	@mkdir -p test_results
 	$(COMPOSE) --profile nvidia up -d --build
+
+vm-up:
+	@mkdir -p test_results
+	$(COMPOSE) up -d prometheus victoriametrics grafana
+
+vm-up-build:
+	@mkdir -p test_results
+	$(COMPOSE) up -d --build prometheus victoriametrics grafana
+
+exporters: build-cpu-exporter build-gpu-exporter
+
+build-cpu-exporter:
+	@echo "Building CPU exporter..."
+	CGO_ENABLED=0 go build -o bin/cpu_exporter ./src/exporters/cpu_exporter/
+	@echo "✓ CPU exporter built at bin/cpu_exporter"
+
+build-gpu-exporter:
+	@echo "Building GPU exporter..."
+	CGO_ENABLED=0 go build -o bin/gpu_exporter ./src/exporters/gpu_exporter/
+	@echo "✓ GPU exporter built at bin/gpu_exporter"
 
 test-suite:
 	$(PYTHON) scripts/run_tests.py suite

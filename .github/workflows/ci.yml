@@ -8,6 +8,32 @@ on:
   workflow_dispatch:
 
 jobs:
+  go-exporters-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      
+      - name: Build CPU exporter
+        run: make build-cpu-exporter
+      
+      - name: Build GPU exporter
+        run: make build-gpu-exporter
+      
+      - name: Test CPU exporter binary
+        run: ./bin/cpu_exporter --help
+      
+      - name: Test GPU exporter binary
+        run: ./bin/gpu_exporter --help
+
   docker-build-test:
     runs-on: ubuntu-latest
     permissions:
@@ -57,12 +83,20 @@ jobs:
           curl -sf http://localhost:9093/-/healthy || exit 1
           echo "✓ Alertmanager is healthy"
       
+      - name: Check VictoriaMetrics is up
+        run: |
+          curl -sf http://localhost:8428/health || exit 1
+          echo "✓ VictoriaMetrics is healthy"
+      
       - name: Check exporters are responding
         run: |
           # RAPL exporter requires privileged access to /sys/class/powercap
           # which is not available in GitHub Actions, so we don't fail on it
           # Note: RAPL uses /metrics endpoint (standard Prometheus exporter pattern)
           curl -sf http://localhost:9500/metrics || echo "⚠ RAPL exporter requires privileged access (expected in CI)"
+          
+          # Go CPU exporter also requires privileged RAPL access
+          curl -sf http://localhost:9510/health || echo "⚠ Go CPU exporter requires privileged access (expected in CI)"
           
           # These exporters should work in CI environment
           # Docker stats uses /metrics (standard Prometheus exporter)

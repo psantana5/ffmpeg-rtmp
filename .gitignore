@@ -73,3 +73,22 @@ temp/
 # Documentation builds
 docs/_build/
 docs/.doctrees/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+vendor/
+
+# Go build artifacts
+/bin/
+/pkg/
+cpu_exporter
+gpu_exporter
+ffmpeg_exporter
