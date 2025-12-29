@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build build-distributed build-master build-agent
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -25,6 +25,11 @@ help:
 	@echo "  make restart         Restart stack"
 	@echo "  make ps              Show container status"
 	@echo "  make logs SERVICE=prometheus   Tail logs for a service"
+	@echo ""
+	@echo "Distributed Compute"
+	@echo "  make build-distributed   Build master and agent binaries"
+	@echo "  make build-master        Build master node binary"
+	@echo "  make build-agent         Build compute agent binary"
 	@echo ""
 	@echo "VictoriaMetrics"
 	@echo "  make vm-up           Start stack with VictoriaMetrics"
@@ -135,3 +140,17 @@ test:
 
 pre-commit:
 	$(PYTHON) -m pre_commit run --all-files
+
+build-distributed: build-master build-agent
+
+build-master:
+	@mkdir -p bin
+	@echo "Building master node..."
+	go build -o bin/master ./cmd/master
+	@echo "✓ Master binary created: bin/master"
+
+build-agent:
+	@mkdir -p bin
+	@echo "Building compute agent..."
+	go build -o bin/agent ./cmd/agent
+	@echo "✓ Agent binary created: bin/agent"
