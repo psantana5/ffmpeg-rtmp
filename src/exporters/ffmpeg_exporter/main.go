@@ -110,9 +110,9 @@ func parseFFmpegLine(line string) {
 		hours, _ := strconv.ParseFloat(match[1], 64)
 		minutes, _ := strconv.ParseFloat(match[2], 64)
 		seconds, _ := strconv.ParseFloat(match[3], 64)
-		millis, _ := strconv.ParseFloat(match[4], 64)
+		centiseconds, _ := strconv.ParseFloat(match[4], 64)
 		
-		totalSeconds := hours*3600 + minutes*60 + seconds + millis/100
+		totalSeconds := hours*3600 + minutes*60 + seconds + centiseconds/100
 		stats.ProcessingTime = totalSeconds
 	}
 	
