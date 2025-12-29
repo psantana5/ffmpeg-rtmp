@@ -22,12 +22,17 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 ### Start the Stack
 
 ```bash
+# IMPORTANT: If upgrading from v1.x, clean up old containers first
+docker compose down -v
+
 # Build and start all services (Go exporters build automatically)
 make up-build
 
 # Or manually
 docker compose up -d --build
 ```
+
+**Note for v2.0 upgrade**: The `docker compose down -v` command removes old containers (prometheus, rapl-exporter) and volumes. This is required for a clean migration to VictoriaMetrics.
 
 ### Access the Dashboards
 

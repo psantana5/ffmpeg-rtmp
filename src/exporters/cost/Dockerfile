@@ -29,7 +29,7 @@ ENV CURRENCY=USD
 ENV REGION=us-east-1
 ENV PRICING_CONFIG=/app/pricing_config.json
 ENV ELECTRICITY_MAPS_TOKEN=""
-ENV PROMETHEUS_URL=http://prometheus:9090
+ENV PROMETHEUS_URL=http://victoriametrics:8428
 
 # Note: advisor module is mounted as volume at runtime
 

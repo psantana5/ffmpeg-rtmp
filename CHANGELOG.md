@@ -41,10 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero missing metrics during high-load scenarios
 
 ### Migration Notes
+- **IMPORTANT**: Run `docker compose down -v` before upgrading to remove old Prometheus and RAPL exporter containers
 - Users upgrading from 1.x should update Grafana dashboards to use VictoriaMetrics datasource
 - Historical Prometheus data will need to be migrated or will be lost after upgrade
 - Python RAPL exporter is no longer supported; use Go CPU exporter instead
 - Update any external monitoring tools to point to VictoriaMetrics at port 8428
+- Cost and results exporters now connect to VictoriaMetrics instead of Prometheus
 
 ### Security
 - All exporters run with minimal privileges (except hardware-access exporters)

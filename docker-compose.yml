@@ -120,6 +120,11 @@ services:
       - DOCKER_STATS_PORT=9501
     networks:
       - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9501/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -202,7 +207,7 @@ services:
     environment:
       - RESULTS_EXPORTER_PORT=9502
       - RESULTS_DIR=/results
-      - PROMETHEUS_URL=http://prometheus:9090
+      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9502/health"]
       interval: 30s
@@ -254,7 +259,7 @@ services:
       - REGION=us-east-1
       - PRICING_CONFIG=/app/pricing_config.json
       - ELECTRICITY_MAPS_TOKEN=${ELECTRICITY_MAPS_TOKEN:-}
-      - PROMETHEUS_URL=http://prometheus:9090
+      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
       interval: 30s
