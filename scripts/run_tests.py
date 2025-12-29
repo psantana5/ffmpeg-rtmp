@@ -888,7 +888,8 @@ def build_ffmpeg_cmd(
     ]
     
     # Add tune for CPU encoders only (GPU encoders don't support tune)
-    if codec in ["libx264", "libx265"]:
+    # Use zerolatency for x264 (streaming), but skip for x265 to preserve quality
+    if codec == "libx264":
         cmd.extend(["-tune", "zerolatency"])
     
     cmd.extend([

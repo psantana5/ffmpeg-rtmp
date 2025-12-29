@@ -249,7 +249,7 @@ def recommend_config(
     # 1. Encoder selection: GPU first, then CPU
     if has_gpu:
         config["encoder"] = "h264_nvenc"
-        # NVENC presets: slow, medium, fast, hp, hq, bd, ll, llhq, llhp, lossless
+        # NVENC supports standard presets (medium is balanced quality/speed)
         config["preset"] = "medium"
         reasons.append(
             "NVIDIA GPU detected → Using hardware-accelerated NVENC encoder"
