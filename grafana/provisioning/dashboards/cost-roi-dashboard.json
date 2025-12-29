@@ -11,7 +11,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "gridPos": {
         "h": 4,
@@ -30,7 +30,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -97,7 +97,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -164,7 +164,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -231,7 +231,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -299,7 +299,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -403,7 +403,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -508,7 +508,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "gridPos": {
         "h": 8,
@@ -527,7 +527,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {

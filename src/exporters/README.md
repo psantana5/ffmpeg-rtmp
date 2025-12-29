@@ -148,7 +148,7 @@ docker ps | grep <port>
 
 ### Metrics Not Appearing in Prometheus
 
-1. Check Prometheus targets: http://localhost:9090/targets
+1. Check Prometheus targets: http://localhost:8428/targets
 2. Verify the exporter is healthy: `curl http://localhost:<port>/health`
 3. Check the metrics endpoint: `curl http://localhost:<port>/metrics`
 

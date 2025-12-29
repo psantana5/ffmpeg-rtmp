@@ -11,7 +11,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "gridPos": {
         "h": 4,
@@ -30,7 +30,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -109,7 +109,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "cost_energy_load_aware",
@@ -120,7 +120,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "cost_compute_load_aware",
@@ -136,7 +136,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -216,7 +216,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "cost_total_load_aware",
@@ -232,7 +232,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -310,7 +310,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "(cost_total_load_aware / on(scenario, bitrate, streams) group_right results_scenario_total_pixels) * 1000000",
@@ -326,7 +326,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -404,7 +404,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "cost_total_load_aware / ((results_scenario_duration_seconds / 3600))",
@@ -420,7 +420,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -476,7 +476,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "sum(cost_total_load_aware)",
@@ -491,7 +491,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -547,7 +547,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "sum(cost_energy_load_aware)",
@@ -562,7 +562,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -618,7 +618,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "sum by (scenario) (cost_total_load_aware)",
@@ -633,7 +633,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -734,7 +734,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -748,7 +748,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -763,7 +763,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,

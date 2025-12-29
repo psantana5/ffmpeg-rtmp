@@ -1,14 +1,9 @@
 global:
-  scrape_interval: 5s
-  evaluation_interval: 5s
-
-rule_files:
-  - /etc/prometheus/prometheus-alerts.yml
-
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: ['alertmanager:9093']
+  scrape_interval: 1s
+  scrape_timeout: 1s
+  external_labels:
+    cluster: 'ffmpeg-rtmp'
+    environment: 'development'
 
 scrape_configs:
   - job_name: 'nginx-rtmp'
@@ -17,11 +12,12 @@ scrape_configs:
         labels:
           service: 'nginx-rtmp'
 
-  - job_name: 'rapl-power'
+  - job_name: 'cpu-power-go'
     static_configs:
-      - targets: ['rapl-exporter:9500']
+      - targets: ['cpu-exporter-go:9500']
         labels:
           service: 'power-monitoring'
+          exporter: 'go'
 
   - job_name: 'docker-stats'
     static_configs:
@@ -46,6 +42,14 @@ scrape_configs:
       - targets: ['dcgm-exporter:9400']
         labels:
           service: 'gpu'
+          exporter: 'dcgm'
+
+  - job_name: 'gpu-exporter-go'
+    static_configs:
+      - targets: ['gpu-exporter-go:9505']
+        labels:
+          service: 'gpu'
+          exporter: 'go'
 
   - job_name: 'results-exporter'
     static_configs:
@@ -70,3 +74,10 @@ scrape_configs:
       - targets: ['exporter-health-checker:9600']
         labels:
           service: 'monitoring'
+
+  - job_name: 'ffmpeg-stats'
+    static_configs:
+      - targets: ['ffmpeg-exporter:9506']
+        labels:
+          service: 'encoding'
+          exporter: 'ffmpeg'

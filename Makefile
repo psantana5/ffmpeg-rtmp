@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -26,6 +26,10 @@ help:
 	@echo "  make ps              Show container status"
 	@echo "  make logs SERVICE=prometheus   Tail logs for a service"
 	@echo ""
+	@echo "VictoriaMetrics"
+	@echo "  make vm-up           Start stack with VictoriaMetrics"
+	@echo "  make vm-up-build     Build + start stack with VictoriaMetrics"
+	@echo ""
 	@echo "GPU (NVIDIA)"
 	@echo "  make nvidia-up       Start stack with NVIDIA profile"
 	@echo "  make nvidia-up-build Build + start stack with NVIDIA profile"
@@ -36,6 +40,7 @@ help:
 	@echo "Tests"
 	@echo "  make test-suite      Run default test suite"
 	@echo "  make test-batch      Run stress-matrix batch (batch_stress_matrix.json)"
+	@echo "  make run-benchmarks  Run automated performance benchmarks"
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
 	@echo "  make retrain-models  Retrain ML models from test results"
 	@echo ""
@@ -82,6 +87,14 @@ nvidia-up-build:
 	@mkdir -p test_results
 	$(COMPOSE) --profile nvidia up -d --build
 
+vm-up:
+	@mkdir -p test_results
+	$(COMPOSE) up -d prometheus victoriametrics grafana
+
+vm-up-build:
+	@mkdir -p test_results
+	$(COMPOSE) up -d --build prometheus victoriametrics grafana
+
 test-suite:
 	$(PYTHON) scripts/run_tests.py suite
 
@@ -105,6 +118,11 @@ analyze:
 
 retrain-models:
 	$(PYTHON) scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
+
+run-benchmarks:
+	@mkdir -p test_results
+	@echo "Running automated benchmark suite..."
+	@bash scripts/run_benchmarks.sh
 
 lint:
 	$(PYTHON) -m ruff check .

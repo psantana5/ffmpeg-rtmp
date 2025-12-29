@@ -113,8 +113,8 @@ cat /sys/class/powercap/intel-rapl:0/energy_uj
 # Test exporter directly
 curl http://localhost:9500/metrics | grep rapl_power_watts
 
-# Check Prometheus targets
-# Open http://localhost:9090/targets
+# Check VictoriaMetrics targets
+# Open http://localhost:8428/targets
 ```
 
 **Solutions**:
@@ -122,16 +122,16 @@ curl http://localhost:9500/metrics | grep rapl_power_watts
 - Check `/sys/class/powercap` is mounted correctly
 - Restart rapl-exporter: `docker compose restart rapl-exporter`
 
-## Prometheus Issues
+## VictoriaMetrics Issues
 
 ### Target is DOWN
 
-**Check Prometheus targets**: http://localhost:9090/targets
+**Check VictoriaMetrics targets**: http://localhost:8428/targets
 
 **Common causes**:
 1. Exporter container not running
 2. Network connectivity issue
-3. Wrong port/URL in prometheus.yml
+3. Wrong port/URL in victoriametrics.yml
 
 **Solutions**:
 ```bash
@@ -151,12 +151,12 @@ docker compose restart prometheus
 ### Metrics Not Showing in Grafana
 
 **Check**:
-1. Prometheus UI: http://localhost:9090
+1. VictoriaMetrics UI: http://localhost:8428
    - Query: `rapl_power_watts`
    - Should return data
 
 2. Grafana datasource:
-   - Settings → Data Sources → Prometheus
+   - Settings → Data Sources → VictoriaMetrics
    - Click "Test" - should show "Data source is working"
 
 **Solutions**:
@@ -392,7 +392,7 @@ docker stats --format "table {{.Name}}\t{{.MemUsage}}"
 ```bash
 # Test each service
 curl -I http://localhost:3000  # Grafana
-curl -I http://localhost:9090  # Prometheus
+curl -I http://localhost:8428  # VictoriaMetrics
 curl -I http://localhost:9093  # Alertmanager
 ```
 

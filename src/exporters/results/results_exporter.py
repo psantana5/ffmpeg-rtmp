@@ -121,7 +121,7 @@ def _extract_instant_value(query_response) -> float:
 class ResultsExporter:
     def __init__(self):
         self.results_dir = Path(os.getenv("RESULTS_DIR", "/results"))
-        self.prometheus_url = os.getenv("PROMETHEUS_URL", "http://prometheus:9090")
+        self.prometheus_url = os.getenv("PROMETHEUS_URL", "http://victoriametrics:8428")
         self.cache_seconds = int(os.getenv("RESULTS_EXPORTER_CACHE_SECONDS", "15"))
         self.client = PrometheusClient(self.prometheus_url)
 

@@ -49,24 +49,27 @@ services:
     networks:
       - streaming-net
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    user: root
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:ro
-      - prometheus-data:/prometheus
+      - ./victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
+      - victoriametrics-data:/storage
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=7d"
-      - "--web.enable-lifecycle"
+      - "--storageDataPath=/storage"
+      - "--retentionPeriod=30d"
+      - "--httpListenAddr=:8428"
+      - "--promscrape.config=/etc/victoriametrics/scrape.yml"
     ports:
-      - "9090:9090"
+      - "8428:8428"
     restart: unless-stopped
     networks:
       - streaming-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   grafana:
     image: grafana/grafana:latest
@@ -82,25 +85,27 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      - prometheus
+      - victoriametrics
     restart: unless-stopped
     networks:
       - streaming-net
 
-  rapl-exporter:
-    build: ./src/exporters/rapl
-    container_name: rapl-exporter
+  cpu-exporter-go:
+    build: 
+      context: .
+      dockerfile: src/exporters/cpu_exporter/Dockerfile
+    container_name: cpu-exporter-go
     privileged: true
     volumes:
       - /sys/class/powercap:/sys/class/powercap:ro
       - /sys/devices:/sys/devices:ro
     ports:
-      - "9500:9500"
+      - "9510:9500"
     restart: unless-stopped
     networks:
       - streaming-net
     environment:
-      - RAPL_EXPORTER_PORT=9500
+      - CPU_EXPORTER_PORT=9500
 
   docker-stats-exporter:
     build: ./src/exporters/docker_stats
@@ -115,6 +120,11 @@ services:
       - DOCKER_STATS_PORT=9501
     networks:
       - streaming-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9501/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -166,6 +176,24 @@ services:
     environment:
       - DCGM_EXPORTER_LISTEN=:9400
 
+  gpu-exporter-go:
+    build:
+      context: .
+      dockerfile: src/exporters/gpu_exporter/Dockerfile
+    container_name: gpu-exporter-go
+    profiles:
+      - nvidia
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9511:9505"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - GPU_EXPORTER_PORT=9505
+
   results-exporter:
     build: ./src/exporters/results
     container_name: results-exporter
@@ -179,7 +207,7 @@ services:
     environment:
       - RESULTS_EXPORTER_PORT=9502
       - RESULTS_DIR=/results
-      - PROMETHEUS_URL=http://prometheus:9090
+      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9502/health"]
       interval: 30s
@@ -231,7 +259,7 @@ services:
       - REGION=us-east-1
       - PRICING_CONFIG=/app/pricing_config.json
       - ELECTRICITY_MAPS_TOKEN=${ELECTRICITY_MAPS_TOKEN:-}
-      - PROMETHEUS_URL=http://prometheus:9090
+      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
       interval: 30s
@@ -255,10 +283,28 @@ services:
       timeout: 5s
       retries: 3
 
+  ffmpeg-exporter:
+    build:
+      context: .
+      dockerfile: src/exporters/ffmpeg_exporter/Dockerfile
+    container_name: ffmpeg-exporter
+    ports:
+      - "9506:9506"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - FFMPEG_EXPORTER_PORT=9506
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9506/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   streaming-net:
     driver: bridge
 
 volumes:
-  prometheus-data:
+  victoriametrics-data:
   grafana-data:

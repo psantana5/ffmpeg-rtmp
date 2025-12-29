@@ -27,8 +27,8 @@ Metrics exported:
 All metrics include labels: scenario, streams, bitrate, encoder, currency, service
 
 Usage:
-    # With Prometheus for load-aware metrics
-    python3 cost_exporter.py --port 9504 --prometheus-url http://prometheus:9090 \
+    # With VictoriaMetrics for load-aware metrics
+    python3 cost_exporter.py --port 9504 --prometheus-url http://victoriametrics:8428 \
         --energy-cost 0.12 --cpu-cost 0.50
 """
 
@@ -666,7 +666,7 @@ def main():
         '--prometheus-url',
         type=str,
         default=None,
-        help='Prometheus URL for load-aware mode (e.g., http://prometheus:9090)',
+        help='Prometheus/VictoriaMetrics URL for load-aware mode (e.g., http://victoriametrics:8428)',
     )
     parser.add_argument(
         '--disable-load-aware',
