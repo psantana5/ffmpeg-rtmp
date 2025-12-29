@@ -44,6 +44,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from advisor.cost import CostModel
+from advisor.regional_pricing import RegionalPricing
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -159,20 +160,40 @@ class CostMetricsExporter:
         currency: str = 'USD',
         prometheus_url: Optional[str] = None,
         use_load_aware: bool = True,
+        region: str = 'default',
+        pricing_config_file: Optional[Path] = None,
+        electricity_maps_token: Optional[str] = None,
     ):
         """
         Initialize cost metrics exporter.
 
         Args:
             results_dir: Directory containing test results
-            energy_cost_per_kwh: Energy cost ($/kWh or €/kWh)
+            energy_cost_per_kwh: Energy cost ($/kWh or €/kWh) - overrides dynamic pricing
             cpu_cost_per_hour: CPU/instance cost ($/h or €/h)
             gpu_cost_per_hour: GPU cost ($/h or €/h)
             currency: Currency code
             prometheus_url: Prometheus URL for load-aware mode
             use_load_aware: Use load-aware calculations if Prometheus available
+            region: AWS region code for regional pricing (e.g., 'us-east-1')
+            pricing_config_file: Path to custom pricing configuration JSON
+            electricity_maps_token: API token for Electricity Maps real-time CO₂ data
         """
         self.results_dir = results_dir
+        self.region = region
+        self.regional_pricing = RegionalPricing(
+            region=region,
+            config_file=pricing_config_file,
+            electricity_maps_token=electricity_maps_token,
+        )
+        
+        # Use regional/dynamic pricing if energy_cost not explicitly set
+        if energy_cost_per_kwh == 0.0:
+            energy_cost_per_kwh = self.regional_pricing.get_electricity_price()
+            logger.info(f"Using dynamic electricity price for {region}: ${energy_cost_per_kwh}/kWh")
+        else:
+            logger.info(f"Using override electricity price: ${energy_cost_per_kwh}/kWh")
+        
         self.cost_model = CostModel(
             energy_cost_per_kwh=energy_cost_per_kwh,
             cpu_cost_per_hour=cpu_cost_per_hour,
@@ -297,6 +318,56 @@ class CostMetricsExporter:
 
         return scenario
 
+    def _compute_hourly_and_monthly_metrics(self, scenario: Dict, baseline_power: Optional[float] = None) -> Dict:
+        """
+        Compute hourly and monthly cost/CO₂ metrics.
+        
+        Args:
+            scenario: Scenario dict with power and cost data
+            baseline_power: Baseline power in watts for savings calculations
+            
+        Returns:
+            Dict with computed metrics
+        """
+        metrics = {}
+        
+        # Get power consumption
+        power_watts = scenario.get('power_watts', [])
+        if not power_watts or not isinstance(power_watts, list) or len(power_watts) == 0:
+            return metrics
+            
+        avg_power_watts = sum(power_watts) / len(power_watts)
+        
+        # Compute hourly costs (USD/hour)
+        # Cost = power (kW) * hours * price_per_kwh
+        energy_kwh_per_hour = avg_power_watts / 1000.0  # Convert W to kW
+        hourly_cost = energy_kwh_per_hour * self.cost_model.energy_cost_per_kwh
+        metrics['cost_usd_per_hour'] = hourly_cost
+        
+        # Compute monthly projection (24/7 operation)
+        hours_per_month = 24 * 30  # 720 hours
+        metrics['cost_monthly_projection'] = hourly_cost * hours_per_month
+        
+        # Compute CO₂ emissions
+        co2_kg_per_hour = self.regional_pricing.compute_co2_emissions(energy_kwh_per_hour)
+        metrics['co2_emissions_kg_per_hour'] = co2_kg_per_hour
+        metrics['co2_monthly_projection'] = co2_kg_per_hour * hours_per_month
+        
+        # Compute savings if baseline provided
+        if baseline_power is not None and baseline_power > 0:
+            baseline_kwh_per_hour = baseline_power / 1000.0
+            baseline_hourly_cost = baseline_kwh_per_hour * self.cost_model.energy_cost_per_kwh
+            baseline_monthly_cost = baseline_hourly_cost * hours_per_month
+            
+            metrics['cost_monthly_savings'] = baseline_monthly_cost - metrics['cost_monthly_projection']
+            
+            # CO₂ savings
+            baseline_co2_per_hour = self.regional_pricing.compute_co2_emissions(baseline_kwh_per_hour)
+            baseline_co2_monthly = baseline_co2_per_hour * hours_per_month
+            metrics['co2_monthly_avoided'] = baseline_co2_monthly - metrics['co2_monthly_projection']
+        
+        return metrics
+
     def generate_prometheus_metrics(self) -> str:
         """
         Generate Prometheus metrics in text format.
@@ -323,6 +394,16 @@ class CostMetricsExporter:
         if self.prometheus_client and self.use_load_aware:
             logger.debug("Enriching scenarios with Prometheus metrics")
             scenarios = [self.enrich_scenario_with_prometheus(s) for s in scenarios]
+        
+        # Find baseline power for savings calculations
+        baseline_power = None
+        for scenario in scenarios:
+            if 'baseline' in scenario.get('name', '').lower() or 'idle' in scenario.get('name', '').lower():
+                power_watts = scenario.get('power_watts', [])
+                if power_watts and isinstance(power_watts, list) and len(power_watts) > 0:
+                    baseline_power = sum(power_watts) / len(power_watts)
+                    logger.info(f"Baseline power detected: {baseline_power:.2f}W")
+                    break
 
         output = []
 
@@ -346,6 +427,20 @@ class CostMetricsExporter:
             f"# HELP cost_per_watch_hour Cost per viewer watch hour ({currency}/hour) - load-aware"
         )
         output.append("# TYPE cost_per_watch_hour gauge")
+        
+        # New metrics for ROI dashboard
+        output.append(f"# HELP cost_usd_per_hour Cost in USD per hour")
+        output.append("# TYPE cost_usd_per_hour gauge")
+        output.append(f"# HELP cost_monthly_projection Projected monthly cost ({currency})")
+        output.append("# TYPE cost_monthly_projection gauge")
+        output.append(f"# HELP cost_monthly_savings Projected monthly savings ({currency})")
+        output.append("# TYPE cost_monthly_savings gauge")
+        output.append(f"# HELP co2_emissions_kg_per_hour CO₂ emissions (kg/hour)")
+        output.append("# TYPE co2_emissions_kg_per_hour gauge")
+        output.append(f"# HELP co2_monthly_projection Projected monthly CO₂ emissions (kg)")
+        output.append("# TYPE co2_monthly_projection gauge")
+        output.append(f"# HELP co2_monthly_avoided Monthly CO₂ avoided vs baseline (kg)")
+        output.append("# TYPE co2_monthly_avoided gauge")
 
         # Track metrics emission statistics
         metrics_emitted = 0
@@ -426,6 +521,27 @@ class CostMetricsExporter:
                     logger.debug(
                         f"Set cost_per_watch_hour{{{safe_name}}}={cost_per_watch_hour:.8f}"
                     )
+                    metrics_emitted += 1
+                
+                # Compute and export new hourly/monthly metrics
+                hourly_monthly = self._compute_hourly_and_monthly_metrics(scenario, baseline_power)
+                if 'cost_usd_per_hour' in hourly_monthly:
+                    output.append(f"cost_usd_per_hour{{{labels}}} {hourly_monthly['cost_usd_per_hour']:.8f}")
+                    metrics_emitted += 1
+                if 'cost_monthly_projection' in hourly_monthly:
+                    output.append(f"cost_monthly_projection{{{labels}}} {hourly_monthly['cost_monthly_projection']:.2f}")
+                    metrics_emitted += 1
+                if 'cost_monthly_savings' in hourly_monthly:
+                    output.append(f"cost_monthly_savings{{{labels}}} {hourly_monthly['cost_monthly_savings']:.2f}")
+                    metrics_emitted += 1
+                if 'co2_emissions_kg_per_hour' in hourly_monthly:
+                    output.append(f"co2_emissions_kg_per_hour{{{labels}}} {hourly_monthly['co2_emissions_kg_per_hour']:.6f}")
+                    metrics_emitted += 1
+                if 'co2_monthly_projection' in hourly_monthly:
+                    output.append(f"co2_monthly_projection{{{labels}}} {hourly_monthly['co2_monthly_projection']:.2f}")
+                    metrics_emitted += 1
+                if 'co2_monthly_avoided' in hourly_monthly:
+                    output.append(f"co2_monthly_avoided{{{labels}}} {hourly_monthly['co2_monthly_avoided']:.2f}")
                     metrics_emitted += 1
             else:
                 scenarios_without_data += 1
@@ -529,6 +645,24 @@ def main():
     )
     parser.add_argument('--currency', type=str, default='USD', help='Currency code (default: USD)')
     parser.add_argument(
+        '--region',
+        type=str,
+        default='default',
+        help='AWS region code for regional pricing (e.g., us-east-1, eu-west-1)',
+    )
+    parser.add_argument(
+        '--pricing-config',
+        type=Path,
+        default=None,
+        help='Path to custom pricing configuration JSON file',
+    )
+    parser.add_argument(
+        '--electricity-maps-token',
+        type=str,
+        default=None,
+        help='API token for Electricity Maps real-time CO₂ data',
+    )
+    parser.add_argument(
         '--prometheus-url',
         type=str,
         default=None,
@@ -556,6 +690,9 @@ def main():
         currency=args.currency,
         prometheus_url=args.prometheus_url,
         use_load_aware=not args.disable_load_aware,
+        region=args.region,
+        pricing_config_file=args.pricing_config,
+        electricity_maps_token=args.electricity_maps_token,
     )
     MetricsHandler.exporter = exporter
 
@@ -563,6 +700,9 @@ def main():
     server = HTTPServer(('0.0.0.0', args.port), MetricsHandler)
 
     logger.info(f"Cost Metrics Exporter started on port {args.port}")
+    logger.info(f"Region: {args.region}")
+    if args.pricing_config:
+        logger.info(f"Using custom pricing config: {args.pricing_config}")
     logger.info(f"Pricing: {args.energy_cost} {args.currency}/kWh")
     logger.info(f"         {args.cpu_cost} {args.currency}/h (CPU)")
     logger.info(f"         {args.gpu_cost} {args.currency}/h (GPU)")

@@ -94,6 +94,12 @@ test-multi:
 test-batch:
 	$(PYTHON) scripts/run_tests.py --output-dir ./test_results batch --file batch_stress_matrix.json
 
+test-production:
+	$(PYTHON) scripts/run_tests.py --output-dir ./test_results batch --file production_benchmarks.json
+
+generate-production-report:
+	$(PYTHON) scripts/generate_production_report.py --results-dir ./test_results --output ./results/PRODUCTION.md
+
 analyze:
 	$(PYTHON) scripts/analyze_results.py
 
