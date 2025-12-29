@@ -17,6 +17,7 @@ jobs:
       
       - name: Create test_results directory
         run: mkdir -p test_results
+        # Note: Required by docker compose services (mounted in results-exporter, qoe-exporter, cost-exporter)
       
       - name: Build and start services
         run: docker compose up -d --build
