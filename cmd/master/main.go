@@ -43,6 +43,9 @@ func main() {
 			log.Fatalf("Failed to generate certificate: %v", err)
 		}
 		log.Println("Certificate generated successfully")
+		log.Printf("  Certificate: %s", *certFile)
+		log.Printf("  Key: %s", *keyFile)
+		return // Exit after generating certificate
 	}
 
 	// Create store
