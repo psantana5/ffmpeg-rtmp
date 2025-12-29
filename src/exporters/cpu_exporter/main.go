@@ -77,10 +77,19 @@ func (r *RAPLReader) discoverZones() error {
 	// List all entries for debugging
 	for _, entry := range entries {
 		entryPath := filepath.Join(raplBasePath, entry.Name())
-		log.Printf("Found entry: %s (isDir: %v)", entry.Name(), entry.IsDir())
 		
-		// Try to read the name file if it exists (only for directories)
-		if entry.IsDir() {
+		// Use os.Stat to follow symlinks and get real file info
+		fileInfo, err := os.Stat(entryPath)
+		if err != nil {
+			log.Printf("Found entry: %s (error stating: %v)", entry.Name(), err)
+			continue
+		}
+		
+		isDir := fileInfo.IsDir()
+		log.Printf("Found entry: %s (isDir: %v, mode: %v)", entry.Name(), isDir, fileInfo.Mode())
+		
+		// Try to read the name file if it's a directory
+		if isDir {
 			namePath := filepath.Join(entryPath, "name")
 			if nameBytes, err := os.ReadFile(namePath); err == nil {
 				log.Printf("  -> name: %s", strings.TrimSpace(string(nameBytes)))
@@ -99,7 +108,16 @@ func (r *RAPLReader) discoverZones() error {
 	}
 	
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		entryPath := filepath.Join(raplBasePath, entry.Name())
+		
+		// Use os.Stat to follow symlinks
+		fileInfo, err := os.Stat(entryPath)
+		if err != nil {
+			log.Printf("Skipping %s: cannot stat (%v)", entry.Name(), err)
+			continue
+		}
+		
+		if !fileInfo.IsDir() {
 			continue
 		}
 		
@@ -116,8 +134,7 @@ func (r *RAPLReader) discoverZones() error {
 		}
 		
 		log.Printf("Attempting to load RAPL zone: %s", entryName)
-		zonePath := filepath.Join(raplBasePath, entryName)
-		zone, err := r.loadZone(zonePath)
+		zone, err := r.loadZone(entryPath)
 		if err != nil {
 			log.Printf("Warning: failed to load zone %s: %v", entryName, err)
 			continue
@@ -125,7 +142,7 @@ func (r *RAPLReader) discoverZones() error {
 		
 		if zone != nil {
 			r.zones[zone.Name] = zone
-			log.Printf("✓ Successfully loaded RAPL zone: %s (path: %s)", zone.Name, zonePath)
+			log.Printf("✓ Successfully loaded RAPL zone: %s (path: %s)", zone.Name, entryPath)
 		}
 	}
 	
