@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -120,7 +120,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_mean_power_watts{run_id=~\"$run_id\"}",
@@ -131,7 +131,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_predicted_power_watts{run_id=~\"$run_id\"}",
@@ -147,7 +147,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -212,7 +212,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_predicted_power_watts{run_id=~\"$run_id\"}",
@@ -223,7 +223,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_prediction_confidence_low{run_id=~\"$run_id\"}",
@@ -235,7 +235,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_prediction_confidence_high{run_id=~\"$run_id\"}",
@@ -251,7 +251,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -307,7 +307,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "100 - (abs(results_scenario_mean_power_watts{run_id=~\"$run_id\"} - results_scenario_predicted_power_watts{run_id=~\"$run_id\"}) / results_scenario_mean_power_watts{run_id=~\"$run_id\"} * 100)",
@@ -322,7 +322,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -377,7 +377,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_prediction_confidence_high{run_id=~\"$run_id\"} - results_scenario_prediction_confidence_low{run_id=~\"$run_id\"}",
@@ -392,7 +392,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -440,7 +440,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_predicted_power_watts{run_id=~\"$run_id\"}",
@@ -455,7 +455,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -608,7 +608,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -622,7 +622,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -637,7 +637,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -652,7 +652,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -808,7 +808,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "DS_PROMETHEUS"
+          "uid": "DS_VICTORIAMETRICS"
         },
         "definition": "label_values(results_scenario_mean_power_watts, run_id)",
         "hide": 0,

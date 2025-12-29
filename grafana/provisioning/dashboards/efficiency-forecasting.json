@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "description": "Energy efficiency score represents pixels delivered per joule consumed or Mbps per watt, depending on scenario type.",
       "fieldConfig": {
@@ -101,7 +101,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_efficiency_score{run_id=~\"$run_id\"}",
@@ -116,7 +116,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -254,7 +254,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -268,7 +268,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -283,7 +283,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -298,7 +298,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -356,7 +356,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -435,7 +435,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -454,7 +454,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "DS_PROMETHEUS"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -503,7 +503,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "DS_PROMETHEUS"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "editorMode": "code",
           "expr": "results_scenario_efficiency_score{run_id=~\"$run_id\"}",
@@ -534,7 +534,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "DS_PROMETHEUS"
+          "uid": "DS_VICTORIAMETRICS"
         },
         "definition": "label_values(results_scenario_efficiency_score, run_id)",
         "hide": 0,
