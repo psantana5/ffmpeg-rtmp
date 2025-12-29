@@ -217,7 +217,7 @@ The CI now:
 ```bash
 # Verified endpoints:
 ✅ http://localhost:8428/health → VictoriaMetrics
-✅ http://localhost:9090/-/healthy → Prometheus
+✅ http://localhost:8428/-/healthy → Prometheus
 ✅ http://localhost:3000/api/health → Grafana
 ✅ http://localhost:9510/health → CPU Exporter (when RAPL available)
 ✅ http://localhost:9511/health → GPU Exporter (when GPU available)

@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 class PrometheusClient:
     """Lightweight Prometheus client for querying metrics."""
 
-    def __init__(self, base_url: str = 'http://localhost:9090'):
+    def __init__(self, base_url: str = 'http://localhost:8428'):
         self.base_url = base_url
 
     def query_range(self, query: str, start: float, end: float, step: str = '5s') -> Optional[Dict]:
@@ -89,7 +89,7 @@ class ModelRetrainer:
         results_dir: Path,
         models_dir: Path,
         hardware_id: Optional[str] = None,
-        prometheus_url: str = 'http://localhost:9090',
+        prometheus_url: str = 'http://localhost:8428',
     ):
         """
         Initialize model retrainer.
@@ -523,8 +523,8 @@ def main():
     parser.add_argument(
         '--prometheus-url',
         type=str,
-        default='http://localhost:9090',
-        help='Prometheus server URL (default: http://localhost:9090)',
+        default='http://localhost:8428',
+        help='Prometheus/VictoriaMetrics server URL (default: http://localhost:8428)',
     )
 
     args = parser.parse_args()

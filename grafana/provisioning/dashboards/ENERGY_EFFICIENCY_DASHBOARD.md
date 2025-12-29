@@ -313,7 +313,7 @@ Set up Prometheus alerts for:
 curl http://localhost:9502/metrics
 
 # Check Prometheus targets
-curl http://localhost:9090/api/v1/targets | grep results-exporter
+curl http://localhost:8428/api/v1/targets | grep results-exporter
 ```
 
 ### Efficiency Scores Seem Wrong

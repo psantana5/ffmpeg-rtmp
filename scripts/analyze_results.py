@@ -9,6 +9,7 @@ import argparse
 import csv
 import json
 import logging
+import os
 import statistics
 import sys
 from pathlib import Path
@@ -26,9 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 class PrometheusClient:
-    """Client for querying Prometheus API"""
+    """Client for querying Prometheus API (also compatible with VictoriaMetrics)"""
 
-    def __init__(self, base_url: str = 'http://localhost:9090'):
+    def __init__(self, base_url: str = 'http://localhost:8428'):
         self.base_url = base_url
 
     def query_range(
@@ -65,7 +66,7 @@ class PrometheusClient:
 class ResultsAnalyzer:
     """Analyzes test results and generates reports"""
 
-    def __init__(self, results_file: Path, prometheus_url: str = 'http://localhost:9090'):
+    def __init__(self, results_file: Path, prometheus_url: str = 'http://localhost:8428'):
         self.results_file = results_file
         self.client = PrometheusClient(prometheus_url)
         self.recommender = TranscodingRecommender()
@@ -811,6 +812,12 @@ Examples:
   # Analyze specific test file
   python3 analyze_results.py test_results/test_results_20231215_143022.json
 
+  # Use custom Prometheus/VictoriaMetrics URL
+  python3 analyze_results.py --prometheus-url http://localhost:9090
+
+  # Use environment variable for Prometheus URL
+  PROMETHEUS_URL=http://victoriametrics:8428 python3 analyze_results.py
+
   # Generate predictions for future stream counts
   python3 analyze_results.py --predict-future 1,2,4,8,12
 
@@ -837,6 +844,13 @@ Examples:
         '--multivariate',
         action='store_true',
         help='Use multivariate ML predictor (more features, ensemble models)',
+    )
+
+    parser.add_argument(
+        '--prometheus-url',
+        type=str,
+        default=os.getenv('PROMETHEUS_URL', 'http://localhost:8428'),
+        help='Prometheus/VictoriaMetrics server URL (default: http://localhost:8428, or PROMETHEUS_URL env var)',
     )
 
     args = parser.parse_args()
@@ -875,7 +889,7 @@ Examples:
             return 1
 
     try:
-        analyzer = ResultsAnalyzer(results_file)
+        analyzer = ResultsAnalyzer(results_file, prometheus_url=args.prometheus_url)
         results = analyzer.generate_report()
 
         # Print summary

@@ -106,8 +106,8 @@ All containers should show status "Up" and "healthy".
   - Password: `admin`
   - You'll be prompted to change the password on first login
 
-- **Prometheus**: http://localhost:9090
-  - Check targets: http://localhost:9090/targets
+- **VictoriaMetrics**: http://localhost:8428
+  - Check targets: http://localhost:8428/targets
   - All targets should be "UP" (green)
 
 - **Alertmanager**: http://localhost:9093
@@ -393,7 +393,7 @@ docker stats
 - Check the [main documentation](../docs/)
 - Review [troubleshooting guide](../docs/troubleshooting.md)
 - Check container logs: `make logs SERVICE=<service>`
-- Verify Prometheus targets: http://localhost:9090/targets
+- Verify VictoriaMetrics targets: http://localhost:8428/targets
 - Ask in the project issues: https://github.com/psantana5/ffmpeg-rtmp/issues
 
 ## What's Next?

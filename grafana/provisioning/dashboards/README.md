@@ -96,10 +96,10 @@ All dashboards use the provisioned Prometheus data source.
 ```yaml
 apiVersion: 1
 datasources:
-  - name: Prometheus
+  - name: VictoriaMetrics
     type: prometheus
     access: proxy
-    url: http://prometheus:9090
+    url: http://victoriametrics:8428
     isDefault: true
 ```
 
@@ -249,10 +249,10 @@ Dashboards include these time ranges:
 **Check Prometheus:**
 ```bash
 # Verify Prometheus is running
-curl http://localhost:9090/-/healthy
+curl http://localhost:8428/-/healthy
 
 # Check targets
-curl http://localhost:9090/api/v1/targets | jq .
+curl http://localhost:8428/api/v1/targets | jq .
 ```
 
 **Check Results Exporter:**
@@ -316,7 +316,7 @@ Optimize PromQL queries:
    - Verify tests have been run: `ls -lh test_results/`
 
 3. **Label filter doesn't match:** Label selectors exclude all series
-   - Check label values: `curl http://localhost:9090/api/v1/label/<label>/values`
+   - Check label values: `curl http://localhost:8428/api/v1/label/<label>/values`
    - Simplify query to test: remove label filters one by one
 
 4. **Datasource not configured:** Dashboard cannot reach Prometheus
@@ -338,7 +338,7 @@ Optimize PromQL queries:
    - Check panels use `"uid": "${DS_PROMETHEUS}"`
 
 3. **Prometheus not running:**
-   - Check: `curl http://localhost:9090/-/healthy`
+   - Check: `curl http://localhost:8428/-/healthy`
    - View logs: `docker logs prometheus`
 
 ## Best Practices
