@@ -18,7 +18,7 @@ make retrain-models
 Or manually:
 
 ```bash
-python3 retrain_models.py --results-dir ./test_results --models-dir ./models
+python3 scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
 ```
 
 ## Model Versioning
