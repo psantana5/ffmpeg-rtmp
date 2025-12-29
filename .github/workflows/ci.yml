@@ -22,7 +22,19 @@ jobs:
         run: docker compose up -d --build
       
       - name: Wait for services to be ready
-        run: sleep 30
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:9090/-/healthy >/dev/null 2>&1; then
+              echo "✓ Services are ready after ${i} seconds"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "✗ Services did not become ready in time"
+              exit 1
+            fi
+            sleep 1
+          done
       
       - name: Check Prometheus is up
         run: |
@@ -41,7 +53,11 @@ jobs:
       
       - name: Check exporters are responding
         run: |
-          curl -f http://localhost:9500/metrics || echo "⚠ RAPL exporter may require privileged access"
+          # RAPL exporter requires privileged access to /sys/class/powercap
+          # which is not available in GitHub Actions, so we don't fail on it
+          curl -f http://localhost:9500/metrics || echo "⚠ RAPL exporter requires privileged access (expected in CI)"
+          
+          # These exporters should work in CI environment
           curl -f http://localhost:9501/metrics || exit 1
           echo "✓ Docker stats exporter is responding"
           curl -f http://localhost:9502/health || exit 1
