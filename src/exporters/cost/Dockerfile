@@ -26,6 +26,7 @@ ENV RESULTS_DIR=/results
 ENV ENERGY_COST_PER_KWH=0.12
 ENV CPU_COST_PER_HOUR=0.50
 ENV CURRENCY=USD
+ENV REGION=us-east-1
 ENV PROMETHEUS_URL=http://prometheus:9090
 
 # Note: advisor module is mounted as volume at runtime
@@ -37,4 +38,5 @@ CMD python3 /app/cost_exporter.py \
     --energy-cost ${ENERGY_COST_PER_KWH} \
     --cpu-cost ${CPU_COST_PER_HOUR} \
     --currency ${CURRENCY} \
+    --region ${REGION} \
     --prometheus-url ${PROMETHEUS_URL}
