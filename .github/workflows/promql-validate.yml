@@ -10,6 +10,8 @@ jobs:
   validate-prometheus-config:
     name: Validate Prometheus Configuration
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
@@ -38,6 +40,8 @@ jobs:
   validate-dashboard-promql:
     name: Validate Dashboard PromQL
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code

@@ -10,6 +10,8 @@ jobs:
   python-lint:
     name: Python Linting (ruff)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
@@ -37,6 +39,8 @@ jobs:
   dockerfile-lint:
     name: Dockerfile Linting (hadolint)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
@@ -52,6 +56,8 @@ jobs:
   json-validation:
     name: JSON Dashboard Validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
