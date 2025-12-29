@@ -16,13 +16,13 @@ scrape_configs:
       - targets: ['nginx-exporter:9728']
         labels:
           service: 'nginx-rtmp'
-  
+
   - job_name: 'rapl-power'
     static_configs:
       - targets: ['rapl-exporter:9500']
         labels:
           service: 'power-monitoring'
-  
+
   - job_name: 'docker-stats'
     static_configs:
       - targets: ['docker-stats-exporter:9501']

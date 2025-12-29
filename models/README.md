@@ -24,4 +24,3 @@ python3 scripts/retrain_models.py --results-dir ./test_results --models-dir ./mo
 ## Model Versioning
 
 Models are timestamped and versioned. The `_latest` symlinks always point to the most recent models.
-

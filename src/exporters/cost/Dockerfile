@@ -38,4 +38,3 @@ CMD python3 /app/cost_exporter.py \
     --cpu-cost ${CPU_COST_PER_HOUR} \
     --currency ${CURRENCY} \
     --prometheus-url ${PROMETHEUS_URL}
-

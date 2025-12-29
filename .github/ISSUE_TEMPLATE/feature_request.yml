@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for suggesting a new feature!
-        
+
   - type: textarea
     id: problem
     attributes:
@@ -16,7 +16,7 @@ body:
       placeholder: I'm always frustrated when...
     validations:
       required: true
-      
+
   - type: textarea
     id: solution
     attributes:
@@ -25,14 +25,14 @@ body:
       placeholder: I would like to see...
     validations:
       required: true
-      
+
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives Considered
       description: Describe alternatives you've considered
       placeholder: I also thought about...
-      
+
   - type: dropdown
     id: component
     attributes:
@@ -48,7 +48,7 @@ body:
         - Other
     validations:
       required: true
-      
+
   - type: dropdown
     id: priority
     attributes:
@@ -60,7 +60,7 @@ body:
         - High - Blocking my work
     validations:
       required: true
-      
+
   - type: textarea
     id: additional
     attributes:

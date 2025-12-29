@@ -11,7 +11,7 @@ This script periodically checks all Prometheus exporters to ensure they are:
 - **Continuous Monitoring**: Run at specified intervals
 - **Prometheus Exporter Mode**: Expose health check results as Prometheus metrics
 - **Detailed Logging**: See exactly what's happening with each exporter
-- **Smart Validation**: 
+- **Smart Validation**:
   - Verifies expected metrics are present
   - Checks that metrics contain actual data (not just empty responses)
   - Validates metric freshness based on exporter type
@@ -84,14 +84,14 @@ EXPORTER HEALTH SUMMARY
 ================================================================================
 Exporter                       Status     Metrics    Samples    Notes
 --------------------------------------------------------------------------------
-nginx-rtmp-exporter           ✓ OK       5          12         
-rapl-exporter                 ✓ OK       2          8          
-docker-stats-exporter         ✓ OK       4          15         
-node-exporter                 ✓ OK       850        2143       
-cadvisor                      ✓ OK       120        456        
+nginx-rtmp-exporter           ✓ OK       5          12
+rapl-exporter                 ✓ OK       2          8
+docker-stats-exporter         ✓ OK       4          15
+node-exporter                 ✓ OK       850        2143
+cadvisor                      ✓ OK       120        456
 results-exporter              ⚠ FAIL     0          0          No metrics found
-qoe-exporter                  ✓ OK       3          9          
-cost-exporter                 ✓ OK       4          12         
+qoe-exporter                  ✓ OK       3          9
+cost-exporter                 ✓ OK       4          12
 --------------------------------------------------------------------------------
 Total: 7/8 healthy
 ================================================================================
@@ -167,7 +167,7 @@ groups:
         annotations:
           summary: "Exporter {{ $labels.exporter }} is unhealthy"
           description: "The exporter {{ $labels.exporter }} has been unhealthy for more than 5 minutes."
-      
+
       - alert: ExporterNoData
         expr: exporter_has_data == 0
         for: 10m

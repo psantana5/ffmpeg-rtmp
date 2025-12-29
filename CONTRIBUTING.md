@@ -160,10 +160,10 @@ def test_cost_calculation_with_custom_rates():
     power_watts = 100
     duration_seconds = 3600
     rate_per_kwh = 0.15
-    
+
     # Act
     result = calculate_cost(power_watts, duration_seconds, rate_per_kwh)
-    
+
     # Assert
     assert result == 0.015
 ```
@@ -182,18 +182,18 @@ Example:
 ```python
 def calculate_efficiency_score(power: float, quality: float, bitrate: int) -> float:
     """Calculate the energy efficiency score for a transcoding configuration.
-    
+
     Args:
         power: Power consumption in watts
         quality: Video quality score (0-100)
         bitrate: Target bitrate in bits per second
-        
+
     Returns:
         Efficiency score normalized to 0-100 range
-        
+
     Raises:
         ValueError: If any parameter is negative or zero
-        
+
     Example:
         >>> calculate_efficiency_score(75.5, 85.0, 2000000)
         78.3

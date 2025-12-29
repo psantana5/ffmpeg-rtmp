@@ -186,7 +186,7 @@ docker exec prometheus du -sh /prometheus
 
 ### FFmpeg Can't Connect to RTMP Server
 
-**Symptoms**: 
+**Symptoms**:
 ```
 Connection refused
 Failed to open rtmp://localhost:1935/live

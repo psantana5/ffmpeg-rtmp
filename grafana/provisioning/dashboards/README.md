@@ -5,8 +5,8 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 ## Available Dashboards
 
 ### 1. Energy Efficiency Analysis
-**File:** `energy-efficiency-dashboard.json`  
-**UID:** `energy-efficiency-dashboard`  
+**File:** `energy-efficiency-dashboard.json`
+**UID:** `energy-efficiency-dashboard`
 **Purpose:** Advanced energy efficiency analysis and optimization
 
 **Use Cases:**
@@ -16,7 +16,7 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 - Analyze stability and reliability
 - Support decision-making for production deployments
 
-**Documentation:** See [ENERGY_EFFICIENCY_DASHBOARD.md](./ENERGY_EFFICIENCY_DASHBOARD.md)  
+**Documentation:** See [ENERGY_EFFICIENCY_DASHBOARD.md](./ENERGY_EFFICIENCY_DASHBOARD.md)
 **Visual Guide:** See [VISUAL_SUMMARY.md](./VISUAL_SUMMARY.md)
 
 **Key Panels:**
@@ -32,7 +32,7 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 ---
 
 ### 2. Power Monitoring
-**File:** `power-monitoring.json`  
+**File:** `power-monitoring.json`
 **Purpose:** Real-time power consumption monitoring
 
 **Use Cases:**
@@ -47,7 +47,7 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 ---
 
 ### 3. Baseline vs Test
-**File:** `baseline-vs-test.json`  
+**File:** `baseline-vs-test.json`
 **Purpose:** Compare baseline and test scenario metrics
 
 **Use Cases:**
@@ -439,6 +439,6 @@ For issues or questions:
 
 ---
 
-**Last Updated:** 2024-12-27  
-**Grafana Version:** 9.5.0+  
+**Last Updated:** 2024-12-27
+**Grafana Version:** 9.5.0+
 **Prometheus Version:** 2.40+
