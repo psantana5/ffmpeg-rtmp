@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -25,6 +25,10 @@ help:
 	@echo "  make restart         Restart stack"
 	@echo "  make ps              Show container status"
 	@echo "  make logs SERVICE=prometheus   Tail logs for a service"
+	@echo ""
+	@echo "VictoriaMetrics"
+	@echo "  make vm-up           Start stack with VictoriaMetrics"
+	@echo "  make vm-up-build     Build + start stack with VictoriaMetrics"
 	@echo ""
 	@echo "GPU (NVIDIA)"
 	@echo "  make nvidia-up       Start stack with NVIDIA profile"
@@ -81,6 +85,14 @@ nvidia-up:
 nvidia-up-build:
 	@mkdir -p test_results
 	$(COMPOSE) --profile nvidia up -d --build
+
+vm-up:
+	@mkdir -p test_results
+	$(COMPOSE) up -d prometheus victoriametrics grafana
+
+vm-up-build:
+	@mkdir -p test_results
+	$(COMPOSE) up -d --build prometheus victoriametrics grafana
 
 test-suite:
 	$(PYTHON) scripts/run_tests.py suite

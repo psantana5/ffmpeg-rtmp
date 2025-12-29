@@ -12,3 +12,18 @@ datasources:
       timeInterval: 5s
       httpMethod: POST
       orgId: 1
+
+  - name: VictoriaMetrics
+    type: prometheus
+    uid: DS_VICTORIAMETRICS
+    access: proxy
+    url: http://victoriametrics:8428
+    isDefault: false
+    editable: false
+    jsonData:
+      timeInterval: 1s
+      httpMethod: POST
+      orgId: 1
+      prometheusType: Prometheus
+      prometheusVersion: 2.40.0
+      customQueryParameters: ''

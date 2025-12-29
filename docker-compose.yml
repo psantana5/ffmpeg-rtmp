@@ -68,6 +68,28 @@ services:
     networks:
       - streaming-net
 
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    volumes:
+      - ./victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
+      - victoriametrics-data:/storage
+    command:
+      - "--storageDataPath=/storage"
+      - "--retentionPeriod=30d"
+      - "--httpListenAddr=:8428"
+      - "--promscrape.config=/etc/victoriametrics/scrape.yml"
+    ports:
+      - "8428:8428"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -83,6 +105,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+      - victoriametrics
     restart: unless-stopped
     networks:
       - streaming-net
@@ -101,6 +124,23 @@ services:
       - streaming-net
     environment:
       - RAPL_EXPORTER_PORT=9500
+
+  cpu-exporter-go:
+    build: 
+      context: .
+      dockerfile: src/exporters/cpu_exporter/Dockerfile
+    container_name: cpu-exporter-go
+    privileged: true
+    volumes:
+      - /sys/class/powercap:/sys/class/powercap:ro
+      - /sys/devices:/sys/devices:ro
+    ports:
+      - "9510:9500"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - CPU_EXPORTER_PORT=9500
 
   docker-stats-exporter:
     build: ./src/exporters/docker_stats
@@ -165,6 +205,24 @@ services:
       - streaming-net
     environment:
       - DCGM_EXPORTER_LISTEN=:9400
+
+  gpu-exporter-go:
+    build:
+      context: .
+      dockerfile: src/exporters/gpu_exporter/Dockerfile
+    container_name: gpu-exporter-go
+    profiles:
+      - nvidia
+    runtime: nvidia
+    cap_add:
+      - SYS_ADMIN
+    ports:
+      - "9511:9505"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - GPU_EXPORTER_PORT=9505
 
   results-exporter:
     build: ./src/exporters/results
@@ -261,4 +319,5 @@ networks:
 
 volumes:
   prometheus-data:
+  victoriametrics-data:
   grafana-data:
