@@ -4,12 +4,25 @@ Cost Metrics Prometheus Exporter
 
 Exports cost analysis metrics as Prometheus metrics for Grafana visualization.
 
-Load-aware metrics use actual CPU usage and power measurements from Prometheus.
+Load-aware metrics use actual CPU usage and power measurements from Prometheus
+with advanced numerical integration (trapezoidal rule) for accurate cost calculation.
+
+Mathematical Approach:
+    - CPU Cost: Integrates CPU usage over time using trapezoidal rule
+      Cost = (∫ cpu(t) dt) × price_per_core_second
+    
+    - Energy Cost: Integrates power consumption using trapezoidal rule
+      Energy = ∫ power(t) dt (Joules)
+      Cost = Energy × price_per_joule
+    
+    - Accuracy: O(h²) convergence vs O(h) for rectangular approximation
 
 Metrics exported:
 - cost_total_load_aware: Total cost (load-aware, scales with actual usage)
 - cost_energy_load_aware: Energy cost (load-aware, scales with actual power)
 - cost_compute_load_aware: Compute cost (load-aware, scales with actual CPU)
+- cost_per_pixel: Cost efficiency metric ($/megapixel delivered)
+- cost_per_watch_hour: Cost per viewer watch hour ($/viewer-hour)
 
 All metrics include labels: scenario, streams, bitrate, encoder, currency, service
 
@@ -220,8 +233,10 @@ class CostMetricsExporter:
         
         try:
             # Query CPU usage
-            # Use rate() to get cores per second, then average over step interval
-            cpu_query = 'rate(container_cpu_usage_seconds_total{name!~".*POD.*"}[30s])'
+            # Use rate() to get CPU cores per second, aggregated across all containers
+            # Exclude POD containers and aggregate by container name
+            # This gives us the instantaneous CPU usage in cores at each sample point
+            cpu_query = 'sum(rate(container_cpu_usage_seconds_total{name!~".*POD.*",name!=""}[30s]))'
             logger.debug(f"Scenario '{scenario_name}': Querying CPU usage")
             cpu_response = self.prometheus_client.query_range(
                 cpu_query, start_time, end_time, f'{step_seconds}s'
@@ -230,6 +245,7 @@ class CostMetricsExporter:
             
             # Query power consumption
             # Sum all RAPL zones for total system power
+            # RAPL provides instantaneous power measurements in watts
             power_query = 'sum(rapl_power_watts)'
             logger.debug(f"Scenario '{scenario_name}': Querying power consumption")
             power_response = self.prometheus_client.query_range(
