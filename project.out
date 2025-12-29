@@ -1,0 +1,241 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Start the stack with '...'
+        2. Run test with '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: I expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Instead, what happened was...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide information about your environment
+      value: |
+        - OS: [e.g., Ubuntu 22.04]
+        - Python version: [e.g., 3.11]
+        - Docker version: [e.g., 24.0.5]
+        - CPU: [e.g., Intel i7-10700K]
+        - Project version/commit: [e.g., main branch, commit abc123]
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Please copy and paste any relevant log output
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/psantana5/ffmpeg-rtmp/tree/main/docs
+    about: Please check the documentation first
+  - name: Discussions
+    url: https://github.com/psantana5/ffmpeg-rtmp/discussions
+    about: Ask questions and discuss ideas with the community
+name: Feature Request
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe.
+      placeholder: I'm always frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like
+      placeholder: I would like to see...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe alternatives you've considered
+      placeholder: I also thought about...
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which component does this relate to?
+      options:
+        - Exporters
+        - Energy Advisor
+        - Grafana Dashboards
+        - Test Runner
+        - Prometheus Configuration
+        - Documentation
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would improve my workflow
+        - High - Blocking my work
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or examples about the feature request here
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  docker-build-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create required directories
+        run: |
+          mkdir -p test_results
+          mkdir -p streams
+        # Note: test_results required by docker compose services (mounted in results-exporter, qoe-exporter, cost-exporter)
+        # Note: streams required by nginx-rtmp service for HLS streaming
+      
+      - name: Build and start services
+        run: docker compose up -d --build
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:9090/-/healthy >/dev/null 2>&1; then
+              echo "✓ Services are ready after ${i} seconds"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "✗ Services did not become ready in time"
+              exit 1
+            fi
+            sleep 1
+          done
+      
+      - name: Check Prometheus is up
+        run: |
+          curl -sf http://localhost:9090/-/healthy || exit 1
+          echo "✓ Prometheus is healthy"
+      
+      - name: Check Grafana is up
+        run: |
+          curl -sf http://localhost:3000/api/health || exit 1
+          echo "✓ Grafana is healthy"
+      
+      - name: Check Alertmanager is up
+        run: |
+          curl -sf http://localhost:9093/-/healthy || exit 1
+          echo "✓ Alertmanager is healthy"
+      
+      - name: Check exporters are responding
+        run: |
+          # RAPL exporter requires privileged access to /sys/class/powercap
+          # which is not available in GitHub Actions, so we don't fail on it
+          # Note: RAPL uses /metrics endpoint (standard Prometheus exporter pattern)
+          curl -sf http://localhost:9500/metrics || echo "⚠ RAPL exporter requires privileged access (expected in CI)"
+          
+          # These exporters should work in CI environment
+          # Docker stats uses /metrics (standard Prometheus exporter)
+          curl -sf http://localhost:9501/metrics || exit 1
+          echo "✓ Docker stats exporter is responding"
+          
+          # Custom exporters use /health endpoint for readiness checks
+          curl -sf http://localhost:9502/health || exit 1
+          echo "✓ Results exporter is healthy"
+          curl -sf http://localhost:9503/health || exit 1
+          echo "✓ QoE exporter is healthy"
+          curl -sf http://localhost:9504/health || exit 1
+          echo "✓ Cost exporter is healthy"
+      
+      - name: Show running containers
+        if: always()
+        run: docker compose ps
+      
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v

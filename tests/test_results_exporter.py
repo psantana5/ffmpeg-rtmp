@@ -141,3 +141,26 @@ class TestResultsExporterEnhancements:
         assert "output_ladder" in labels
         assert "encoder_type" in labels
         assert labels["encoder_type"] == "cpu"  # default
+        assert "encoder" in labels
+        assert labels["encoder"] == "h264"  # default
+        assert "preset" in labels
+        assert labels["preset"] == "veryfast"  # default
+
+    def test_scenario_labels_with_custom_encoder_preset(self):
+        """Test that scenario labels include custom encoder and preset"""
+        exporter = ResultsExporter()
+
+        scenario = {
+            "name": "GPU NVENC test",
+            "bitrate": "5000k",
+            "resolution": "1920x1080",
+            "fps": 60,
+            "encoder": "h264_nvenc",
+            "preset": "medium",
+        }
+
+        labels = exporter._scenario_labels(scenario)
+
+        assert labels["encoder"] == "h264_nvenc"
+        assert labels["preset"] == "medium"
+        assert labels["encoder_type"] == "gpu"  # detected from name
