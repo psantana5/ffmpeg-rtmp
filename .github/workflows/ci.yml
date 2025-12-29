@@ -8,32 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  go-exporters-build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-      
-      - name: Build CPU exporter
-        run: make build-cpu-exporter
-      
-      - name: Build GPU exporter
-        run: make build-gpu-exporter
-      
-      - name: Test CPU exporter binary
-        run: ./bin/cpu_exporter --help
-      
-      - name: Test GPU exporter binary
-        run: ./bin/gpu_exporter --help
-
   docker-build-test:
     runs-on: ubuntu-latest
     permissions:

@@ -12,17 +12,12 @@ RUN go mod download
 # Copy source code
 COPY src/exporters/gpu_exporter/ ./src/exporters/gpu_exporter/
 
-# Build the exporter
+# Build the exporter as a static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" \
     -o gpu_exporter ./src/exporters/gpu_exporter/
 
-# Runtime stage
+# Runtime stage - use NVIDIA CUDA base for nvidia-smi
 FROM nvidia/cuda:12.3.1-base-ubuntu22.04
-
-# Install nvidia-smi (part of CUDA driver)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

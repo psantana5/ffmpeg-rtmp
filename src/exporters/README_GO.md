@@ -26,14 +26,17 @@ Monitors Intel RAPL (Running Average Power Limit) for CPU power consumption.
 
 **Usage:**
 ```bash
-# Build
-make build-cpu-exporter
+# Build via Docker (no Go installation required)
+docker compose build cpu-exporter-go
 
-# Run locally (requires privileged access to /sys/class/powercap)
-sudo ./bin/cpu_exporter --port 9510
-
-# Or via Docker
+# Run via Docker
 docker compose up -d cpu-exporter-go
+
+# Or extract binary from image
+docker create --name temp-cpu ffmpeg-rtmp-cpu-exporter-go
+docker cp temp-cpu:/app/cpu_exporter ./cpu_exporter
+docker rm temp-cpu
+sudo ./cpu_exporter --port 9510
 ```
 
 **Endpoints:**
@@ -70,14 +73,17 @@ Monitors NVIDIA GPU metrics via nvidia-smi XML output.
 
 **Usage:**
 ```bash
-# Build
-make build-gpu-exporter
+# Build via Docker (no Go installation required)
+docker compose build gpu-exporter-go
 
-# Run locally (requires nvidia-smi)
-./bin/gpu_exporter --port 9505
-
-# Or via Docker with NVIDIA profile
+# Run via Docker with NVIDIA profile
 docker compose --profile nvidia up -d gpu-exporter-go
+
+# Or extract binary from image
+docker create --name temp-gpu ffmpeg-rtmp-gpu-exporter-go
+docker cp temp-gpu:/app/gpu_exporter ./gpu_exporter
+docker rm temp-gpu
+./gpu_exporter --port 9505
 ```
 
 **Endpoints:**
@@ -112,41 +118,55 @@ All metrics include labels: `gpu_id`, `gpu_name`, `gpu_uuid`
 
 ## Building
 
-### Local Builds
-
-```bash
-# All exporters
-make exporters
-
-# Individual exporters
-make build-cpu-exporter
-make build-gpu-exporter
-
-# Binaries are created in bin/
-ls -lh bin/
-```
-
-### Cross-Compilation
-
-```bash
-# ARM64 (Raspberry Pi, AWS Graviton)
-GOOS=linux GOARCH=arm64 go build -o bin/cpu_exporter_arm64 ./src/exporters/cpu_exporter/
-GOOS=linux GOARCH=arm64 go build -o bin/gpu_exporter_arm64 ./src/exporters/gpu_exporter/
-
-# AMD64 (standard servers)
-GOOS=linux GOARCH=amd64 go build -o bin/cpu_exporter_amd64 ./src/exporters/cpu_exporter/
-GOOS=linux GOARCH=amd64 go build -o bin/gpu_exporter_amd64 ./src/exporters/gpu_exporter/
-```
+All builds happen inside Docker containers - **no Go installation required on the host**.
 
 ### Docker Builds
 
 ```bash
-# Build images
+# Build all services including Go exporters
+docker compose build
+
+# Build specific Go exporters
 docker compose build cpu-exporter-go
 docker compose build gpu-exporter-go
+```
 
-# Or build everything
-docker compose build
+### Extracting Binaries (Optional)
+
+If you need standalone binaries for deployment outside Docker:
+
+```bash
+# Extract CPU exporter binary
+docker compose build cpu-exporter-go
+docker create --name temp-cpu ffmpeg-rtmp-cpu-exporter-go
+docker cp temp-cpu:/app/cpu_exporter ./cpu_exporter
+docker rm temp-cpu
+
+# Extract GPU exporter binary
+docker compose build gpu-exporter-go
+docker create --name temp-gpu ffmpeg-rtmp-gpu-exporter-go
+docker cp temp-gpu:/app/gpu_exporter ./gpu_exporter
+docker rm temp-gpu
+```
+
+### Multi-Architecture Builds
+
+Build for ARM64 (Raspberry Pi, AWS Graviton) using Docker buildx:
+
+```bash
+# Set up buildx (one-time)
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
+
+# Build for ARM64
+docker buildx build --platform linux/arm64 \
+  -f src/exporters/cpu_exporter/Dockerfile \
+  -t cpu-exporter:arm64 .
+
+# Build for multiple architectures
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -f src/exporters/cpu_exporter/Dockerfile \
+  -t cpu-exporter:multiarch .
 ```
 
 ## Testing

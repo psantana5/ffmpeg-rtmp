@@ -70,30 +70,71 @@ This starts:
 - Prometheus (port 9090, for comparison)
 - Grafana (port 3000)
 
-## Building Standalone Binaries
+## Building via Docker
+
+All Go exporters are built inside Docker containers - no local Go installation required.
 
 ```bash
-# Build all Go exporters
-make exporters
+# Build all services including Go exporters
+docker compose build
 
-# Build individual exporters
-make build-cpu-exporter
-make build-gpu-exporter
+# Build specific Go exporter
+docker compose build cpu-exporter-go
+docker compose build gpu-exporter-go
 
-# Binaries are created in bin/
-./bin/cpu_exporter --port 9510
-./bin/gpu_exporter --port 9505
+# Start the exporters
+docker compose up -d cpu-exporter-go
+docker compose up -d gpu-exporter-go
 ```
 
-### Cross-Compilation for ARM64
+### Extracting Binaries from Docker Images (Optional)
+
+If you need standalone binaries for deployment outside Docker:
 
 ```bash
-# ARM64 (Raspberry Pi, AWS Graviton)
-GOOS=linux GOARCH=arm64 go build -o bin/cpu_exporter_arm64 ./src/exporters/cpu_exporter/
-GOOS=linux GOARCH=arm64 go build -o bin/gpu_exporter_arm64 ./src/exporters/gpu_exporter/
+# Extract CPU exporter binary
+docker compose build cpu-exporter-go
+docker create --name temp-cpu ffmpeg-rtmp-cpu-exporter-go
+docker cp temp-cpu:/app/cpu_exporter ./cpu_exporter
+docker rm temp-cpu
 
-# AMD64 (standard servers)
-GOOS=linux GOARCH=amd64 go build -o bin/cpu_exporter_amd64 ./src/exporters/cpu_exporter/
+# Extract GPU exporter binary
+docker compose build gpu-exporter-go
+docker create --name temp-gpu ffmpeg-rtmp-gpu-exporter-go
+docker cp temp-gpu:/app/gpu_exporter ./gpu_exporter
+docker rm temp-gpu
+
+# Run extracted binaries
+sudo ./cpu_exporter --port 9510
+./gpu_exporter --port 9505
+```
+
+### Multi-Architecture Builds
+
+Build for ARM64 (Raspberry Pi, AWS Graviton) using Docker buildx:
+
+### Multi-Architecture Builds
+
+Build for ARM64 (Raspberry Pi, AWS Graviton) using Docker buildx:
+
+```bash
+# Set up buildx (one-time setup)
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
+
+# Build for ARM64
+docker buildx build --platform linux/arm64 \
+  -f src/exporters/cpu_exporter/Dockerfile \
+  -t cpu-exporter:arm64 .
+
+docker buildx build --platform linux/arm64 \
+  -f src/exporters/gpu_exporter/Dockerfile \
+  -t gpu-exporter:arm64 .
+
+# Build for multiple architectures
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -f src/exporters/cpu_exporter/Dockerfile \
+  -t cpu-exporter:multiarch .
 ```
 
 ## Metric Compatibility

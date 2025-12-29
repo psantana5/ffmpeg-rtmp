@@ -86,9 +86,7 @@ go.work
 go.work.sum
 vendor/
 
-# Go build artifacts
-/bin/
-/pkg/
+# Go exporters - extracted binaries (optional, for standalone deployment)
 cpu_exporter
 gpu_exporter
 ffmpeg_exporter

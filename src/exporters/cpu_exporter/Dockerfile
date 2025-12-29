@@ -12,23 +12,17 @@ RUN go mod download
 # Copy source code
 COPY src/exporters/cpu_exporter/ ./src/exporters/cpu_exporter/
 
-# Build the exporter
+# Build the exporter as a static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" \
     -o cpu_exporter ./src/exporters/cpu_exporter/
 
-# Runtime stage
-FROM alpine:3.19
-
-# Add ca-certificates for HTTPS support
-RUN apk --no-cache add ca-certificates
+# Runtime stage - use scratch for minimal image
+FROM scratch
 
 WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /build/cpu_exporter .
-
-# Run as non-root user (but needs privileged for RAPL access)
-USER nobody
 
 EXPOSE 9500
 
