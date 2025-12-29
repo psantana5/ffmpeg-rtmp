@@ -1,6 +1,16 @@
 #!/bin/bash
 # Quick Production Demo - TLS + API Auth + SQLite
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+MASTER_BIN="$SCRIPT_DIR/bin/master"
+
+# Check if binary exists
+if [ ! -x "$MASTER_BIN" ]; then
+    echo "Error: Master binary not found at $MASTER_BIN"
+    echo "Please run: make build-distributed"
+    exit 1
+fi
+
 echo "=== Production Features Quick Demo ===="
 echo ""
 
@@ -11,7 +21,7 @@ cd /tmp/demo-quick
 
 # Generate cert
 echo "1. Generating certificate..."
-/home/runner/work/ffmpeg-rtmp/ffmpeg-rtmp/bin/master \
+$MASTER_BIN \
   --generate-cert --cert server.crt --key server.key > /dev/null 2>&1
 echo "   ✓ Certificate created"
 echo ""
@@ -19,7 +29,7 @@ echo ""
 # Start master with TLS + API + SQLite
 API_KEY="prod-key-123"
 echo "2. Starting master (TLS + API auth + SQLite)..."
-nohup /home/runner/work/ffmpeg-rtmp/ffmpeg-rtmp/bin/master \
+nohup $MASTER_BIN \
   --port 9443 \
   --db data.db \
   --tls \
@@ -68,7 +78,7 @@ kill %1 2>/dev/null
 wait %1 2>/dev/null
 sleep 2
 
-nohup /home/runner/work/ffmpeg-rtmp/ffmpeg-rtmp/bin/master \
+nohup $MASTER_BIN \
   --port 9443 \
   --db data.db \
   --tls \

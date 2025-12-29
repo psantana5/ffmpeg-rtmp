@@ -5,6 +5,14 @@ set -e
 # Demonstrates mTLS, SQLite persistence, and API authentication
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+MASTER_BIN="$SCRIPT_DIR/bin/master"
+
+# Check if binary exists
+if [ ! -x "$MASTER_BIN" ]; then
+    echo "Error: Master binary not found at $MASTER_BIN"
+    echo "Please run: make build-distributed"
+    exit 1
+fi
 
 echo "=========================================="
 echo "Production Features Demo"
@@ -21,13 +29,13 @@ echo "   (Using self-signed for demo - use CA-signed in production)"
 echo ""
 
 # Generate master certificate
-$SCRIPT_DIR/bin/master --generate-cert \
+$MASTER_BIN --generate-cert \
   --cert certs/master.crt \
   --key certs/master.key \
   > /dev/null 2>&1
 
 # Generate agent certificate (simulating different machine)
-$SCRIPT_DIR/bin/master --generate-cert \
+$MASTER_BIN --generate-cert \
   --cert certs/agent.crt \
   --key certs/agent.key \
   > /dev/null 2>&1
@@ -52,7 +60,7 @@ echo "   - API authentication enabled"
 echo ""
 
 # Start master in background
-nohup $SCRIPT_DIR/bin/master \
+nohup $MASTER_BIN \
   --port 8443 \
   --db data/master.db \
   --tls \
@@ -145,7 +153,7 @@ echo "   ✓ Master stopped gracefully"
 echo ""
 
 echo "10. Testing persistence (restart master)..."
-nohup $SCRIPT_DIR/bin/master \
+nohup $MASTER_BIN \
   --port 8443 \
   --db data/master.db \
   --tls \

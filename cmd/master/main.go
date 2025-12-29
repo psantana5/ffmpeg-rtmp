@@ -65,16 +65,9 @@ func main() {
 	}
 
 	// Setup authentication if API key provided
-	var apiKeyManager *auth.APIKeyManager
 	if *apiKey != "" {
 		log.Println("API authentication enabled")
-		apiKeyManager = auth.NewAPIKeyManager()
-		// Add the provided API key
-		if _, err := apiKeyManager.GenerateAPIKey("master-key"); err != nil {
-			log.Fatalf("Failed to setup API key: %v", err)
-		}
-		// For simplicity, we'll check the provided key directly
-		log.Printf("API Key authentication enabled (key provided via flag)")
+		log.Printf("Using API key for authentication")
 	} else {
 		log.Println("WARNING: API authentication disabled (not recommended for production)")
 	}
@@ -102,9 +95,9 @@ func main() {
 					return
 				}
 
-				// Simple bearer token check
+				// Simple bearer token check with constant-time comparison
 				expectedAuth := "Bearer " + *apiKey
-				if authHeader != expectedAuth {
+				if !auth.SecureCompare(authHeader, expectedAuth) {
 					http.Error(w, "Invalid API key", http.StatusUnauthorized)
 					return
 				}

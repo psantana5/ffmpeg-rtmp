@@ -272,7 +272,9 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 		}
 
 		if paramsJSON.Valid {
-			json.Unmarshal([]byte(paramsJSON.String), &job.Parameters)
+			if err := json.Unmarshal([]byte(paramsJSON.String), &job.Parameters); err != nil {
+				continue
+			}
 		}
 
 		if startedAt.Valid {
@@ -307,7 +309,6 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 		WHERE status = ?
 		ORDER BY created_at ASC
 		LIMIT 1
-		FOR UPDATE
 	`, models.JobStatusPending).Scan(&job.ID, &job.Scenario, &job.Confidence,
 		&paramsJSON, &job.Status, &job.NodeID, &job.CreatedAt,
 		&job.StartedAt, &job.CompletedAt, &job.RetryCount, &job.Error)
@@ -320,7 +321,9 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	}
 
 	if paramsJSON.Valid {
-		json.Unmarshal([]byte(paramsJSON.String), &job.Parameters)
+		if err := json.Unmarshal([]byte(paramsJSON.String), &job.Parameters); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
+		}
 	}
 
 	// Update job status
