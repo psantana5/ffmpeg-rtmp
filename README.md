@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters** and **VictoriaMetrics** for production-grade telemetry.
+A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, and **distributed compute capabilities** for scaling workloads across multiple nodes.
 
 ## ⚡ Quick Start
 
@@ -75,6 +75,7 @@ This project helps you:
 4. **Analyze energy efficiency** and get recommendations for optimal transcoding settings
 5. **Visualize results** in Grafana dashboards
 6. **Set up alerts** for power thresholds
+7. **Scale workloads** across multiple compute nodes (NEW in v2.1)
 
 ## Architecture
 
@@ -90,12 +91,14 @@ The stack includes:
 - **Python Exporters**: QoE metrics, Cost analysis, Results tracking
 - **Energy Advisor**: ML-based recommendations for optimal configurations
 - **Benchmark Automation**: 4 workload profiles for performance testing
+- **Distributed Compute**: Master-worker architecture for scaling across multiple nodes (NEW in v2.1)
 
 ## Documentation
 
 Detailed documentation is organized by topic:
 
-- **[Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md)** - ⚡ New! One-command deployment
+- **[Distributed Architecture](docs/distributed_architecture_v1.md)** - 🆕 Scale workloads across multiple nodes
+- **[Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md)** - ⚡ One-command deployment
 - **[Go Exporters Migration Guide](docs/go-exporters-migration.md)** - Python to Go migration
 - **[Getting Started Guide](docs/getting-started.md)** - Complete setup and first steps
 - **[Running Tests](scripts/README.md)** - How to run different test scenarios
@@ -113,6 +116,11 @@ make up-build          # Start stack with rebuild
 make down              # Stop stack
 make ps                # Show container status
 make logs SERVICE=prometheus  # View logs
+
+# Distributed compute
+make build-distributed # Build master and agent binaries
+./bin/master          # Start master node
+./bin/agent --help    # See agent options
 
 # Testing
 make test-single       # Run single stream test
