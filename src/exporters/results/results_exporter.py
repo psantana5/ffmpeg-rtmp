@@ -455,9 +455,9 @@ class ResultsExporter:
 
         total_energy_wh = (energy_j / 3600) if duration > 0 else 0.0
 
-        # Docker overhead is estimated: docker_engine_cpu_percent × total power
+        # Docker overhead is estimated: docker_containers_total_cpu_percent × total power
         estimated_docker_overhead_w = 0.0
-        docker_engine_query = "docker_engine_cpu_percent"
+        docker_engine_query = "docker_containers_total_cpu_percent"
         docker_engine_data = self.client.query_range(docker_engine_query, start, end, step="5s")
         docker_engine_values = _extract_values(docker_engine_data)
         mean_docker_engine_cpu = mean(docker_engine_values) if docker_engine_values else 0.0
@@ -855,11 +855,8 @@ class ResultsExporter:
                     output.append(
                         f"results_scenario_predicted_energy_joules{lbl} {predictions['energy_joules']:.4f}"
                     )
-            else:
-                # Export zero/NaN values so Grafana dashboards don't show "No data"
-                # This helps distinguish between "predictor not trained" vs "no metrics at all"
-                output.append(f"results_scenario_predicted_power_watts{lbl} NaN")
-                output.append(f"results_scenario_predicted_energy_joules{lbl} NaN")
+            # Note: We intentionally omit predicted metrics when predictor is not trained
+            # rather than outputting NaN, as NaN causes issues with Prometheus queries
 
             if baseline_stats and not self._is_baseline_scenario(scenario, baseline):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]

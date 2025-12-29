@@ -21,7 +21,7 @@
       },
       "id": 999,
       "options": {
-        "content": "# Load-Aware Cost Model\n\nThis dashboard uses **load-aware cost calculations** based on actual resource usage:\n\n**Compute Cost Formula:**\n```\ncompute_cost = sum_over_time(cpu_usage_cores[scenario]) \u00d7 PRICE_PER_CORE_SECOND\n```\n\n**Energy Cost Formula:**\n```\nenergy_joules = sum_over_time(power_watts \u00d7 step_seconds)\nenergy_cost = energy_joules \u00d7 PRICE_PER_JOULE\n```\n\n**Total Cost:**\n```\ntotal_cost = compute_cost + energy_cost\n```\n\n### Cost Scaling\n- \u2705 More streams \u2192 Higher CPU usage \u2192 Higher cost\n- \u2705 Higher bitrate \u2192 Higher CPU usage \u2192 Higher cost  \n- \u2705 Multi-resolution ladders \u2192 More pixels encoded \u2192 Higher cost\n- \u2705 Idle baseline \u2192 Minimal CPU usage \u2192 Lowest cost\n\nCosts are based on **real measurements** from Prometheus, not fixed wall-clock duration.\n",
+        "content": "# Load-Aware Cost Model (Advanced Integration)\n\nThis dashboard uses **load-aware cost calculations** with **trapezoidal numerical integration** for mathematical accuracy:\n\n**Compute Cost Formula (Trapezoidal Integration):**\n```\ncompute_cost = ∫ cpu_usage_cores(t) dt × PRICE_PER_CORE_SECOND\n≈ (Δt/2) × [cpu₀ + 2×cpu₁ + ... + 2×cpuₙ₋₁ + cpuₙ] × PRICE\n```\n\n**Energy Cost Formula (Trapezoidal Integration):**\n```\nenergy_joules = ∫ power_watts(t) dt\n≈ (Δt/2) × [P₀ + 2×P₁ + ... + 2×Pₙ₋₁ + Pₙ]\nenergy_cost = energy_joules × PRICE_PER_JOULE\n```\n\n**Total Cost:**\n```\ntotal_cost = compute_cost + energy_cost\n```\n\n### Mathematical Accuracy\n- 🔬 **Trapezoidal rule**: O(h²) convergence for smooth functions\n- 📊 **Better than rectangular**: Accounts for slope between measurements\n- ⚡ **Truth-to-life**: Captures actual resource consumption curves\n\n### Cost Scaling\n- ✅ More streams → Higher CPU usage → Higher cost\n- ✅ Higher bitrate → Higher CPU usage → Higher cost  \n- ✅ Multi-resolution ladders → More pixels encoded → Higher cost\n- ✅ Idle baseline → Minimal CPU usage → Lowest cost\n\nCosts are based on **real measurements** from Prometheus with **numerical integration** for accuracy.\n",
         "mode": "markdown"
       },
       "title": "\u2139\ufe0f Load-Aware Cost Model",
@@ -313,7 +313,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_pixel * 1000000",
+          "expr": "(cost_total_load_aware / on(scenario, bitrate, streams) group_right results_scenario_total_pixels) * 1000000",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"
@@ -407,7 +407,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_watch_hour",
+          "expr": "cost_total_load_aware / ((results_scenario_duration_seconds / 3600))",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"

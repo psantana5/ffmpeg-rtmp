@@ -11,10 +11,29 @@ Provides cost analysis for energy-aware transcoding optimization:
 
 This enables cost-optimized transcoding decisions for cloud and edge deployments.
 
-Cost Formulas (Load-Aware):
-    compute_cost = sum_over_time(cpu_usage_cores) * PRICE_PER_CORE_SECOND
-    energy_cost = sum_over_time(power_watts * step_seconds) * PRICE_PER_JOULE
-    total_cost = compute_cost + energy_cost
+Cost Formulas (Load-Aware with Trapezoidal Integration):
+    
+    Compute Cost:
+        compute_cost = (∫ cpu_usage_cores(t) dt) × PRICE_PER_CORE_SECOND
+        
+        Using trapezoidal rule for numerical integration:
+        ≈ (Δt/2) × [cpu₀ + 2×cpu₁ + 2×cpu₂ + ... + 2×cpuₙ₋₁ + cpuₙ] × PRICE
+    
+    Energy Cost:
+        energy_joules = ∫ power_watts(t) dt
+        energy_cost = energy_joules × PRICE_PER_JOULE
+        
+        Using trapezoidal rule:
+        ≈ (Δt/2) × [P₀ + 2×P₁ + 2×P₂ + ... + 2×Pₙ₋₁ + Pₙ] × PRICE
+    
+    Total Cost:
+        total_cost = compute_cost + energy_cost
+
+Mathematical Justification:
+    The trapezoidal rule provides O(h²) accuracy for smooth functions,
+    significantly better than rectangular approximation's O(h) accuracy.
+    For time-series data with varying rates, this captures the actual
+    area under the curve more accurately.
 """
 
 import logging
@@ -413,6 +432,47 @@ class CostModel:
         
         return (None, None)
     
+    def _trapezoidal_integrate(self, values: List[float], step: float) -> float:
+        """
+        Numerically integrate time-series data using the trapezoidal rule.
+        
+        The trapezoidal rule provides better accuracy than rectangular approximation
+        by treating each interval as a trapezoid rather than a rectangle.
+        
+        Formula:
+            ∫[a,b] f(x)dx ≈ h/2 * [f(x₀) + 2f(x₁) + 2f(x₂) + ... + 2f(xₙ₋₁) + f(xₙ)]
+        
+        Where:
+            h = step size (time interval between measurements)
+            f(xᵢ) = value at measurement i
+        
+        Args:
+            values: List of measurements at regular intervals
+            step: Time interval between measurements (seconds)
+        
+        Returns:
+            Integrated value (area under the curve)
+        
+        Example:
+            values = [1.0, 2.0, 3.0, 2.5, 2.0]  # CPU cores over time
+            step = 5.0  # 5 seconds between measurements
+            result = _trapezoidal_integrate(values, step)
+            # result ≈ 5.0/2 * (1.0 + 2*2.0 + 2*3.0 + 2*2.5 + 2.0) = 51.25 core-seconds
+        """
+        if not values or len(values) == 0:
+            return 0.0
+        
+        if len(values) == 1:
+            # Single point: area = value * step (rectangular)
+            return values[0] * step
+        
+        # Trapezoidal rule: (step/2) * [first + 2*(middle terms) + last]
+        integral = values[0] + values[-1]  # First and last terms
+        integral += 2.0 * sum(values[1:-1])  # Middle terms (weighted by 2)
+        integral *= step / 2.0
+        
+        return integral
+    
     # ========================================================================
     # Load-Aware Cost Calculation Methods (Recommended)
     # ========================================================================
@@ -459,8 +519,13 @@ class CostModel:
         """
         Compute compute cost based on actual CPU usage (load-aware).
         
-        Formula:
-            compute_cost = sum(cpu_usage_cores[i] * step_seconds) * price_per_core_second
+        Formula (using trapezoidal integration for accuracy):
+            compute_cost = ∫ cpu_usage_cores(t) dt * price_per_core_second
+            ≈ (step_seconds / 2) * Σ(cpu[i] + cpu[i+1]) * price_per_core_second
+        
+        This uses the trapezoidal rule for numerical integration, which provides
+        better accuracy than rectangular approximation by accounting for the 
+        slope between measurements.
         
         This scales with actual load, not wall-clock time:
             - More streams → higher CPU usage → higher cost
@@ -492,14 +557,18 @@ class CostModel:
             logger.debug(f"Scenario '{scenario.get('name')}': No step_seconds data")
             return None
         
-        # Sum CPU core-seconds
-        total_core_seconds = sum(cpu_usage_cores) * step_seconds
+        if len(cpu_usage_cores) == 0:
+            return 0.0
+        
+        # Use trapezoidal integration for better accuracy
+        # Integral ≈ (h/2) * [y0 + 2*y1 + 2*y2 + ... + 2*y(n-1) + yn]
+        total_core_seconds = self._trapezoidal_integrate(cpu_usage_cores, step_seconds)
         
         # Add GPU if available and pricing is configured
         gpu_usage_cores = scenario.get('gpu_usage_cores')
-        if gpu_usage_cores and isinstance(gpu_usage_cores, list):
+        if gpu_usage_cores and isinstance(gpu_usage_cores, list) and len(gpu_usage_cores) > 0:
             # Use same pricing for GPU cores (can be extended later)
-            total_core_seconds += sum(gpu_usage_cores) * step_seconds
+            total_core_seconds += self._trapezoidal_integrate(gpu_usage_cores, step_seconds)
         
         # Calculate cost
         cost = total_core_seconds * self.price_per_core_second
@@ -516,11 +585,18 @@ class CostModel:
         """
         Compute energy cost from integrated power measurements (load-aware).
         
-        Formula:
-            energy_joules = sum(power_watts[i] * step_seconds)
+        Formula (using trapezoidal integration for accuracy):
+            energy_joules = ∫ power_watts(t) dt
+            ≈ (step_seconds / 2) * Σ(power[i] + power[i+1])
             energy_cost = energy_joules * price_per_joule
         
-        This integrates actual power consumption over time, not average power.
+        This uses the trapezoidal rule for numerical integration of power over time,
+        which provides accurate energy consumption (in Joules) by accounting for the
+        variation between measurements rather than assuming constant power within intervals.
+        
+        Mathematical basis:
+            Energy = ∫ Power dt (Joules = Watts × seconds)
+            Using trapezoidal rule: ∫[a,b] f(x)dx ≈ (b-a)/2 * [f(a) + f(b)]
         
         Args:
             scenario: Scenario dict with power time series
@@ -545,8 +621,11 @@ class CostModel:
             logger.debug(f"Scenario '{scenario.get('name')}': No step_seconds data")
             return None
         
-        # Integrate power over time to get energy in joules
-        energy_joules = sum(power_watts) * step_seconds
+        if len(power_watts) == 0:
+            return 0.0
+        
+        # Use trapezoidal integration for accurate energy calculation
+        energy_joules = self._trapezoidal_integrate(power_watts, step_seconds)
         
         # Calculate cost
         cost = energy_joules * self.price_per_joule
