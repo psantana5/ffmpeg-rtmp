@@ -170,6 +170,10 @@ class ResultsExporter:
         # Detect encoder type (cpu/gpu) from scenario metadata or name
         encoder_type = scenario.get("encoder_type", self._detect_encoder_type(scenario))
 
+        # Extract encoder and preset from scenario (added for new encoder support)
+        encoder = scenario.get("encoder", "h264")
+        preset = scenario.get("preset", "veryfast")
+
         return {
             "scenario": str(scenario.get("name", "")),
             "bitrate": str(scenario.get("bitrate", "")),
@@ -178,6 +182,8 @@ class ResultsExporter:
             "streams": str(streams),
             "output_ladder": output_ladder,
             "encoder_type": encoder_type,
+            "encoder": encoder,
+            "preset": preset,
         }
 
     def _extract_stream_count(self, scenario: dict) -> int:
