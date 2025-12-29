@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'Predictions & Forecasting'
+    orgId: 1
+    folder: 'Predictions'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/predictions

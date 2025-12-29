@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'Efficiency & QoE Analysis'
+    orgId: 1
+    folder: 'Efficiency & QoE'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/efficiency-qoe
