@@ -14,13 +14,13 @@ import (
 
 // MasterHandler handles master node API requests
 type MasterHandler struct {
-	store *store.MemoryStore
+	store store.Store
 }
 
 // NewMasterHandler creates a new master handler
-func NewMasterHandler(store *store.MemoryStore) *MasterHandler {
+func NewMasterHandler(s store.Store) *MasterHandler {
 	return &MasterHandler{
-		store: store,
+		store: s,
 	}
 }
 

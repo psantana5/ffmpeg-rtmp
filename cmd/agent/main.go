@@ -11,6 +11,7 @@ import (
 
 	"github.com/psantana5/ffmpeg-rtmp/pkg/agent"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
+	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
 
 func main() {
@@ -19,9 +20,13 @@ func main() {
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")
 	allowMasterAsWorker := flag.Bool("allow-master-as-worker", false, "Allow registering master node as worker (development mode)")
+	apiKey := flag.String("api-key", "", "API key for authentication")
+	certFile := flag.String("cert", "", "TLS client certificate file (for mTLS)")
+	keyFile := flag.String("key", "", "TLS client key file (for mTLS)")
+	caFile := flag.String("ca", "", "CA certificate file to verify server")
 	flag.Parse()
 
-	log.Println("Starting FFmpeg RTMP Distributed Compute Agent")
+	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
 	log.Printf("Master URL: %s", *masterURL)
 
 	// Detect hardware capabilities
@@ -45,8 +50,30 @@ func main() {
 	log.Printf("  Node Type: %s", nodeType)
 	log.Printf("  OS/Arch: %s/%s", caps.Labels["os"], caps.Labels["arch"])
 
-	// Create client
-	client := agent.NewClient(*masterURL)
+	// Create client with TLS support if certificates provided
+	var client *agent.Client
+	if *certFile != "" && *keyFile != "" {
+		log.Println("Initializing TLS client...")
+		tlsConfig, err := tlsutil.LoadClientTLSConfig(*certFile, *keyFile, *caFile)
+		if err != nil {
+			log.Fatalf("Failed to load TLS config: %v", err)
+		}
+		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
+		log.Println("TLS enabled")
+	} else {
+		client = agent.NewClient(*masterURL)
+		if strings.HasPrefix(*masterURL, "https://") {
+			log.Println("WARNING: Using HTTPS without client certificate")
+		}
+	}
+
+	// Set API key if provided
+	if *apiKey != "" {
+		client.SetAPIKey(*apiKey)
+		log.Println("API authentication enabled")
+	} else {
+		log.Println("WARNING: No API key provided (authentication disabled)")
+	}
 
 	// Register with master if requested
 	if *register {
