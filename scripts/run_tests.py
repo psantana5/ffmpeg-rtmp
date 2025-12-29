@@ -20,6 +20,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Add parent directory to path for advisor imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from advisor.quality.vmaf_integration import compute_vmaf, is_vmaf_available
+    from advisor.quality.psnr import compute_psnr, is_psnr_available
+    QUALITY_AVAILABLE = True
+except ImportError:
+    QUALITY_AVAILABLE = False
+    logger.warning("Quality computation modules not available")
+
 
 class TestScenario:
     """Represents a single test scenario"""
@@ -53,17 +64,40 @@ class TestScenario:
             "end_time": self.end_time,
             "outputs": self.outputs,  # Always include, even if None
         }
+        # Add quality scores if they exist
+        if hasattr(self, 'vmaf_score') and self.vmaf_score is not None:
+            result['vmaf_score'] = self.vmaf_score
+        if hasattr(self, 'psnr_score') and self.psnr_score is not None:
+            result['psnr_score'] = self.psnr_score
         return result
 
 
 class TestRunner:
     """Orchestrates automated testing"""
 
-    def __init__(self, output_dir: str = "./test_results"):
+    def __init__(self, output_dir: str = "./test_results", compute_quality: bool = False):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         self.current_process: Optional[subprocess.Popen] = None
         self.test_results: List[Dict] = []
+        self.compute_quality = compute_quality
+        
+        # Create videos directory if quality computation is enabled
+        if self.compute_quality:
+            self.videos_dir = self.output_dir / "videos"
+            self.videos_dir.mkdir(exist_ok=True)
+            
+            # Check quality computation availability
+            if not QUALITY_AVAILABLE:
+                logger.warning("Quality computation requested but modules not available")
+                self.compute_quality = False
+            else:
+                vmaf_avail = is_vmaf_available()
+                psnr_avail = is_psnr_available()
+                logger.info(f"Quality computation enabled - VMAF: {vmaf_avail}, PSNR: {psnr_avail}")
+                if not vmaf_avail and not psnr_avail:
+                    logger.warning("Neither VMAF nor PSNR available, disabling quality computation")
+                    self.compute_quality = False
 
         # Register signal handlers for cleanup
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -91,6 +125,144 @@ class TestRunner:
             subprocess.run("pkill -9 ffmpeg", shell=True, stderr=subprocess.DEVNULL)
         except Exception:
             pass
+
+    def _generate_reference_video(self, scenario: TestScenario, output_path: Path) -> bool:
+        """
+        Generate a reference video for quality comparison.
+        
+        Args:
+            scenario: Test scenario with video parameters
+            output_path: Path to save reference video
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Generate short reference video (10 seconds is enough for quality comparison)
+            duration = min(10, scenario.duration)
+            
+            cmd = [
+                'ffmpeg',
+                '-f', 'lavfi',
+                '-i', f'testsrc=size={scenario.resolution}:rate={scenario.fps}',
+                '-f', 'lavfi',
+                '-i', 'sine=frequency=1000:sample_rate=48000',
+                '-c:v', 'libx264',
+                '-preset', 'medium',  # Better quality for reference
+                '-crf', '18',  # High quality
+                '-pix_fmt', 'yuv420p',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-t', str(duration),
+                '-y',  # Overwrite if exists
+                str(output_path)
+            ]
+            
+            logger.info(f"Generating reference video: {output_path.name}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=60,
+                check=False
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to generate reference video: {result.stderr.decode()}")
+                return False
+                
+            logger.info(f"Reference video generated successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error generating reference video: {e}")
+            return False
+
+    def _record_output_video(self, scenario: TestScenario, stream_key: str, output_path: Path, duration: int = 10) -> bool:
+        """
+        Record output video from RTMP stream for quality comparison.
+        
+        Args:
+            scenario: Test scenario
+            stream_key: RTMP stream key
+            output_path: Path to save recorded video
+            duration: Duration to record (seconds)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Wait a bit for stream to stabilize
+            time.sleep(2)
+            
+            cmd = [
+                'ffmpeg',
+                '-i', f'rtmp://localhost:1935/live/{stream_key}',
+                '-c', 'copy',
+                '-t', str(duration),
+                '-y',
+                str(output_path)
+            ]
+            
+            logger.info(f"Recording output video from stream: {stream_key}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=duration + 30,
+                check=False
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Failed to record output video: {result.stderr.decode()}")
+                return False
+                
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                logger.error("Output video file is empty or missing")
+                return False
+                
+            logger.info(f"Output video recorded successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error recording output video: {e}")
+            return False
+
+    def _compute_quality_scores(self, reference_path: Path, output_path: Path, scenario: TestScenario) -> None:
+        """
+        Compute VMAF and PSNR quality scores.
+        
+        Args:
+            reference_path: Path to reference video
+            output_path: Path to output video
+            scenario: Test scenario to store scores in
+        """
+        if not QUALITY_AVAILABLE:
+            return
+            
+        logger.info("Computing quality scores...")
+        
+        # Compute VMAF if available
+        if is_vmaf_available():
+            try:
+                vmaf_score = compute_vmaf(str(reference_path), str(output_path))
+                if vmaf_score is not None:
+                    scenario.vmaf_score = vmaf_score
+                    logger.info(f"VMAF score: {vmaf_score:.2f}")
+                else:
+                    logger.warning("VMAF computation returned None")
+            except Exception as e:
+                logger.error(f"Error computing VMAF: {e}")
+        
+        # Compute PSNR if available
+        if is_psnr_available():
+            try:
+                psnr_score = compute_psnr(str(reference_path), str(output_path))
+                if psnr_score is not None:
+                    scenario.psnr_score = psnr_score
+                    logger.info(f"PSNR score: {psnr_score:.2f} dB")
+                else:
+                    logger.warning("PSNR computation returned None")
+            except Exception as e:
+                logger.error(f"Error computing PSNR: {e}")
 
     def wait_for_services(self, timeout: int = 60) -> bool:
         """Wait for all required services to be ready"""
@@ -160,15 +332,31 @@ class TestRunner:
         )
 
         # Build ffmpeg command
+        stream_key = scenario.name.replace(" ", "_").replace("(", "").replace(")", "")
         cmd = build_ffmpeg_cmd(
             name=scenario.name,
-            stream_key=scenario.name.replace(" ", "_"),
+            stream_key=stream_key,
             bitrate=scenario.bitrate,
             resolution=scenario.resolution,
             fps=scenario.fps,
         )
 
         try:
+            # Generate reference video if quality computation is enabled
+            reference_path = None
+            output_path = None
+            compute_quality_for_scenario = self.compute_quality
+            
+            if compute_quality_for_scenario:
+                # Sanitize stream key for filesystem (handle special characters)
+                safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in stream_key)
+                reference_path = self.videos_dir / f"reference_{safe_name}.mp4"
+                output_path = self.videos_dir / f"output_{safe_name}.mp4"
+                
+                if not self._generate_reference_video(scenario, reference_path):
+                    logger.warning("Failed to generate reference video, skipping quality computation for this scenario")
+                    compute_quality_for_scenario = False
+
             # Start streaming
             self.current_process = subprocess.Popen(
                 cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -179,7 +367,15 @@ class TestRunner:
             )
             time.sleep(stabilization_time)
 
-            # Record start time after stabilization
+            # Record output video if quality computation is enabled
+            if compute_quality_for_scenario and reference_path and output_path:
+                if not self._record_output_video(scenario, stream_key, output_path, duration=10):
+                    logger.warning("Failed to record output video, skipping quality computation for this scenario")
+                    compute_quality_for_scenario = False
+                    reference_path = None
+                    output_path = None
+
+            # Record start time after stabilization and recording
             scenario.start_time = time.time()
             logger.info(f"Recording data for {scenario.duration}s...")
 
@@ -191,6 +387,13 @@ class TestRunner:
 
             # Stop streaming
             self.cleanup()
+
+            # Compute quality scores if videos were recorded
+            if compute_quality_for_scenario and reference_path and output_path:
+                if reference_path.exists() and output_path.exists():
+                    self._compute_quality_scores(reference_path, output_path, scenario)
+                else:
+                    logger.warning("Reference or output video missing, skipping quality computation")
 
             logger.info(f"Scenario '{scenario.name}' complete")
 
@@ -206,6 +409,9 @@ class TestRunner:
         except Exception as e:
             logger.error(f"Error running scenario '{scenario.name}': {e}")
             self.cleanup()
+            raise
+            self.cleanup()
+            raise
             raise
 
     def run_streams_mixed(
@@ -373,6 +579,8 @@ def main():
     parser.add_argument("--output-dir", default="./test_results")
     parser.add_argument("--wait-timeout", type=int, default=60)
     parser.add_argument("--skip-wait", action="store_true")
+    parser.add_argument("--compute-quality", action="store_true", 
+                       help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -381,6 +589,8 @@ def main():
     suite_p.add_argument("--scenario-duration", type=int, default=300)
     suite_p.add_argument("--stabilization", type=int, default=30)
     suite_p.add_argument("--cooldown", type=int, default=30)
+    suite_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     single_p = subparsers.add_parser("single")
     single_p.add_argument("--name", required=True)
@@ -392,6 +602,8 @@ def main():
     single_p.add_argument("--cooldown", type=int, default=30)
     single_p.add_argument("--with-baseline", action="store_true")
     single_p.add_argument("--baseline-duration", type=int, default=120)
+    single_p.add_argument("--compute-quality", action="store_true",
+                         help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     multi_p = subparsers.add_parser("multi")
     multi_p.add_argument("--count", type=int, required=True)
@@ -404,18 +616,24 @@ def main():
     multi_p.add_argument("--cooldown", type=int, default=30)
     multi_p.add_argument("--with-baseline", action="store_true")
     multi_p.add_argument("--baseline-duration", type=int, default=120)
+    multi_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     batch_p = subparsers.add_parser("batch")
     batch_p.add_argument("--file", required=True)
     batch_p.add_argument("--stabilization", type=int, default=30)
     batch_p.add_argument("--cooldown", type=int, default=30)
+    batch_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     args = parser.parse_args()
 
-    runner = TestRunner(output_dir=args.output_dir)
+    runner = TestRunner(output_dir=args.output_dir, compute_quality=args.compute_quality)
 
     logger.info("=" * 60)
     logger.info("AUTOMATED STREAMING ENERGY TESTS")
+    if args.compute_quality:
+        logger.info("Quality scoring: ENABLED")
     logger.info("=" * 60)
 
     if not args.skip_wait:

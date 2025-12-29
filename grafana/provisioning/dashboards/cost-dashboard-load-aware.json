@@ -313,7 +313,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_pixel * 1000000",
+          "expr": "(cost_total_load_aware / on(scenario, bitrate, streams) group_right results_scenario_total_pixels) * 1000000",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"
@@ -407,7 +407,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "cost_per_watch_hour",
+          "expr": "cost_total_load_aware / ((results_scenario_duration_seconds / 3600))",
           "legendFormat": "{{scenario}} ({{streams}} streams @ {{bitrate}})",
           "range": true,
           "refId": "A"

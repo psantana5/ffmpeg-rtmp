@@ -88,7 +88,7 @@
             "uid": "DS_PROMETHEUS"
           },
           "editorMode": "code",
-          "expr": "sum(docker_engine_cpu_percent) * sum(rapl_power_watts{zone=~\"package.*\"}) / 100",
+          "expr": "docker_containers_total_cpu_percent * sum(rapl_power_watts{zone=~\"package.*\"}) / 100",
           "legendFormat": "Estimated Docker Overhead",
           "range": true,
           "refId": "B"

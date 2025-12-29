@@ -35,6 +35,7 @@ Usage:
 import argparse
 import json
 import logging
+import re
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -127,6 +128,29 @@ class PrometheusClient:
         logger.debug(f"Extracted {num_samples} samples from {num_series} time series")
         
         return values
+
+
+def _extract_stream_count(scenario: Dict) -> int:
+    """
+    Extract number of concurrent streams from scenario name.
+    
+    Args:
+        scenario: Scenario dictionary with 'name' field
+    
+    Returns:
+        Number of streams (int, minimum 1)
+    
+    Examples:
+        "2 streams @ 2500k" -> 2
+        "4 Streams" -> 4
+        "Single test" -> 1 (default)
+    """
+    name = scenario.get("name", "").lower()
+    # Look for patterns like "2 streams", "4 Streams", etc.
+    match = re.search(r'(\d+)\s+streams?', name)
+    if match:
+        return int(match.group(1))
+    return 1
 
 
 class CostMetricsExporter:
@@ -348,16 +372,16 @@ class CostMetricsExporter:
             # Sanitize name for Prometheus labels
             safe_name = scenario_name.replace(' ', '_').replace('"', '')
             
-            # Extract additional labels
-            streams = scenario.get('streams')
+            # Extract additional labels - use helper function for streams
+            streams = _extract_stream_count(scenario)
             bitrate = scenario.get('bitrate', '')
             encoder = scenario.get('encoder_type', 'unknown')
             
-            # Skip metrics without required labels (streams or bitrate)
-            if streams is None or not bitrate:
+            # Skip metrics without required labels (bitrate)
+            if not bitrate:
                 logger.debug(
                     f"Skipping scenario '{scenario_name}': "
-                    f"missing streams or bitrate labels"
+                    f"missing bitrate label"
                 )
                 continue
             
