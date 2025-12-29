@@ -8,12 +8,12 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements.txt /app/
+COPY ../../../requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY qoe_exporter.py /app/
-COPY advisor /app/advisor
+COPY ../../../advisor /app/advisor
 
 RUN chmod +x /app/qoe_exporter.py
 

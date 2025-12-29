@@ -88,7 +88,7 @@ services:
       - streaming-net
 
   rapl-exporter:
-    build: ./rapl-exporter
+    build: ./src/exporters/rapl
     container_name: rapl-exporter
     privileged: true
     volumes:
@@ -103,7 +103,7 @@ services:
       - RAPL_EXPORTER_PORT=9500
 
   docker-stats-exporter:
-    build: ./docker-stats-exporter
+    build: ./src/exporters/docker_stats
     container_name: docker-stats-exporter
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -167,7 +167,7 @@ services:
       - DCGM_EXPORTER_LISTEN=:9400
 
   results-exporter:
-    build: ./results-exporter
+    build: ./src/exporters/results
     container_name: results-exporter
     volumes:
       - ./test_results:/results
@@ -187,13 +187,10 @@ services:
       retries: 3
 
   qoe-exporter:
-    build:
-      context: .
-      dockerfile: Dockerfile.qoe-exporter
+    build: ./src/exporters/qoe
     container_name: qoe-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./qoe_exporter.py:/app/qoe_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
       - "9503:9503"
@@ -210,13 +207,10 @@ services:
       retries: 3
 
   cost-exporter:
-    build:
-      context: .
-      dockerfile: Dockerfile.cost-exporter
+    build: ./src/exporters/cost
     container_name: cost-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./cost_exporter.py:/app/cost_exporter.py:ro
       - ./advisor:/app/advisor:ro
     ports:
       - "9504:9504"
@@ -237,9 +231,7 @@ services:
       retries: 3
 
   exporter-health-checker:
-    build:
-      context: .
-      dockerfile: Dockerfile.health-checker
+    build: ./src/exporters/health_checker
     container_name: exporter-health-checker
     ports:
       - "9600:9600"
