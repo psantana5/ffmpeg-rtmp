@@ -23,9 +23,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 ENV COST_EXPORTER_PORT=9504
 ENV RESULTS_DIR=/results
-ENV ENERGY_COST_PER_KWH=0.12
+ENV ENERGY_COST_PER_KWH=0.0
 ENV CPU_COST_PER_HOUR=0.50
 ENV CURRENCY=USD
+ENV REGION=us-east-1
+ENV PRICING_CONFIG=/app/pricing_config.json
+ENV ELECTRICITY_MAPS_TOKEN=""
 ENV PROMETHEUS_URL=http://prometheus:9090
 
 # Note: advisor module is mounted as volume at runtime
@@ -37,4 +40,6 @@ CMD python3 /app/cost_exporter.py \
     --energy-cost ${ENERGY_COST_PER_KWH} \
     --cpu-cost ${CPU_COST_PER_HOUR} \
     --currency ${CURRENCY} \
+    --region ${REGION} \
+    --pricing-config ${PRICING_CONFIG} \
     --prometheus-url ${PROMETHEUS_URL}

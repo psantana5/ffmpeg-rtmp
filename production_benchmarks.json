@@ -1,0 +1,148 @@
+{
+  "name": "Production Streaming Benchmarks",
+  "description": "Real-world streaming scenarios for Twitch, YouTube, and Zoom",
+  "scenarios": [
+    {
+      "type": "baseline",
+      "name": "Baseline (Idle)",
+      "duration": 60,
+      "description": "System idle baseline for savings calculations"
+    },
+    {
+      "type": "single",
+      "name": "Twitch 1080p 60fps @ 6000k",
+      "bitrate": "6000k",
+      "resolution": "1920x1080",
+      "fps": 60,
+      "encoder": "h264",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "Twitch recommended settings for 1080p60 gaming streams",
+      "quality_target": "VMAF>=85"
+    },
+    {
+      "type": "single",
+      "name": "Twitch 1080p 60fps @ 6000k (x264 fast)",
+      "bitrate": "6000k",
+      "resolution": "1920x1080",
+      "fps": 60,
+      "encoder": "h264",
+      "preset": "fast",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "Twitch 1080p60 with x264 fast preset (CPU optimized)",
+      "quality_target": "VMAF>=85"
+    },
+    {
+      "type": "single",
+      "name": "YouTube 4K 60fps @ 20000k",
+      "bitrate": "20000k",
+      "resolution": "3840x2160",
+      "fps": 60,
+      "encoder": "h264",
+      "stabilization": 20,
+      "duration": 300,
+      "cooldown": 30,
+      "description": "YouTube recommended bitrate for 4K60 content",
+      "quality_target": "VMAF>=90"
+    },
+    {
+      "type": "single",
+      "name": "YouTube 4K 30fps @ 13000k",
+      "bitrate": "13000k",
+      "resolution": "3840x2160",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 20,
+      "duration": 300,
+      "cooldown": 30,
+      "description": "YouTube recommended bitrate for 4K30 content",
+      "quality_target": "VMAF>=90"
+    },
+    {
+      "type": "single",
+      "name": "YouTube 1440p 60fps @ 12000k",
+      "bitrate": "12000k",
+      "resolution": "2560x1440",
+      "fps": 60,
+      "encoder": "h264",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "YouTube 1440p60 (2K) streaming",
+      "quality_target": "VMAF>=88"
+    },
+    {
+      "type": "single",
+      "name": "Zoom HD 720p 30fps @ 1500k",
+      "bitrate": "1500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 10,
+      "duration": 300,
+      "cooldown": 15,
+      "description": "Zoom HD video conferencing settings",
+      "quality_target": "VMAF>=80"
+    },
+    {
+      "type": "single",
+      "name": "Zoom Group HD 720p 30fps @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 10,
+      "duration": 300,
+      "cooldown": 15,
+      "description": "Zoom group call HD quality",
+      "quality_target": "VMAF>=82"
+    },
+    {
+      "type": "single",
+      "name": "Facebook Live 1080p 30fps @ 4000k",
+      "bitrate": "4000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "Facebook Live recommended 1080p settings",
+      "quality_target": "VMAF>=85"
+    },
+    {
+      "type": "single",
+      "name": "LinkedIn Live 1080p 30fps @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "LinkedIn Live professional streaming",
+      "quality_target": "VMAF>=87"
+    },
+    {
+      "type": "single",
+      "name": "Multi-resolution ABR Ladder (1080p+720p+480p)",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "encoder": "h264",
+      "stabilization": 15,
+      "duration": 300,
+      "cooldown": 20,
+      "description": "Adaptive Bitrate Ladder for HLS/DASH",
+      "outputs": [
+        {"resolution": "1920x1080", "fps": 30, "bitrate": "5000k"},
+        {"resolution": "1280x720", "fps": 30, "bitrate": "2500k"},
+        {"resolution": "854x480", "fps": 30, "bitrate": "1000k"}
+      ],
+      "quality_target": "VMAF>=85"
+    }
+  ]
+}

@@ -216,6 +216,7 @@ services:
     volumes:
       - ./test_results:/results:ro
       - ./advisor:/app/advisor:ro
+      - ./pricing_config.json:/app/pricing_config.json:ro
     ports:
       - "9504:9504"
     restart: unless-stopped
@@ -224,9 +225,12 @@ services:
     environment:
       - COST_EXPORTER_PORT=9504
       - RESULTS_DIR=/results
-      - ENERGY_COST_PER_KWH=0.12
+      - ENERGY_COST_PER_KWH=0.0
       - CPU_COST_PER_HOUR=0.50
       - CURRENCY=USD
+      - REGION=us-east-1
+      - PRICING_CONFIG=/app/pricing_config.json
+      - ELECTRICITY_MAPS_TOKEN=${ELECTRICITY_MAPS_TOKEN:-}
       - PROMETHEUS_URL=http://prometheus:9090
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
