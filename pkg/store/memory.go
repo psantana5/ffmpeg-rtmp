@@ -143,16 +143,15 @@ func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 
 	// Find first pending job
 	for i, jobID := range s.jobQueue {
-		s.jobsMu.RLock()
+		// Lock both jobs and nodes for atomic operation
+		s.jobsMu.Lock()
 		job, ok := s.jobs[jobID]
-		s.jobsMu.RUnlock()
-
 		if !ok || job.Status != models.JobStatusPending {
+			s.jobsMu.Unlock()
 			continue
 		}
 
 		// Mark job as running and assign to node
-		s.jobsMu.Lock()
 		now := time.Now()
 		job.Status = models.JobStatusRunning
 		job.NodeID = nodeID

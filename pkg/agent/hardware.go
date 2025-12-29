@@ -13,6 +13,13 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 )
 
+const (
+	// ServerDetectionMinThreads is the minimum CPU threads for server classification
+	ServerDetectionMinThreads = 16
+	// ServerDetectionMinRAMGB is the minimum RAM in GB for server classification
+	ServerDetectionMinRAMGB = 32
+)
+
 // DetectHardware detects the hardware capabilities of the current system
 func DetectHardware() (*models.NodeCapabilities, error) {
 	caps := &models.NodeCapabilities{
@@ -180,8 +187,8 @@ func DetectNodeType(cpuThreads int, ramBytes uint64) models.NodeType {
 
 	ramGB := float64(ramBytes) / (1024 * 1024 * 1024)
 
-	// Server: >16 threads AND >32GB RAM
-	if cpuThreads > 16 && ramGB > 32 {
+	// Server: >ServerDetectionMinThreads threads AND >ServerDetectionMinRAMGB GB RAM
+	if cpuThreads > ServerDetectionMinThreads && ramGB > ServerDetectionMinRAMGB {
 		return models.NodeTypeServer
 	}
 

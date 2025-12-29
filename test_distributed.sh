@@ -1,7 +1,7 @@
 #!/bin/bash
-# Integration test for distributed compute system
-
 set -e
+
+# Integration test for distributed compute system
 
 echo "=================================="
 echo "Distributed Compute Integration Test"
