@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to fill out this bug report!
-        
+
   - type: textarea
     id: description
     attributes:
@@ -16,7 +16,7 @@ body:
       placeholder: Tell us what you see!
     validations:
       required: true
-      
+
   - type: textarea
     id: reproduction
     attributes:
@@ -28,7 +28,7 @@ body:
         3. See error
     validations:
       required: true
-      
+
   - type: textarea
     id: expected
     attributes:
@@ -37,7 +37,7 @@ body:
       placeholder: I expected...
     validations:
       required: true
-      
+
   - type: textarea
     id: actual
     attributes:
@@ -46,7 +46,7 @@ body:
       placeholder: Instead, what happened was...
     validations:
       required: true
-      
+
   - type: textarea
     id: environment
     attributes:
@@ -60,14 +60,14 @@ body:
         - Project version/commit: [e.g., main branch, commit abc123]
     validations:
       required: true
-      
+
   - type: textarea
     id: logs
     attributes:
       label: Relevant Logs
       description: Please copy and paste any relevant log output
       render: shell
-      
+
   - type: textarea
     id: additional
     attributes:

@@ -11,32 +11,32 @@ on:
 jobs:
   retrain:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Retrain models
         run: |
-          python retrain_models.py --results-dir ./test_results --models-dir ./models
-      
+          python scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
+
       - name: Upload model artifacts
         uses: actions/upload-artifact@v4
         with:
           name: trained-models
           path: models/
           retention-days: 90
-      
+
       - name: Commit updated models (optional)
         run: |
           git config --global user.name "github-actions[bot]"

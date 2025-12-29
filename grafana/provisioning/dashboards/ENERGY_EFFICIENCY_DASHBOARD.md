@@ -8,7 +8,7 @@ The **Energy Efficiency Dashboard** is an advanced Grafana dashboard designed to
 
 ### 1. Energy Efficiency Leaderboard
 
-**Type:** Table  
+**Type:** Table
 **Purpose:** Ranks all transcoding scenarios by their energy efficiency score
 
 **Columns:**
@@ -28,12 +28,12 @@ The **Energy Efficiency Dashboard** is an advanced Grafana dashboard designed to
 
 ### 2. Pixels Delivered per Joule
 
-**Type:** Horizontal Bar Chart  
+**Type:** Horizontal Bar Chart
 **Purpose:** Shows total pixels delivered per joule of energy consumed
 
 **Metric:** `results_scenario_efficiency_score` (already computed as pixels/J)
 
-**Interpretation:** 
+**Interpretation:**
 - Higher bars = more efficient configurations
 - Useful for comparing scenarios with different output resolutions
 - Groups scenarios by output ladder for fair comparison
@@ -44,7 +44,7 @@ The **Energy Efficiency Dashboard** is an advanced Grafana dashboard designed to
 
 ### 3. Energy Wasted vs Optimal
 
-**Type:** Horizontal Bar Chart  
+**Type:** Horizontal Bar Chart
 **Purpose:** Shows extra energy consumed compared to the most efficient configuration within the same output ladder
 
 **PromQL:**
@@ -65,7 +65,7 @@ min by(output_ladder) (results_scenario_total_energy_joules)
 
 ### 4. CPU vs GPU Scaling
 
-**Type:** Time Series (Line/Scatter)  
+**Type:** Time Series (Line/Scatter)
 **Purpose:** Compares CPU and GPU encoder power consumption as stream count increases
 
 **Metrics:**
@@ -83,12 +83,12 @@ min by(output_ladder) (results_scenario_total_energy_joules)
 
 ### 5. Efficiency Stability
 
-**Type:** Horizontal Bar Chart  
+**Type:** Horizontal Bar Chart
 **Purpose:** Shows variability in efficiency scores over time (coefficient of variation)
 
 **PromQL:**
 ```promql
-stddev_over_time(results_scenario_efficiency_score[5m]) 
+stddev_over_time(results_scenario_efficiency_score[5m])
 / avg_over_time(results_scenario_efficiency_score[5m])
 ```
 
@@ -104,7 +104,7 @@ stddev_over_time(results_scenario_efficiency_score[5m])
 
 ### 6. Energy per Mbps Throughput
 
-**Type:** Time Series  
+**Type:** Time Series
 **Purpose:** Shows energy efficiency in terms of Wh per Mbps of throughput
 
 **Metric:** `results_scenario_energy_wh_per_mbps`
@@ -120,7 +120,7 @@ stddev_over_time(results_scenario_efficiency_score[5m])
 
 ### 7. Energy per Frame
 
-**Type:** Time Series  
+**Type:** Time Series
 **Purpose:** Shows energy consumption per video frame (mJ/frame)
 
 **Metric:** `results_scenario_energy_mj_per_frame`
@@ -136,7 +136,7 @@ stddev_over_time(results_scenario_efficiency_score[5m])
 
 ### 8. Power Overhead vs Baseline
 
-**Type:** Table  
+**Type:** Table
 **Purpose:** Shows power increase compared to idle baseline state
 
 **Columns:**
@@ -378,6 +378,6 @@ For issues or questions:
 
 ---
 
-**Last Updated:** 2024-12-27  
-**Dashboard Version:** 1.0  
+**Last Updated:** 2024-12-27
+**Dashboard Version:** 1.0
 **Compatibility:** Grafana 9.5.0+, Prometheus 2.40+

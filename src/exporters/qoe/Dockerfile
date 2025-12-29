@@ -28,4 +28,3 @@ ENV RESULTS_DIR=/results
 
 # Use shell form to allow environment variable expansion
 CMD python3 /app/qoe_exporter.py --port ${QOE_EXPORTER_PORT} --results-dir ${RESULTS_DIR}
-

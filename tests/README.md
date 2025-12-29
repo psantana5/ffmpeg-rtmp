@@ -59,20 +59,20 @@ from advisor.module_name import ClassName
 
 class TestClassName:
     """Tests for ClassName class."""
-    
+
     @pytest.fixture
     def sample_data(self):
         """Fixture providing sample test data."""
         return {...}
-    
+
     def test_specific_functionality(self, sample_data):
         """Test a specific aspect of the functionality."""
         # Arrange
         instance = ClassName()
-        
+
         # Act
         result = instance.method(sample_data)
-        
+
         # Assert
         assert result == expected_value
 ```
@@ -455,7 +455,7 @@ Example:
 class TestEnergyEfficiencyScorer:
     def test_compute_score_single_stream(self):
         ...
-    
+
     def test_compute_score_multi_stream(self):
         ...
 ```
@@ -500,10 +500,10 @@ def test_compute_score_single_stream(self):
         'bitrate': '1000k',
         'power': {'mean_watts': 50.0}
     }
-    
+
     # Act
     score = scorer.compute_score(scenario)
-    
+
     # Assert
     assert score is not None
     assert pytest.approx(score, rel=1e-3) == 0.02
@@ -535,7 +535,7 @@ Example:
 ```python
 def test_new_functionality(self, sample_scenarios):
     """Test the new functionality added in PR #123.
-    
+
     This test verifies that the new feature correctly handles
     multi-stream scenarios with GPU acceleration.
     """
