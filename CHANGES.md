@@ -84,10 +84,11 @@ The cost dashboards now include a "Currency" dropdown in the top-left corner:
 The nginx-rtmp service was always showing as unhealthy because the healthcheck was looking for `/hls/stream.m3u8`, which only exists when a stream is actively broadcasting.
 
 ### Solution
-Changed the healthcheck to use the proper `/health` endpoint:
+Changed the healthcheck to use the proper `/health` endpoint with wget (more commonly available in nginx containers):
 ```yaml
 healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost/health"]
+  test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+  start_period: 10s
 ```
 
 ### Result
