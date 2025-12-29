@@ -855,11 +855,8 @@ class ResultsExporter:
                     output.append(
                         f"results_scenario_predicted_energy_joules{lbl} {predictions['energy_joules']:.4f}"
                     )
-            else:
-                # Export zero/NaN values so Grafana dashboards don't show "No data"
-                # This helps distinguish between "predictor not trained" vs "no metrics at all"
-                output.append(f"results_scenario_predicted_power_watts{lbl} NaN")
-                output.append(f"results_scenario_predicted_energy_joules{lbl} NaN")
+            # Note: We intentionally omit predicted metrics when predictor is not trained
+            # rather than outputting NaN, as NaN causes issues with Prometheus queries
 
             if baseline_stats and not self._is_baseline_scenario(scenario, baseline):
                 d_power = stats["mean_power_w"] - baseline_stats["mean_power_w"]

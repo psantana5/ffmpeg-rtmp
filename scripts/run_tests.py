@@ -15,6 +15,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 # Add parent directory to path for advisor imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -25,11 +30,6 @@ try:
 except ImportError:
     QUALITY_AVAILABLE = False
     logger.warning("Quality computation modules not available")
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 
 class TestScenario:
@@ -345,14 +345,17 @@ class TestRunner:
             # Generate reference video if quality computation is enabled
             reference_path = None
             output_path = None
-            if self.compute_quality:
-                safe_name = stream_key.replace("/", "_")
+            compute_quality_for_scenario = self.compute_quality
+            
+            if compute_quality_for_scenario:
+                # Sanitize stream key for filesystem (handle special characters)
+                safe_name = "".join(c if c.isalnum() or c in ('-', '_') else '_' for c in stream_key)
                 reference_path = self.videos_dir / f"reference_{safe_name}.mp4"
                 output_path = self.videos_dir / f"output_{safe_name}.mp4"
                 
                 if not self._generate_reference_video(scenario, reference_path):
-                    logger.warning("Failed to generate reference video, skipping quality computation")
-                    self.compute_quality = False  # Disable for this run
+                    logger.warning("Failed to generate reference video, skipping quality computation for this scenario")
+                    compute_quality_for_scenario = False
 
             # Start streaming
             self.current_process = subprocess.Popen(
@@ -365,9 +368,10 @@ class TestRunner:
             time.sleep(stabilization_time)
 
             # Record output video if quality computation is enabled
-            if self.compute_quality and reference_path and output_path:
+            if compute_quality_for_scenario and reference_path and output_path:
                 if not self._record_output_video(scenario, stream_key, output_path, duration=10):
                     logger.warning("Failed to record output video, skipping quality computation for this scenario")
+                    compute_quality_for_scenario = False
                     reference_path = None
                     output_path = None
 
@@ -385,7 +389,7 @@ class TestRunner:
             self.cleanup()
 
             # Compute quality scores if videos were recorded
-            if self.compute_quality and reference_path and output_path:
+            if compute_quality_for_scenario and reference_path and output_path:
                 if reference_path.exists() and output_path.exists():
                     self._compute_quality_scores(reference_path, output_path, scenario)
                 else:
@@ -404,6 +408,8 @@ class TestRunner:
 
         except Exception as e:
             logger.error(f"Error running scenario '{scenario.name}': {e}")
+            self.cleanup()
+            raise
             self.cleanup()
             raise
             raise
