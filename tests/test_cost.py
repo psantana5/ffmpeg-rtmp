@@ -398,7 +398,8 @@ class TestCostModelLoadAware:
         
         cost = model.compute_compute_cost_load_aware(scenario)
         
-        # Expected (trapezoidal): (10/2) * [2.0 + 2*(2.5+3.0+2.8) + 2.2] * 0.0001 = 5 * 20.8 * 0.0001 = 0.0104
+        # Expected (trapezoidal): (10/2) * [2.0 + 2*(2.5+3.0+2.8) + 2.2] * 0.0001
+        # = 5 * 20.8 * 0.0001 = 0.0104
         assert cost is not None
         assert pytest.approx(cost, rel=1e-6) == 0.0104
     
@@ -417,7 +418,10 @@ class TestCostModelLoadAware:
         
         cost = model.compute_compute_cost_load_aware(scenario)
         
-        # Expected (trapezoidal): CPU: (10/2)*[2.0 + 2*(2.0) + 2.0] = 5*8 = 40, GPU: (10/2)*[1.0 + 2*(1.0) + 1.0] = 5*4 = 20, Total: (40+20)*0.0001 = 0.006
+        # Expected (trapezoidal):
+        # CPU: (10/2)*[2.0 + 2*(2.0) + 2.0] = 5*8 = 40
+        # GPU: (10/2)*[1.0 + 2*(1.0) + 1.0] = 5*4 = 20
+        # Total: (40+20)*0.0001 = 0.006
         assert cost is not None
         assert pytest.approx(cost, rel=1e-6) == 0.006
     
@@ -435,7 +439,8 @@ class TestCostModelLoadAware:
         
         cost = model.compute_energy_cost_load_aware(scenario)
         
-        # Expected (trapezoidal): (10/2) * [100 + 2*(150+200+180) + 120] * 1e-7 = 5 * 1280 * 1e-7 = 0.00064
+        # Expected (trapezoidal): (10/2) * [100 + 2*(150+200+180) + 120] * 1e-7
+        # = 5 * 1280 * 1e-7 = 0.00064
         assert cost is not None
         assert pytest.approx(cost, rel=1e-6) == 0.00064
     
