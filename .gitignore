@@ -90,3 +90,7 @@ vendor/
 cpu_exporter
 gpu_exporter
 ffmpeg_exporter
+
+# Distributed compute binaries
+bin/
+.ffmpeg-agent/

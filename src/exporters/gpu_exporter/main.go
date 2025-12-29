@@ -26,14 +26,14 @@ type NvidiaSMILog struct {
 }
 
 type GPU struct {
-	ID           string       `xml:"id,attr"`
-	ProductName  string       `xml:"product_name"`
-	UUID         string       `xml:"uuid"`
-	Power        PowerReadings `xml:"gpu_power_readings"`
-	Temperature  Temperature  `xml:"temperature"`
-	Utilization  Utilization  `xml:"utilization"`
-	FBMemory     FBMemory     `xml:"fb_memory_usage"`
-	Clocks       Clocks       `xml:"clocks"`
+	ID          string        `xml:"id,attr"`
+	ProductName string        `xml:"product_name"`
+	UUID        string        `xml:"uuid"`
+	Power       PowerReadings `xml:"gpu_power_readings"`
+	Temperature Temperature   `xml:"temperature"`
+	Utilization Utilization   `xml:"utilization"`
+	FBMemory    FBMemory      `xml:"fb_memory_usage"`
+	Clocks      Clocks        `xml:"clocks"`
 }
 
 type PowerReadings struct {
@@ -65,26 +65,26 @@ type Clocks struct {
 
 // GPUMetrics represents parsed GPU metrics
 type GPUMetrics struct {
-	ID                      string
-	Name                    string
-	UUID                    string
-	PowerDrawWatts          float64
-	PowerLimitWatts         float64
-	TemperatureCelsius      float64
-	UtilizationGPUPercent   float64
-	UtilizationMemoryPercent float64
+	ID                        string
+	Name                      string
+	UUID                      string
+	PowerDrawWatts            float64
+	PowerLimitWatts           float64
+	TemperatureCelsius        float64
+	UtilizationGPUPercent     float64
+	UtilizationMemoryPercent  float64
 	UtilizationEncoderPercent float64
 	UtilizationDecoderPercent float64
-	MemoryUsedMB            float64
-	MemoryTotalMB           float64
-	ClocksGraphicsMHz       float64
-	ClocksSMMHz             float64
-	ClocksMemoryMHz         float64
+	MemoryUsedMB              float64
+	MemoryTotalMB             float64
+	ClocksGraphicsMHz         float64
+	ClocksSMMHz               float64
+	ClocksMemoryMHz           float64
 }
 
 // GPUExporter manages GPU metrics collection
 type GPUExporter struct {
-	available   bool
+	available    bool
 	metricsCache []GPUMetrics
 	lastUpdate   time.Time
 	mu           sync.RWMutex
@@ -116,7 +116,7 @@ func parseFloat(s string) float64 {
 	if len(parts) == 0 {
 		return 0
 	}
-	
+
 	val, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return 0
@@ -129,20 +129,20 @@ func (e *GPUExporter) getGPUMetrics() ([]GPUMetrics, error) {
 	if !e.available {
 		return []GPUMetrics{}, nil
 	}
-	
+
 	cmd := exec.Command("nvidia-smi", "-q", "-x")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query nvidia-smi: %w", err)
 	}
-	
+
 	var smiLog NvidiaSMILog
 	if err := xml.Unmarshal(output, &smiLog); err != nil {
 		return nil, fmt.Errorf("failed to parse nvidia-smi XML: %w", err)
 	}
-	
+
 	metrics := make([]GPUMetrics, 0, len(smiLog.GPUs))
-	
+
 	for _, gpu := range smiLog.GPUs {
 		m := GPUMetrics{
 			ID:                        gpu.ID,
@@ -163,7 +163,7 @@ func (e *GPUExporter) getGPUMetrics() ([]GPUMetrics, error) {
 		}
 		metrics = append(metrics, m)
 	}
-	
+
 	return metrics, nil
 }
 
@@ -175,18 +175,18 @@ func (e *GPUExporter) getMetricsWithCache() []GPUMetrics {
 		return e.metricsCache
 	}
 	e.mu.RUnlock()
-	
+
 	metrics, err := e.getGPUMetrics()
 	if err != nil {
 		log.Printf("Error getting GPU metrics: %v", err)
 		return e.metricsCache // Return cached data on error
 	}
-	
+
 	e.mu.Lock()
 	e.metricsCache = metrics
 	e.lastUpdate = time.Now()
 	e.mu.Unlock()
-	
+
 	return metrics
 }
 
@@ -208,23 +208,23 @@ func (h *MetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	
+
 	// Exporter alive metric
 	fmt.Fprintln(w, "# HELP gpu_exporter_alive GPU exporter health check (always 1)")
 	fmt.Fprintln(w, "# TYPE gpu_exporter_alive gauge")
 	fmt.Fprintln(w, "gpu_exporter_alive 1")
-	
+
 	metrics := h.exporter.getMetricsWithCache()
-	
+
 	// GPU count
 	fmt.Fprintln(w, "# HELP gpu_count Number of GPUs detected")
 	fmt.Fprintln(w, "# TYPE gpu_count gauge")
 	fmt.Fprintf(w, "gpu_count %d\n", len(metrics))
-	
+
 	if len(metrics) == 0 {
 		return
 	}
-	
+
 	// Define all metric types
 	fmt.Fprintln(w, "# HELP gpu_power_draw_watts GPU power draw in watts")
 	fmt.Fprintln(w, "# TYPE gpu_power_draw_watts gauge")
@@ -250,11 +250,11 @@ func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "# TYPE gpu_clocks_sm_mhz gauge")
 	fmt.Fprintln(w, "# HELP gpu_clocks_memory_mhz GPU memory clock in MHz")
 	fmt.Fprintln(w, "# TYPE gpu_clocks_memory_mhz gauge")
-	
+
 	// Export metrics for each GPU
 	for _, m := range metrics {
 		labels := fmt.Sprintf("gpu_id=\"%s\",gpu_name=\"%s\",gpu_uuid=\"%s\"", m.ID, m.Name, m.UUID)
-		
+
 		fmt.Fprintf(w, "gpu_power_draw_watts{%s} %.2f\n", labels, m.PowerDrawWatts)
 		fmt.Fprintf(w, "gpu_power_limit_watts{%s} %.2f\n", labels, m.PowerLimitWatts)
 		fmt.Fprintf(w, "gpu_temperature_celsius{%s} %.1f\n", labels, m.TemperatureCelsius)
@@ -268,7 +268,7 @@ func (h *MetricsHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "gpu_clocks_sm_mhz{%s} %.0f\n", labels, m.ClocksSMMHz)
 		fmt.Fprintf(w, "gpu_clocks_memory_mhz{%s} %.0f\n", labels, m.ClocksMemoryMHz)
 	}
-	
+
 	// Exporter info
 	fmt.Fprintln(w, "# HELP gpu_exporter_info GPU exporter information")
 	fmt.Fprintln(w, "# TYPE gpu_exporter_info gauge")
@@ -284,19 +284,19 @@ func (h *MetricsHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
 func main() {
 	port := flag.Int("port", defaultPort, "Port to listen on")
 	flag.Parse()
-	
+
 	// Check for port override via environment variable
 	if envPort := os.Getenv("GPU_EXPORTER_PORT"); envPort != "" {
 		if p, err := strconv.Atoi(envPort); err == nil {
 			*port = p
 		}
 	}
-	
+
 	log.Printf("Starting GPU Power Exporter (Go) on port %d", *port)
-	
+
 	// Initialize GPU exporter
 	exporter := NewGPUExporter()
-	
+
 	// Set up HTTP server
 	handler := &MetricsHandler{exporter: exporter}
 	server := &http.Server{
@@ -306,10 +306,10 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  15 * time.Second,
 	}
-	
+
 	log.Printf("Exporter ready at http://0.0.0.0:%d/metrics", *port)
 	log.Printf("Health endpoint at http://0.0.0.0:%d/health", *port)
-	
+
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
