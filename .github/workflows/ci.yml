@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  docker-build-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create test_results directory
+        run: mkdir -p test_results
+      
+      - name: Build and start services
+        run: docker compose up -d --build
+      
+      - name: Wait for services to be ready
+        run: sleep 30
+      
+      - name: Check Prometheus is up
+        run: |
+          curl -f http://localhost:9090/-/healthy || exit 1
+          echo "✓ Prometheus is healthy"
+      
+      - name: Check Grafana is up
+        run: |
+          curl -f http://localhost:3000/api/health || exit 1
+          echo "✓ Grafana is healthy"
+      
+      - name: Check Alertmanager is up
+        run: |
+          curl -f http://localhost:9093/-/healthy || exit 1
+          echo "✓ Alertmanager is healthy"
+      
+      - name: Check exporters are responding
+        run: |
+          curl -f http://localhost:9500/metrics || echo "⚠ RAPL exporter may require privileged access"
+          curl -f http://localhost:9501/metrics || exit 1
+          echo "✓ Docker stats exporter is responding"
+          curl -f http://localhost:9502/health || exit 1
+          echo "✓ Results exporter is healthy"
+          curl -f http://localhost:9503/health || exit 1
+          echo "✓ QoE exporter is healthy"
+          curl -f http://localhost:9504/health || exit 1
+          echo "✓ Cost exporter is healthy"
+      
+      - name: Show running containers
+        if: always()
+        run: docker compose ps
+      
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v
