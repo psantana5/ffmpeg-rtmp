@@ -29,7 +29,6 @@ docker compose ps
 
 # Access the dashboards
 # Grafana:          http://localhost:3000 (admin/admin)
-# Prometheus:       http://localhost:9090
 # VictoriaMetrics:  http://localhost:8428
 
 # Check Go exporter health (if RAPL is available)
@@ -210,5 +209,5 @@ User runs: docker compose up -d --build
 
 - **Run your first test**: See [Running Tests](../../scripts/README.md)
 - **View metrics**: Open Grafana at http://localhost:3000
-- **Compare Python vs Go**: Check Prometheus targets at http://localhost:9090/targets
+- **Compare Python vs Go**: Check VictoriaMetrics targets at http://localhost:8428/targets
 - **Deep dive**: Read the [Migration Guide](go-exporters-migration.md)

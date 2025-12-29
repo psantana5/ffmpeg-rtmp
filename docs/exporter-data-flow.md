@@ -415,7 +415,7 @@ results-exporter:
     - ./test_results:/results
   environment:
     - RESULTS_DIR=/results
-    - PROMETHEUS_URL=http://prometheus:9090
+    - PROMETHEUS_URL=http://victoriametrics:8428
 ```
 
 #### Troubleshooting
@@ -548,7 +548,7 @@ cost-exporter:
     - ./advisor:/app/advisor:ro
   environment:
     - RESULTS_DIR=/results
-    - PROMETHEUS_URL=http://prometheus:9090
+    - PROMETHEUS_URL=http://victoriametrics:8428
     - ENERGY_COST_PER_KWH=0.12
     - CPU_COST_PER_HOUR=0.50
     - CURRENCY=USD
@@ -859,10 +859,10 @@ curl http://localhost:9600/metrics | head  # Health Check
 
 ```bash
 # Open Prometheus UI
-open http://localhost:9090/targets
+open http://localhost:8428/targets
 
 # Or check via CLI
-curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+curl -s http://localhost:8428/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
 ```
 
 All targets should show `health: "up"`.
@@ -919,7 +919,7 @@ Navigate to pre-provisioned dashboards:
    docker logs prometheus
 
    # Check targets page
-   curl http://localhost:9090/api/v1/targets
+   curl http://localhost:8428/api/v1/targets
    ```
 
 4. **Enable Debug Logging**
@@ -973,7 +973,7 @@ Navigate to pre-provisioned dashboards:
 
 3. Check Prometheus connectivity:
    ```bash
-   docker exec cost-exporter curl -s http://prometheus:9090/-/healthy
+   docker exec cost-exporter curl -s http://victoriametrics:8428/-/healthy
    ```
 
 **Solutions**:
@@ -1034,12 +1034,12 @@ Navigate to pre-provisioned dashboards:
 
 2. Reload configuration:
    ```bash
-   curl -X POST http://localhost:9090/-/reload
+   curl -X POST http://localhost:8428/-/reload
    ```
 
 3. Check scrape errors:
    ```bash
-   curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.health != "up")'
+   curl http://localhost:8428/api/v1/targets | jq '.data.activeTargets[] | select(.health != "up")'
    ```
 
 #### Issue: High Resource Usage
@@ -1073,7 +1073,7 @@ Use this checklist for systematic troubleshooting:
 
 - [ ] All containers running: `docker ps`
 - [ ] All exporters responding: `curl localhost:<port>/metrics`
-- [ ] Prometheus targets UP: `http://localhost:9090/targets`
+- [ ] Prometheus targets UP: `http://localhost:8428/targets`
 - [ ] Test results exist: `ls test_results/`
 - [ ] RAPL available: `ls /sys/class/powercap/`
 - [ ] Docker socket accessible: `docker ps`
@@ -1116,7 +1116,7 @@ If issues persist:
 
    # Test minimal setup
    curl http://localhost:9500/metrics
-   curl http://localhost:9090/api/v1/query?query=rapl_power_watts
+   curl http://localhost:8428/api/v1/query?query=rapl_power_watts
    ```
 
 ---
