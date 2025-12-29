@@ -40,7 +40,7 @@ sudo ./cpu_exporter --port 9510
 ```
 
 **Endpoints:**
-- `/metrics` - Prometheus metrics (port 9510)
+- `/metrics` - Prometheus metrics (internal port 9500, external 9510)
 - `/health` - Health check
 
 **Metrics:**
@@ -87,7 +87,7 @@ docker rm temp-gpu
 ```
 
 **Endpoints:**
-- `/metrics` - Prometheus metrics (port 9511)
+- `/metrics` - Prometheus metrics (internal port 9505, external 9511)
 - `/health` - Health check
 
 **Metrics:**

@@ -113,10 +113,6 @@ sudo ./cpu_exporter --port 9510
 
 Build for ARM64 (Raspberry Pi, AWS Graviton) using Docker buildx:
 
-### Multi-Architecture Builds
-
-Build for ARM64 (Raspberry Pi, AWS Graviton) using Docker buildx:
-
 ```bash
 # Set up buildx (one-time setup)
 docker buildx create --name multiarch --use
