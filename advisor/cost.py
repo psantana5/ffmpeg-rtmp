@@ -18,7 +18,7 @@ Cost Formulas (Load-Aware):
 """
 
 import logging
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 

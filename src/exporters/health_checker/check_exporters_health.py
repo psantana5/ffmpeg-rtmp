@@ -24,7 +24,6 @@ Usage:
 """
 
 import argparse
-import json
 import logging
 import re
 import sys
@@ -33,8 +32,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
 
 logging.basicConfig(
     level=logging.INFO,
