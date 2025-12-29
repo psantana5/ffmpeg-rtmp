@@ -161,28 +161,38 @@ class CostMetricsExporter:
         prometheus_url: Optional[str] = None,
         use_load_aware: bool = True,
         region: str = 'default',
+        pricing_config_file: Optional[Path] = None,
+        electricity_maps_token: Optional[str] = None,
     ):
         """
         Initialize cost metrics exporter.
 
         Args:
             results_dir: Directory containing test results
-            energy_cost_per_kwh: Energy cost ($/kWh or €/kWh)
+            energy_cost_per_kwh: Energy cost ($/kWh or €/kWh) - overrides dynamic pricing
             cpu_cost_per_hour: CPU/instance cost ($/h or €/h)
             gpu_cost_per_hour: GPU cost ($/h or €/h)
             currency: Currency code
             prometheus_url: Prometheus URL for load-aware mode
             use_load_aware: Use load-aware calculations if Prometheus available
             region: AWS region code for regional pricing (e.g., 'us-east-1')
+            pricing_config_file: Path to custom pricing configuration JSON
+            electricity_maps_token: API token for Electricity Maps real-time CO₂ data
         """
         self.results_dir = results_dir
         self.region = region
-        self.regional_pricing = RegionalPricing(region=region)
+        self.regional_pricing = RegionalPricing(
+            region=region,
+            config_file=pricing_config_file,
+            electricity_maps_token=electricity_maps_token,
+        )
         
-        # Use regional pricing if energy_cost not explicitly set
+        # Use regional/dynamic pricing if energy_cost not explicitly set
         if energy_cost_per_kwh == 0.0:
             energy_cost_per_kwh = self.regional_pricing.get_electricity_price()
-            logger.info(f"Using regional electricity price for {region}: ${energy_cost_per_kwh}/kWh")
+            logger.info(f"Using dynamic electricity price for {region}: ${energy_cost_per_kwh}/kWh")
+        else:
+            logger.info(f"Using override electricity price: ${energy_cost_per_kwh}/kWh")
         
         self.cost_model = CostModel(
             energy_cost_per_kwh=energy_cost_per_kwh,
@@ -641,6 +651,18 @@ def main():
         help='AWS region code for regional pricing (e.g., us-east-1, eu-west-1)',
     )
     parser.add_argument(
+        '--pricing-config',
+        type=Path,
+        default=None,
+        help='Path to custom pricing configuration JSON file',
+    )
+    parser.add_argument(
+        '--electricity-maps-token',
+        type=str,
+        default=None,
+        help='API token for Electricity Maps real-time CO₂ data',
+    )
+    parser.add_argument(
         '--prometheus-url',
         type=str,
         default=None,
@@ -669,6 +691,8 @@ def main():
         prometheus_url=args.prometheus_url,
         use_load_aware=not args.disable_load_aware,
         region=args.region,
+        pricing_config_file=args.pricing_config,
+        electricity_maps_token=args.electricity_maps_token,
     )
     MetricsHandler.exporter = exporter
 
@@ -677,6 +701,8 @@ def main():
 
     logger.info(f"Cost Metrics Exporter started on port {args.port}")
     logger.info(f"Region: {args.region}")
+    if args.pricing_config:
+        logger.info(f"Using custom pricing config: {args.pricing_config}")
     logger.info(f"Pricing: {args.energy_cost} {args.currency}/kWh")
     logger.info(f"         {args.cpu_cost} {args.currency}/h (CPU)")
     logger.info(f"         {args.gpu_cost} {args.currency}/h (GPU)")
