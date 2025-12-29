@@ -42,6 +42,8 @@ class TestScenario:
         fps: int = 30,
         duration: int = 300,
         outputs: Optional[List[Dict]] = None,
+        encoder: str = "h264",
+        preset: str = "veryfast",
     ):
         self.name = name
         self.bitrate = bitrate
@@ -49,6 +51,8 @@ class TestScenario:
         self.fps = fps
         self.duration = duration
         self.outputs = outputs  # List of output ladder configs
+        self.encoder = encoder
+        self.preset = preset
         self.start_time: Optional[float] = None
         self.end_time: Optional[float] = None
 
@@ -59,6 +63,8 @@ class TestScenario:
             "resolution": self.resolution,
             "fps": self.fps,
             "duration": self.duration,
+            "encoder": self.encoder,
+            "preset": self.preset,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "outputs": self.outputs,  # Always include, even if None
@@ -335,7 +341,9 @@ class TestRunner:
         """Run a single test scenario"""
         logger.info(f"Starting scenario: {scenario.name}")
         logger.info(
-            f"  Bitrate: {scenario.bitrate}, Resolution: {scenario.resolution}, FPS: {scenario.fps}"
+            f"  Bitrate: {scenario.bitrate}, Resolution: {scenario.resolution}, "
+            f"FPS: {scenario.fps}, Encoder: {scenario.encoder}, "
+            f"Preset: {scenario.preset}"
         )
 
         # Build ffmpeg command
@@ -346,6 +354,8 @@ class TestRunner:
             bitrate=scenario.bitrate,
             resolution=scenario.resolution,
             fps=scenario.fps,
+            encoder=scenario.encoder,
+            preset=scenario.preset,
         )
 
         try:
@@ -611,6 +621,18 @@ def main():
     single_p.add_argument("--duration", type=int, default=300)
     single_p.add_argument("--stabilization", type=int, default=30)
     single_p.add_argument("--cooldown", type=int, default=30)
+    single_p.add_argument(
+        "--encoder",
+        default="h264",
+        choices=["h264", "h264_nvenc", "h265", "hevc_nvenc"],
+        help="Video encoder to use (default: h264)",
+    )
+    single_p.add_argument(
+        "--preset",
+        default="veryfast",
+        choices=["ultrafast", "veryfast", "fast", "medium", "slow", "slower"],
+        help="Encoder preset (default: veryfast)",
+    )
     single_p.add_argument("--with-baseline", action="store_true")
     single_p.add_argument("--baseline-duration", type=int, default=120)
     single_p.add_argument(
@@ -691,6 +713,8 @@ def main():
                 resolution=args.resolution,
                 fps=args.fps,
                 duration=args.duration,
+                encoder=args.encoder,
+                preset=args.preset,
             )
             runner.run_scenario(
                 scenario,
@@ -776,6 +800,8 @@ def main():
                     fps=int(entry.get("fps", 30)),
                     duration=int(entry.get("duration", 300)),
                     outputs=entry.get("outputs"),  # Pass outputs if present
+                    encoder=entry.get("encoder", "h264"),
+                    preset=entry.get("preset", "veryfast"),
                 )
                 runner.run_scenario(
                     scenario,
@@ -815,9 +841,36 @@ def build_ffmpeg_cmd(
     bitrate: str,
     resolution: str,
     fps: int,
+    encoder: str = "h264",
+    preset: str = "veryfast",
 ) -> List[str]:
+    """Build FFmpeg command with specified encoder and preset.
+    
+    Args:
+        name: Test scenario name
+        stream_key: RTMP stream key
+        bitrate: Target video bitrate (e.g., "2500k")
+        resolution: Video resolution (e.g., "1920x1080")
+        fps: Frames per second
+        encoder: Video encoder to use - "h264", "h264_nvenc", "h265", or "hevc_nvenc"
+        preset: Encoder preset - "ultrafast", "veryfast", "fast", "medium", "slow", "slower"
+    
+    Returns:
+        List of command arguments for FFmpeg
+    """
     bufsize = f"{parse_bitrate_to_kbps(bitrate) * 2}k"
-    return [
+    
+    # Map encoder names to FFmpeg codec names
+    encoder_map = {
+        "h264": "libx264",
+        "h264_nvenc": "h264_nvenc",
+        "h265": "libx265",
+        "hevc_nvenc": "hevc_nvenc",
+    }
+    
+    codec = encoder_map.get(encoder, "libx264")
+    
+    cmd = [
         "ffmpeg",
         "-re",
         "-f",
@@ -829,11 +882,16 @@ def build_ffmpeg_cmd(
         "-i",
         "sine=frequency=1000:sample_rate=48000",
         "-c:v",
-        "libx264",
+        codec,
         "-preset",
-        "veryfast",
-        "-tune",
-        "zerolatency",
+        preset,
+    ]
+    
+    # Add tune for CPU encoders only (GPU encoders don't support tune)
+    if codec in ["libx264", "libx265"]:
+        cmd.extend(["-tune", "zerolatency"])
+    
+    cmd.extend([
         "-b:v",
         bitrate,
         "-maxrate",
@@ -853,7 +911,9 @@ def build_ffmpeg_cmd(
         "-f",
         "flv",
         f"rtmp://localhost:1935/live/{stream_key}",
-    ]
+    ])
+    
+    return cmd
 
 
 def parse_bitrate_to_kbps(bitrate: str) -> int:
