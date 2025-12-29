@@ -589,6 +589,8 @@ def main():
     suite_p.add_argument("--scenario-duration", type=int, default=300)
     suite_p.add_argument("--stabilization", type=int, default=30)
     suite_p.add_argument("--cooldown", type=int, default=30)
+    suite_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     single_p = subparsers.add_parser("single")
     single_p.add_argument("--name", required=True)
@@ -600,6 +602,8 @@ def main():
     single_p.add_argument("--cooldown", type=int, default=30)
     single_p.add_argument("--with-baseline", action="store_true")
     single_p.add_argument("--baseline-duration", type=int, default=120)
+    single_p.add_argument("--compute-quality", action="store_true",
+                         help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     multi_p = subparsers.add_parser("multi")
     multi_p.add_argument("--count", type=int, required=True)
@@ -612,11 +616,15 @@ def main():
     multi_p.add_argument("--cooldown", type=int, default=30)
     multi_p.add_argument("--with-baseline", action="store_true")
     multi_p.add_argument("--baseline-duration", type=int, default=120)
+    multi_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     batch_p = subparsers.add_parser("batch")
     batch_p.add_argument("--file", required=True)
     batch_p.add_argument("--stabilization", type=int, default=30)
     batch_p.add_argument("--cooldown", type=int, default=30)
+    batch_p.add_argument("--compute-quality", action="store_true",
+                        help="Compute VMAF/PSNR quality scores (increases test duration)")
 
     args = parser.parse_args()
 
