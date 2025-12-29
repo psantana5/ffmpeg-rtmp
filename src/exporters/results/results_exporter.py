@@ -545,7 +545,8 @@ class ResultsExporter:
                 print("✓ ML predictor trained successfully")
                 info = self.predictor.get_model_info()
                 print(
-                    f"  Best model: {info.get('best_model', 'unknown')} (R²={info.get('best_score', {}).get('r2', 0):.4f})"
+                    f"  Best model: {info.get('best_model', 'unknown')} "
+                    f"(R²={info.get('best_score', {}).get('r2', 0):.4f})"
                 )
             else:
                 print("✗ ML predictor training failed (insufficient data or error)")
@@ -648,19 +649,23 @@ class ResultsExporter:
         )
         output.append("# TYPE results_scenario_measured_power_watts gauge")
         output.append(
-            "# HELP results_scenario_estimated_docker_overhead_watts Estimated Docker overhead power (W)"
+            "# HELP results_scenario_estimated_docker_overhead_watts "
+            "Estimated Docker overhead power (W)"
         )
         output.append("# TYPE results_scenario_estimated_docker_overhead_watts gauge")
         output.append(
-            "# HELP results_scenario_total_energy_joules Total energy (J) during scenario (from rapl_energy_joules_total)"
+            "# HELP results_scenario_total_energy_joules "
+            "Total energy (J) during scenario (from rapl_energy_joules_total)"
         )
         output.append("# TYPE results_scenario_total_energy_joules gauge")
         output.append(
-            "# HELP results_scenario_total_energy_wh Total energy (Wh) during scenario (derived from mean power)"
+            "# HELP results_scenario_total_energy_wh "
+            "Total energy (Wh) during scenario (derived from mean power)"
         )
         output.append("# TYPE results_scenario_total_energy_wh gauge")
         output.append(
-            "# HELP results_scenario_container_cpu_percent Mean total container CPU percent during scenario"
+            "# HELP results_scenario_container_cpu_percent "
+            "Mean total container CPU percent during scenario"
         )
         output.append("# TYPE results_scenario_container_cpu_percent gauge")
         output.append("# HELP results_scenario_energy_wh_per_min Energy per minute (Wh/min)")
@@ -694,23 +699,28 @@ class ResultsExporter:
         )
         output.append("# TYPE results_scenario_total_pixels gauge")
         output.append(
-            "# HELP results_scenario_predicted_power_watts Predicted power consumption (W) from ML model"
+            "# HELP results_scenario_predicted_power_watts "
+            "Predicted power consumption (W) from ML model"
         )
         output.append("# TYPE results_scenario_predicted_power_watts gauge")
         output.append(
-            "# HELP results_scenario_predicted_energy_joules Predicted total energy (J) from ML model"
+            "# HELP results_scenario_predicted_energy_joules "
+            "Predicted total energy (J) from ML model"
         )
         output.append("# TYPE results_scenario_predicted_energy_joules gauge")
         output.append(
-            "# HELP results_scenario_predicted_efficiency_score Predicted efficiency score from ML model"
+            "# HELP results_scenario_predicted_efficiency_score "
+            "Predicted efficiency score from ML model"
         )
         output.append("# TYPE results_scenario_predicted_efficiency_score gauge")
         output.append(
-            "# HELP results_scenario_prediction_confidence_low Lower bound of prediction confidence interval (W)"
+            "# HELP results_scenario_prediction_confidence_low "
+            "Lower bound of prediction confidence interval (W)"
         )
         output.append("# TYPE results_scenario_prediction_confidence_low gauge")
         output.append(
-            "# HELP results_scenario_prediction_confidence_high Upper bound of prediction confidence interval (W)"
+            "# HELP results_scenario_prediction_confidence_high "
+            "Upper bound of prediction confidence interval (W)"
         )
         output.append("# TYPE results_scenario_prediction_confidence_high gauge")
         output.append(
@@ -775,7 +785,8 @@ class ResultsExporter:
                 f"results_scenario_measured_power_watts{lbl} {stats['measured_power_watts']:.4f}"
             )
             output.append(
-                f"results_scenario_estimated_docker_overhead_watts{lbl} {stats['estimated_docker_overhead_watts']:.4f}"
+                f"results_scenario_estimated_docker_overhead_watts{lbl} "
+                f"{stats['estimated_docker_overhead_watts']:.4f}"
             )
             output.append(
                 f"results_scenario_total_energy_joules{lbl} {stats['total_energy_j']:.4f}"
@@ -829,19 +840,23 @@ class ResultsExporter:
                 output.append(f"results_scenario_power_stdev{lbl} {stats['power_stdev_w']:.4f}")
             if 'prediction_confidence_high' in stats:
                 output.append(
-                    f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}"
+                    f"results_scenario_prediction_confidence_high{lbl} "
+                    f"{stats['prediction_confidence_high']:.4f}"
                 )
             if 'prediction_confidence_low' in stats:
                 output.append(
-                    f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}"
+                    f"results_scenario_prediction_confidence_low{lbl} "
+                    f"{stats['prediction_confidence_low']:.4f}"
                 )
 
             # Export prediction confidence metrics
             output.append(
-                f"results_scenario_prediction_confidence_high{lbl} {stats['prediction_confidence_high']:.4f}"
+                f"results_scenario_prediction_confidence_high{lbl} "
+                f"{stats['prediction_confidence_high']:.4f}"
             )
             output.append(
-                f"results_scenario_prediction_confidence_low{lbl} {stats['prediction_confidence_low']:.4f}"
+                f"results_scenario_prediction_confidence_low{lbl} "
+                f"{stats['prediction_confidence_low']:.4f}"
             )
             output.append(f"results_scenario_power_stdev{lbl} {stats['power_stdev_w']:.4f}")
             # Generate ML predictions if predictor is trained
@@ -849,11 +864,13 @@ class ResultsExporter:
             if predictions:
                 if predictions['power_watts'] is not None:
                     output.append(
-                        f"results_scenario_predicted_power_watts{lbl} {predictions['power_watts']:.4f}"
+                        f"results_scenario_predicted_power_watts{lbl} "
+                        f"{predictions['power_watts']:.4f}"
                     )
                 if predictions['energy_joules'] is not None:
                     output.append(
-                        f"results_scenario_predicted_energy_joules{lbl} {predictions['energy_joules']:.4f}"
+                        f"results_scenario_predicted_energy_joules{lbl} "
+                        f"{predictions['energy_joules']:.4f}"
                     )
             # Note: We intentionally omit predicted metrics when predictor is not trained
             # rather than outputting NaN, as NaN causes issues with Prometheus queries

@@ -8,6 +8,7 @@ for more accurate cost modeling.
 """
 
 import sys
+
 sys.path.insert(0, '.')
 from advisor.cost import CostModel
 
@@ -39,12 +40,12 @@ def compare_integration_methods():
     print(f"Time step: {step} seconds")
     print()
     print(f"Rectangular approximation: {rectangular:.2f} core-seconds")
-    print(f"  Formula: sum(values) × step")
-    print(f"  Accuracy: O(h) - assumes constant value between measurements")
+    print("  Formula: sum(values) × step")
+    print("  Accuracy: O(h) - assumes constant value between measurements")
     print()
     print(f"Trapezoidal approximation: {trapezoidal:.2f} core-seconds")
-    print(f"  Formula: (step/2) × [v₀ + 2v₁ + 2v₂ + ... + 2vₙ₋₁ + vₙ]")
-    print(f"  Accuracy: O(h²) - accounts for slope between measurements")
+    print("  Formula: (step/2) × [v₀ + 2v₁ + 2v₂ + ... + 2vₙ₋₁ + vₙ]")
+    print("  Accuracy: O(h²) - accounts for slope between measurements")
     print()
     print(f"Difference: {abs(trapezoidal - rectangular):.2f} core-seconds")
     print(f"Relative difference: {abs(trapezoidal - rectangular) / rectangular * 100:.1f}%")

@@ -700,7 +700,12 @@ class ResultsAnalyzer:
 
         logger.info(f"CSV exported to {output_file}")
     
-    def print_multivariate_predictions(self, results: List[Dict], predictor: MultivariatePredictor, stream_counts: List[int]):
+    def print_multivariate_predictions(
+        self,
+        results: List[Dict],
+        predictor: MultivariatePredictor,
+        stream_counts: List[int],
+    ):
         """
         Print multivariate model predictions for specified stream counts.
         
@@ -730,7 +735,10 @@ class ResultsAnalyzer:
         print(f"\n{'─' * 100}")
         print("Predicted Power Consumption with Confidence Intervals:")
         print("─" * 100)
-        print(f"{'Streams':<10} {'Mean Power (W)':<18} {'CI Low (W)':<15} {'CI High (W)':<15} {'CI Width (W)':<15}")
+        print(
+            f"{'Streams':<10} {'Mean Power (W)':<18} "
+            f"{'CI Low (W)':<15} {'CI High (W)':<15} {'CI Width (W)':<15}"
+        )
         print("─" * 100)
         
         # Use representative scenario for base features
@@ -752,7 +760,9 @@ class ResultsAnalyzer:
                 'total_pixels': 1920 * 1080 * 30 * 60,  # 1080p30 for 60s
                 'cpu_usage_pct': min(95.0, 20.0 + stream_count * 10),  # Estimated
                 'encoder_type': typical_scenario.get('encoder_type', 'x264'),
-                'hardware_cpu_model': typical_scenario.get('hardware', {}).get('cpu_model', 'unknown'),
+                'hardware_cpu_model': typical_scenario.get('hardware', {}).get(
+                    'cpu_model', 'unknown'
+                ),
                 'container_cpu_pct': min(10.0, 2.0 + stream_count * 0.5),  # Estimated
             }
             
@@ -887,7 +897,10 @@ Examples:
                     # Default predictions
                     analyzer.print_multivariate_predictions(results, mv_predictor, [1, 2, 4, 8, 12])
             else:
-                logger.warning("Multivariate predictor training failed, falling back to simple predictor")
+                logger.warning(
+                    "Multivariate predictor training failed, "
+                    "falling back to simple predictor"
+                )
                 args.multivariate = False
         
         if not args.multivariate:

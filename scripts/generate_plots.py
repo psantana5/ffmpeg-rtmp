@@ -198,7 +198,11 @@ def plot_efficiency_comparison(df: pd.DataFrame, output_dir: Path):
         test_df['duration_hours'] = test_df['duration'] / 3600
         test_df['energy_wh'] = test_df['total_energy_wh']
         test_df['wh_per_mbps'] = test_df.apply(
-            lambda row: row['energy_wh'] / row['bitrate_mbps'] if row['bitrate_mbps'] > 0 else np.nan, 
+            lambda row: (
+                row['energy_wh'] / row['bitrate_mbps']
+                if row['bitrate_mbps'] > 0
+                else np.nan
+            ),
             axis=1
         )
         test_df['wh_per_hour'] = test_df['total_energy_wh'] / test_df['duration_hours']
@@ -298,7 +302,7 @@ def create_summary_dashboard(df: pd.DataFrame, output_dir: Path):
     ax4 = fig.add_subplot(gs[1, 2])
     energy_data = df.dropna(subset=['total_energy_wh'])
     if not energy_data.empty:
-        bars = ax4.bar(range(len(energy_data)), energy_data['total_energy_wh'],
+        ax4.bar(range(len(energy_data)), energy_data['total_energy_wh'],
                       alpha=0.8, edgecolor='black')
         ax4.set_title('Total Energy Consumption')
         ax4.set_ylabel('Energy (Wh)')
@@ -314,8 +318,13 @@ def create_summary_dashboard(df: pd.DataFrame, output_dir: Path):
         test_df = df[~df['name'].str.contains('baseline', case=False)].copy()
         test_df['power_above_baseline'] = test_df['mean_power_w'] - baseline_power
         
-        bars = ax5.bar(range(len(test_df)), test_df['power_above_baseline'],
-                      color='#d62728', alpha=0.8, edgecolor='black')
+        ax5.bar(
+            range(len(test_df)),
+            test_df['power_above_baseline'],
+            color='#d62728',
+            alpha=0.8,
+            edgecolor='black',
+        )
         ax5.axhline(y=0, color='black', linestyle='-', alpha=0.5)
         ax5.set_title(f'Power Above Baseline (Baseline: {baseline_power:.1f}W)')
         ax5.set_ylabel('Power Above Baseline (W)')
@@ -352,7 +361,9 @@ def create_summary_dashboard(df: pd.DataFrame, output_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate plots from FFmpeg power monitoring results')
+    parser = argparse.ArgumentParser(
+        description='Generate plots from FFmpeg power monitoring results'
+    )
     parser.add_argument('--input', '-i', type=str, required=True,
                        help='Path to test results JSON file')
     parser.add_argument('--csv', '-c', type=str,
@@ -369,7 +380,7 @@ def main():
     output_dir.mkdir(exist_ok=True)
     
     # Load data
-    test_data = load_test_results(input_path)
+    load_test_results(input_path)
     
     # Try to load CSV analysis
     csv_path = None

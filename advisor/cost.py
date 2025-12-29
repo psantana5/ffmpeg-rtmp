@@ -37,7 +37,7 @@ Mathematical Justification:
 """
 
 import logging
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -120,14 +120,18 @@ class CostModel:
             self.price_per_core_second = price_per_core_second
         else:
             # Auto-derive from hourly rate if not provided
-            self.price_per_core_second = cpu_cost_per_hour / 3600.0 if cpu_cost_per_hour > 0 else 0.0
+            self.price_per_core_second = (
+                cpu_cost_per_hour / 3600.0 if cpu_cost_per_hour > 0 else 0.0
+            )
         
         if price_per_joule is not None:
             self.price_per_joule = price_per_joule
         else:
             # Auto-derive from kWh rate if not provided
             # 1 kWh = 3,600,000 joules
-            self.price_per_joule = energy_cost_per_kwh / 3_600_000.0 if energy_cost_per_kwh > 0 else 0.0
+            self.price_per_joule = (
+                energy_cost_per_kwh / 3_600_000.0 if energy_cost_per_kwh > 0 else 0.0
+            )
         
         logger.info(
             f"CostModel initialized: {energy_cost_per_kwh} {currency}/kWh, "

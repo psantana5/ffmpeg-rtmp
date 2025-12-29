@@ -20,7 +20,6 @@ import json
 import logging
 import pickle
 import platform
-import shutil
 import statistics
 import sys
 from datetime import datetime

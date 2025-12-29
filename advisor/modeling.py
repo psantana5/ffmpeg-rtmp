@@ -793,7 +793,10 @@ class MultivariatePredictor:
             targets_list.append(target_value)
         
         if len(features_list) < 2:
-            logger.warning(f"Insufficient data for multivariate predictor: {len(features_list)} samples")
+            logger.warning(
+                f"Insufficient data for multivariate predictor: "
+                f"{len(features_list)} samples"
+            )
             return False
         
         # Build encoder categories from training data

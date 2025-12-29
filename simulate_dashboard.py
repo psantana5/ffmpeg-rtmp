@@ -7,10 +7,12 @@ based on the current cost exporter metrics.
 """
 
 import sys
+
 sys.path.insert(0, '.')
 
 import json
 from pathlib import Path
+
 from advisor.cost import CostModel
 
 
@@ -121,7 +123,10 @@ def simulate_dashboard_panels(scenarios):
         
         cost_per_watch_hour = model.compute_cost_per_watch_hour_load_aware(scenario)
         if cost_per_watch_hour:
-            print(f"  {name} ({streams} streams @ {bitrate}): ${cost_per_watch_hour:.6f}/viewer-hour")
+            print(
+                f"  {name} ({streams} streams @ {bitrate}): "
+                f"${cost_per_watch_hour:.6f}/viewer-hour"
+            )
     print()
     
     # Panel 5: Current Total Cost (Gauge)
@@ -173,7 +178,10 @@ def simulate_dashboard_panels(scenarios):
     print("=" * 80)
     print("SUMMARY")
     print("=" * 80)
-    print(f"Total scenarios analyzed: {len([s for s in scenarios if s.get('streams') is not None])}")
+    print(
+        f"Total scenarios analyzed: "
+        f"{len([s for s in scenarios if s.get('streams') is not None])}"
+    )
     print(f"Total cost (all scenarios): ${total_cost_sum:.6f}")
     print(f"Average cost per scenario: ${total_cost_sum / len(costs_by_scenario):.6f}")
     print()
