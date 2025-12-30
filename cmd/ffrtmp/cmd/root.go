@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	masterURL  string
-	outputJSON bool
-	cfgFile    string
+	masterURL    string
+	outputFormat string
+	cfgFile      string
 )
 
 // rootCmd represents the base command
@@ -33,7 +34,7 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ffrtmp/config)")
 	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or http://localhost:8080)")
-	rootCmd.PersistentFlags().BoolVar(&outputJSON, "output", false, "output format: false=table, true=json")
+	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", "table", "output format: table or json")
 }
 
 // initConfig reads in config file and ENV variables if set
@@ -72,12 +73,12 @@ func initConfig() {
 	}
 }
 
-// GetMasterURL returns the configured master URL
+// GetMasterURL returns the configured master URL with trailing slashes removed
 func GetMasterURL() string {
-	return masterURL
+	return strings.TrimRight(masterURL, "/")
 }
 
 // IsJSONOutput returns true if JSON output is requested
 func IsJSONOutput() bool {
-	return outputJSON
+	return outputFormat == "json"
 }
