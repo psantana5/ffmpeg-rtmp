@@ -22,7 +22,12 @@ The CLI reads configuration from `~/.ffrtmp/config.yaml`:
 
 ```yaml
 master_url: http://localhost:8080
+api_key: your-api-key-here
 ```
+
+Configuration options:
+- `master_url` - The URL of the master server (default: http://localhost:8080)
+- `api_key` - API key for authentication (required if master has authentication enabled)
 
 You can also specify the master URL using the `--master` flag, which takes precedence over the config file.
 
@@ -147,6 +152,7 @@ ffrtmp nodes list --master https://master.example.com
 # Use config file
 cat > ~/.ffrtmp/config.yaml << EOF
 master_url: https://master.example.com
+api_key: your-secure-api-key
 EOF
 ffrtmp nodes list
 ```
