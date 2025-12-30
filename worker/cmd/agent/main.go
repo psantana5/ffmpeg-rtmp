@@ -82,6 +82,12 @@ func main() {
 	}
 	log.Printf("  Optimization Reason: %s", ffmpegOpt.Reason)
 
+	// Create engine selector for dual-engine support
+	log.Println("Initializing transcoding engines...")
+	engineSelector := agent.NewEngineSelector(caps, nodeType)
+	availableEngines := engineSelector.GetAvailableEngines()
+	log.Printf("  Available engines: %v", availableEngines)
+
 	// Start Prometheus metrics exporter
 	hostname, _ := os.Hostname()
 	nodeID := fmt.Sprintf("%s:%s", hostname, *metricsPort)
@@ -272,7 +278,7 @@ func main() {
 		// Execute job with hardware-optimized parameters
 		// Pass client to access master URL for RTMP streaming
 		metricsExporter.SetActiveJobs(1)
-		result := executeJob(job, client, ffmpegOpt)
+		result := executeJob(job, client, ffmpegOpt, engineSelector)
 		metricsExporter.SetActiveJobs(0)
 
 		// Send results
@@ -336,12 +342,17 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) *models.JobResult {
+func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization, engineSelector *agent.EngineSelector) *models.JobResult {
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
-	// Execute the actual job based on parameters
-	metrics, analyzerOutput, err := executeFFmpegJob(job, client, ffmpegOpt)
+	// Select the best engine for this job
+	selectedEngine, reason := engineSelector.SelectEngine(job)
+	log.Printf("Selected engine: %s", selectedEngine.Name())
+	log.Printf("Selection reason: %s", reason)
+
+	// Execute the actual job with the selected engine
+	metrics, analyzerOutput, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt)
 	
 	duration := time.Since(startTime).Seconds()
 	
@@ -355,18 +366,20 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 			CompletedAt: time.Now(),
 			Metrics: map[string]interface{}{
 				"duration": duration,
+				"engine":   selectedEngine.Name(),
 			},
 		}
 	}
 
-	// Add duration to metrics
+	// Add duration and engine to metrics
 	if metrics == nil {
 		metrics = make(map[string]interface{})
 	}
 	metrics["duration"] = duration
 	metrics["scenario"] = job.Scenario
+	metrics["engine"] = selectedEngine.Name()
 
-	log.Printf("Job %s completed successfully in %.2f seconds", job.ID, duration)
+	log.Printf("Job %s completed successfully in %.2f seconds using %s", job.ID, duration, selectedEngine.Name())
 	return &models.JobResult{
 		JobID:          job.ID,
 		NodeID:         client.GetNodeID(),
@@ -377,7 +390,87 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 }
 
+// executeEngineJob executes a job using the selected engine
+func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+	// Build command using the selected engine
+	args, err := engine.BuildCommand(job, client.GetMasterURL())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build command: %w", err)
+	}
+
+	// Determine the command to run based on engine
+	var cmdPath string
+	var cmdName string
+	
+	if engine.Name() == "gstreamer" {
+		cmdPath, err = exec.LookPath("gst-launch-1.0")
+		cmdName = "gst-launch-1.0"
+		if err != nil {
+			return nil, nil, fmt.Errorf("gst-launch-1.0 not found in PATH: %w", err)
+		}
+	} else {
+		cmdPath, err = exec.LookPath("ffmpeg")
+		cmdName = "ffmpeg"
+		if err != nil {
+			return nil, nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
+		}
+	}
+
+	// Execute the command
+	cmd := exec.Command(cmdPath, args...)
+	
+	// Capture output for metrics
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	log.Printf("Running: %s %s", cmdName, strings.Join(args, " "))
+	
+	startTime := time.Now()
+	if err := cmd.Run(); err != nil {
+		log.Printf("%s stderr: %s", cmdName, stderr.String())
+		return nil, nil, fmt.Errorf("%s execution failed: %w", cmdName, err)
+	}
+	execDuration := time.Since(startTime).Seconds()
+
+	// Determine output mode
+	outputMode := "file"
+	if job.Parameters != nil {
+		if mode, ok := job.Parameters["output_mode"].(string); ok {
+			outputMode = mode
+		}
+	}
+
+	// Log completion
+	if outputMode == "rtmp" || outputMode == "stream" {
+		log.Printf("✓ %s streaming completed (%.2f seconds)", engine.Name(), execDuration)
+	} else {
+		log.Printf("✓ %s transcoding completed (%.2f seconds)", engine.Name(), execDuration)
+	}
+
+	// Parse output for metrics (works for both engines)
+	if engine.Name() == "ffmpeg" {
+		metrics = parseFFmpegMetrics(stderr.String(), execDuration, 0)
+	} else {
+		// GStreamer metrics
+		metrics = make(map[string]interface{})
+		metrics["exec_duration"] = execDuration
+	}
+
+	// Generate analyzer output
+	analyzerOutput = map[string]interface{}{
+		"scenario":      job.Scenario,
+		"engine":        engine.Name(),
+		"output_mode":   outputMode,
+		"exec_duration": execDuration,
+		"status":        "success",
+	}
+
+	return metrics, analyzerOutput, nil
+}
+
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
+// This is kept for backward compatibility and direct FFmpeg usage
 func executeFFmpegJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
 	// Extract parameters from job
 	params := job.Parameters
