@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -260,32 +262,242 @@ func confirmMasterAsWorker() bool {
 
 // executeJob executes a job and returns the result
 func executeJob(job *models.Job, nodeID string) *models.JobResult {
-	log.Printf("Executing job %s...", job.ID)
+	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
+	startTime := time.Now()
 
-	// For now, just simulate job execution
-	// In a real implementation, this would:
-	// 1. Run recommended_test.py with appropriate parameters
-	// 2. Execute FFmpeg with optimal parameters
-	// 3. Collect metrics from exporters
-	// 4. Run analyzer to generate output
-	time.Sleep(5 * time.Second)
-
-	result := &models.JobResult{
-		JobID:       job.ID,
-		NodeID:      nodeID,
-		Status:      models.JobStatusCompleted,
-		CompletedAt: time.Now(),
-		Metrics: map[string]interface{}{
-			"cpu_usage":    75.5,
-			"memory_usage": 2048,
-			"duration":     5.0,
-		},
-		AnalyzerOutput: map[string]interface{}{
-			"scenario":       job.Scenario,
-			"recommendation": "optimal",
-		},
+	// Execute the actual job based on parameters
+	metrics, analyzerOutput, err := executeFFmpegJob(job)
+	
+	duration := time.Since(startTime).Seconds()
+	
+	if err != nil {
+		log.Printf("Job %s failed: %v", job.ID, err)
+		return &models.JobResult{
+			JobID:       job.ID,
+			NodeID:      nodeID,
+			Status:      models.JobStatusFailed,
+			Error:       err.Error(),
+			CompletedAt: time.Now(),
+			Metrics: map[string]interface{}{
+				"duration": duration,
+			},
+		}
 	}
 
-	log.Printf("Job %s completed successfully", job.ID)
-	return result
+	// Add duration to metrics
+	if metrics == nil {
+		metrics = make(map[string]interface{})
+	}
+	metrics["duration"] = duration
+	metrics["scenario"] = job.Scenario
+
+	log.Printf("Job %s completed successfully in %.2f seconds", job.ID, duration)
+	return &models.JobResult{
+		JobID:          job.ID,
+		NodeID:         nodeID,
+		Status:         models.JobStatusCompleted,
+		CompletedAt:    time.Now(),
+		Metrics:        metrics,
+		AnalyzerOutput: analyzerOutput,
+	}
+}
+
+// executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
+func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+	// Extract parameters from job
+	params := job.Parameters
+	if params == nil {
+		params = make(map[string]interface{})
+	}
+
+	// Get input file (use test pattern if not specified)
+	inputFile := "/tmp/test_input.mp4"
+	if input, ok := params["input"].(string); ok && input != "" {
+		inputFile = input
+	}
+
+	// Get output file
+	outputFile := fmt.Sprintf("/tmp/job_%s_output.mp4", job.ID)
+	if output, ok := params["output"].(string); ok && output != "" {
+		outputFile = output
+	}
+
+	// Get transcode parameters with defaults
+	bitrate := "2000k"
+	if b, ok := params["bitrate"].(string); ok && b != "" {
+		bitrate = b
+	}
+
+	codec := "libx264"
+	if c, ok := params["codec"].(string); ok && c != "" {
+		// Map common codec names
+		switch c {
+		case "h264":
+			codec = "libx264"
+		case "h265", "hevc":
+			codec = "libx265"
+		case "vp9":
+			codec = "libvpx-vp9"
+		default:
+			codec = c
+		}
+	}
+
+	preset := "medium"
+	if p, ok := params["preset"].(string); ok && p != "" {
+		preset = p
+	}
+
+	duration := 0
+	if d, ok := params["duration"].(float64); ok {
+		duration = int(d)
+	} else if d, ok := params["duration"].(int); ok {
+		duration = d
+	}
+
+	// Create test input if it doesn't exist
+	if _, statErr := os.Stat(inputFile); os.IsNotExist(statErr) {
+		log.Printf("Input file %s not found, creating test video...", inputFile)
+		if err := createTestVideo(inputFile, duration); err != nil {
+			return nil, nil, fmt.Errorf("failed to create test input: %w", err)
+		}
+	}
+
+	log.Printf("Transcoding: %s -> %s", inputFile, outputFile)
+	log.Printf("  Codec: %s, Bitrate: %s, Preset: %s", codec, bitrate, preset)
+
+	// Build FFmpeg command
+	args := []string{
+		"-i", inputFile,
+		"-c:v", codec,
+		"-b:v", bitrate,
+		"-preset", preset,
+		"-y", // Overwrite output
+	}
+
+	// Add duration limit if specified
+	if duration > 0 {
+		args = append([]string{"-t", fmt.Sprintf("%d", duration)}, args...)
+	}
+
+	args = append(args, outputFile)
+
+	// Execute FFmpeg
+	cmd := exec.Command("ffmpeg", args...)
+	
+	// Capture output for metrics
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	log.Printf("Running: ffmpeg %s", strings.Join(args, " "))
+	
+	startTime := time.Now()
+	if err := cmd.Run(); err != nil {
+		log.Printf("FFmpeg stderr: %s", stderr.String())
+		return nil, nil, fmt.Errorf("ffmpeg execution failed: %w", err)
+	}
+	execDuration := time.Since(startTime).Seconds()
+
+	// Verify output was created
+	outputInfo, err := os.Stat(outputFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("output file not created: %w", err)
+	}
+
+	log.Printf("✓ Transcoding completed: %s (%.2f MB in %.2f seconds)", 
+		outputFile, float64(outputInfo.Size())/1024/1024, execDuration)
+
+	// Parse FFmpeg output for metrics
+	metrics = parseFFmpegMetrics(stderr.String(), execDuration, outputInfo.Size())
+
+	// Generate analyzer output
+	analyzerOutput = map[string]interface{}{
+		"scenario":      job.Scenario,
+		"input_file":    inputFile,
+		"output_file":   outputFile,
+		"output_size":   outputInfo.Size(),
+		"codec":         codec,
+		"bitrate":       bitrate,
+		"preset":        preset,
+		"exec_duration": execDuration,
+		"status":        "success",
+	}
+
+	return metrics, analyzerOutput, nil
+}
+
+// createTestVideo creates a test video using FFmpeg's test source
+func createTestVideo(outputPath string, duration int) error {
+	if duration <= 0 {
+		duration = 10 // Default 10 seconds
+	}
+
+	args := []string{
+		"-f", "lavfi",
+		"-i", fmt.Sprintf("testsrc=duration=%d:size=1280x720:rate=30", duration),
+		"-pix_fmt", "yuv420p",
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+		"-y",
+		outputPath,
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to create test video: %w", err)
+	}
+
+	log.Printf("✓ Created test video: %s (%d seconds)", outputPath, duration)
+	return nil
+}
+
+// parseFFmpegMetrics extracts metrics from FFmpeg output
+func parseFFmpegMetrics(ffmpegOutput string, duration float64, outputSize int64) map[string]interface{} {
+	metrics := map[string]interface{}{
+		"transcode_duration_sec": duration,
+		"output_size_bytes":      outputSize,
+		"output_size_mb":         float64(outputSize) / 1024 / 1024,
+	}
+
+	// Parse frame count
+	if strings.Contains(ffmpegOutput, "frame=") {
+		// Extract frame count (example: "frame= 300")
+		lines := strings.Split(ffmpegOutput, "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.Contains(lines[i], "frame=") {
+				fields := strings.Fields(lines[i])
+				for j, field := range fields {
+					if strings.HasPrefix(field, "frame=") {
+						if j+1 < len(fields) {
+							metrics["frames_encoded"] = fields[j+1]
+						}
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// Parse FPS
+	if strings.Contains(ffmpegOutput, "fps=") {
+		lines := strings.Split(ffmpegOutput, "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.Contains(lines[i], "fps=") {
+				fields := strings.Fields(lines[i])
+				for j, field := range fields {
+					if strings.HasPrefix(field, "fps=") {
+						if j+1 < len(fields) {
+							metrics["encoding_fps"] = fields[j+1]
+						}
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	return metrics
 }
