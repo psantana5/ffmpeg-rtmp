@@ -17,10 +17,24 @@ type SQLiteStore struct {
 
 // NewSQLiteStore creates a new SQLite store
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	// Configure SQLite connection string with parameters for concurrent access
+	// - _journal_mode=WAL: Enable Write-Ahead Logging for better concurrency
+	// - _busy_timeout=10000: Wait up to 10 seconds when database is locked
+	// - _synchronous=NORMAL: Balance between safety and performance
+	// - _cache_size=-8000: 8MB memory cache for better performance
+	// - _txlock=immediate: Acquire write lock at transaction start to reduce conflicts
+	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_busy_timeout=10000&_synchronous=NORMAL&_cache_size=-8000&_txlock=immediate", dbPath)
+	
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+
+	// Set connection pool limits to prevent too many concurrent writes
+	// Single writer for SQLite to avoid lock contention
+	db.SetMaxOpenConns(1)  // Serialize writes to avoid SQLITE_BUSY
+	db.SetMaxIdleConns(1)  // Keep one connection ready
+	db.SetConnMaxLifetime(30 * time.Minute)
 
 	store := &SQLiteStore{db: db}
 	if err := store.initSchema(); err != nil {

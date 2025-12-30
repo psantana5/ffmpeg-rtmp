@@ -180,7 +180,9 @@ func (h *MasterHandler) GetNextJob(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Job %s assigned to node %s", job.ID, nodeID)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(job)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"job": job,
+	})
 }
 
 // ReceiveResults receives job results from a compute node
