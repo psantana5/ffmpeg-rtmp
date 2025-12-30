@@ -41,8 +41,9 @@ func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/nodes/{id}/heartbeat", h.NodeHeartbeat).Methods("POST")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
 	r.HandleFunc("/jobs", h.ListJobs).Methods("GET")
-	r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
+	// Register specific routes before parameterized routes
 	r.HandleFunc("/jobs/next", h.GetNextJob).Methods("GET")
+	r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
 	r.HandleFunc("/results", h.ReceiveResults).Methods("POST")
 	r.HandleFunc("/health", h.Health).Methods("GET")
 }
