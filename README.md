@@ -33,10 +33,10 @@ make build-master
 export MASTER_API_KEY=$(openssl rand -base64 32)
 
 # Start master service with production defaults
-# ✅ TLS enabled (auto-generates cert)
-# ✅ SQLite persistence (master.db)
-# ✅ Job retry (3 attempts)
-# ✅ Prometheus metrics (:9090)
+# TLS enabled (auto-generates cert)
+# SQLite persistence (master.db)
+# Job retry (3 attempts)
+# Prometheus metrics (:9090)
 ./bin/master --port 8080 &
 
 # Start monitoring stack (VictoriaMetrics + Grafana)
@@ -92,7 +92,7 @@ See [deployment/README.md](deployment/README.md) for systemd service templates a
 
 For **development and local testing only**, you can use Docker Compose to run all components on a single machine.
 
-**⚠️ Important**: Docker Compose mode is **NOT recommended for production**. Use Distributed Mode above for production workloads.
+**Important**: Docker Compose mode is **NOT recommended for production**. Use Distributed Mode above for production workloads.
 
 ### Prerequisites
 
@@ -122,7 +122,7 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 
 **See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
 
-## 🔒 What's New: Production-Ready v2.2
+## What's New: Production-Ready v2.2
 
 **Distributed mode now production-ready with enterprise features:**
 
@@ -135,7 +135,7 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 
 See [docs/PRODUCTION_FEATURES.md](docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
-## 🚀 What's New: Go Exporters + VictoriaMetrics (v2.0)
+## What's New: Go Exporters + VictoriaMetrics (v2.0)
 
 This project now features **production-ready Go exporters** that have replaced Python exporters for all critical telemetry:
 
@@ -191,7 +191,7 @@ Docker Compose stack on single machine:
 - **Python Exporters**: QoE metrics, cost analysis, results tracking
 - **Alertmanager**: Alert routing
 
-**⚠️ Local Testing mode is for development only. Use Distributed Compute mode for production.**
+**Local Testing mode is for development only. Use Distributed Compute mode for production.**
 
 See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and architecture diagrams.
 
@@ -200,11 +200,11 @@ See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison
 Documentation organized by topic:
 
 ### Deployment & Operations
-- **[Production Features](docs/PRODUCTION_FEATURES.md)** - 🆕 ✅ Production-ready features guide (TLS, auth, retry, metrics)
-- **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - 🆕 Production vs development deployment guide
-- **[Internal Architecture](docs/INTERNAL_ARCHITECTURE.md)** - 🆕 Complete runtime model and operations reference
+- **[Production Features](docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
+- **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
+- **[Internal Architecture](docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
 - **[Distributed Architecture](docs/distributed_architecture_v1.md)** - Distributed compute details
-- **[Production Deployment](deployment/README.md)** - 🆕 Systemd service templates and setup
+- **[Production Deployment](deployment/README.md)** - Systemd service templates and setup
 - **[Getting Started Guide](docs/getting-started.md)** - Initial setup walkthrough
 
 ### Development & Testing
