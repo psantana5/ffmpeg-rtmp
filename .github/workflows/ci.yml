@@ -117,7 +117,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./src/exporters/cpu_exporter/Dockerfile
+          file: ./worker/exporters/cpu_exporter/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ffmpeg-rtmp/cpu-exporter:latest
@@ -128,7 +128,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./src/exporters/gpu_exporter/Dockerfile
+          file: ./worker/exporters/gpu_exporter/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ffmpeg-rtmp/gpu-exporter:latest
@@ -139,7 +139,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./src/exporters/ffmpeg_exporter/Dockerfile
+          file: ./worker/exporters/ffmpeg_exporter/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ffmpeg-rtmp/ffmpeg-exporter:latest
