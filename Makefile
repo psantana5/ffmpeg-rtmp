@@ -24,7 +24,7 @@ help:
 	@echo "  make down            Stop stack"
 	@echo "  make restart         Restart stack"
 	@echo "  make ps              Show container status"
-	@echo "  make logs SERVICE=prometheus   Tail logs for a service"
+	@echo "  make logs SERVICE=victoriametrics   Tail logs for a service"
 	@echo ""
 	@echo "Distributed Compute"
 	@echo "  make build-distributed   Build master and agent binaries"
@@ -39,8 +39,8 @@ help:
 	@echo "  make nvidia-up       Start stack with NVIDIA profile"
 	@echo "  make nvidia-up-build Build + start stack with NVIDIA profile"
 	@echo ""
-	@echo "Prometheus/Grafana"
-	@echo "  make prom-reload     Reload Prometheus config"
+	@echo "VictoriaMetrics/Grafana"
+	@echo "  make prom-reload     Reload VictoriaMetrics config"
 	@echo ""
 	@echo "Tests"
 	@echo "  make test-suite      Run default test suite"
@@ -78,11 +78,10 @@ ps:
 	$(COMPOSE) ps
 
 logs:
-	@test -n "$(SERVICE)" || (echo "SERVICE is required. Example: make logs SERVICE=prometheus" && exit 2)
-	$(COMPOSE) logs -f --tail=200 $(SERVICE)
+	@test -n "$(SERVICE)" || (echo "SERVICE is required. Example: make logs SERVICE=victoriametrics" && exit 2) || $(COMPOSE) logs -f --tail=200 $(SERVICE)
 
 prom-reload:
-	curl -fsS -X POST http://localhost:9090/-/reload >/dev/null
+	curl -fsS -X POST http://localhost:8428/-/reload >/dev/null
 
 nvidia-up:
 	@mkdir -p test_results
@@ -94,11 +93,11 @@ nvidia-up-build:
 
 vm-up:
 	@mkdir -p test_results
-	$(COMPOSE) up -d prometheus victoriametrics grafana
+	$(COMPOSE) up -d victoriametrics grafana
 
 vm-up-build:
 	@mkdir -p test_results
-	$(COMPOSE) up -d --build prometheus victoriametrics grafana
+	$(COMPOSE) up -d --build victoriametrics grafana
 
 test-suite:
 	$(PYTHON) scripts/run_tests.py suite
