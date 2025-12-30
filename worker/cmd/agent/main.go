@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,9 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
+
+// Global variable to store master URL for RTMP streaming
+var globalMasterURL string
 
 func main() {
 	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
@@ -44,6 +48,9 @@ func main() {
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
 	log.Printf("Master URL: %s", *masterURL)
+
+	// Store master URL globally for RTMP streaming
+	globalMasterURL = *masterURL
 
 	// Detect hardware capabilities
 	log.Println("Detecting hardware capabilities...")
@@ -336,17 +343,33 @@ func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (met
 	// Get RTMP URL if streaming mode
 	rtmpURL := ""
 	if outputMode == "rtmp" || outputMode == "stream" {
-		if url, ok := params["rtmp_url"].(string); ok && url != "" {
-			rtmpURL = url
+		if rtmpURLParam, ok := params["rtmp_url"].(string); ok && rtmpURLParam != "" {
+			rtmpURL = rtmpURLParam
 		} else {
-			// Default RTMP server (for testing)
+			// Default: construct RTMP URL pointing to master node
+			// Parse master URL to get host
+			masterHost := "localhost"
+			if globalMasterURL != "" {
+				parsedURL, err := url.Parse(globalMasterURL)
+				if err == nil && parsedURL.Host != "" {
+					// Extract hostname (remove port if present)
+					host := parsedURL.Host
+					if colonIdx := strings.Index(host, ":"); colonIdx > 0 {
+						host = host[:colonIdx]
+					}
+					masterHost = host
+				}
+			}
+			
 			streamKey := job.ID
 			if key, ok := params["stream_key"].(string); ok && key != "" {
 				streamKey = key
 			}
-			rtmpURL = fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
+			// RTMP server runs on master at port 1935
+			rtmpURL = fmt.Sprintf("rtmp://%s:1935/live/%s", masterHost, streamKey)
 		}
 		log.Printf("RTMP streaming mode enabled: %s", rtmpURL)
+		log.Printf("  Streaming to master node RTMP server")
 	}
 
 	// Get input file (use test pattern if not specified)
@@ -426,7 +449,7 @@ func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (met
 	
 	if outputMode == "rtmp" || outputMode == "stream" {
 		// RTMP Streaming mode - generate test source and stream
-		log.Printf("Building RTMP streaming command...")
+		log.Printf("Building RTMP streaming command with hardware optimizations...")
 		
 		// Get resolution and framerate for test source
 		resolution := "1280x720"
@@ -448,37 +471,79 @@ func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (met
 			bufsize = fmt.Sprintf("%sk", bitrateNum) // Can multiply by 2 here if needed
 		}
 		
-		// Build streaming command
+		// Build streaming command with hardware optimizations
 		args = []string{
 			"-re", // Read input at native framerate (important for streaming)
 			"-f", "lavfi",
 			"-i", fmt.Sprintf("testsrc=size=%s:rate=%d", resolution, fps),
 			"-f", "lavfi",
 			"-i", "sine=frequency=1000:sample_rate=48000",
-			"-c:v", codec,
-			"-preset", preset,
+		}
+		
+		// Add duration limit if specified (before encoding options)
+		if duration > 0 {
+			args = append(args, "-t", fmt.Sprintf("%d", duration))
+		}
+		
+		// Video encoding options with hardware optimization
+		args = append(args, "-c:v", codec, "-preset", preset)
+		
+		// Apply hardware-optimized extra flags from ffmpegOpt
+		log.Printf("Applying hardware optimization flags to RTMP stream...")
+		for key, value := range ffmpegOpt.ExtraFlags {
+			switch key {
+			case "tune":
+				// Apply tune for software encoders
+				if codec == "libx264" || codec == "libx265" {
+					args = append(args, "-tune", value)
+					log.Printf("  Added -tune %s (from hardware optimization)", value)
+				}
+			case "threads":
+				args = append(args, "-threads", value)
+				log.Printf("  Added -threads %s (from hardware optimization)", value)
+			case "rc", "spatial-aq", "temporal-aq", "bf", "zerolatency":
+				// NVENC-specific flags
+				if strings.Contains(codec, "nvenc") {
+					args = append(args, fmt.Sprintf("-%s", key), value)
+					log.Printf("  Added -%s %s (NVENC optimization)", key, value)
+				}
+			case "aq-mode", "no-sao", "bframes", "rd":
+				// HEVC-specific flags
+				if codec == "libx265" {
+					args = append(args, "-x265-params", fmt.Sprintf("%s=%s", key, value))
+					log.Printf("  Added x265 param %s=%s (from hardware optimization)", key, value)
+				}
+			case "me":
+				// Motion estimation for x264
+				if codec == "libx264" {
+					args = append(args, "-me_method", value)
+					log.Printf("  Added -me_method %s (from hardware optimization)", value)
+				}
+			case "g":
+				// GOP size - already handled below
+				continue
+			}
+		}
+		
+		// Streaming-specific encoding options
+		args = append(args,
 			"-b:v", bitrate,
 			"-maxrate", bitrate,
 			"-bufsize", bufsize,
 			"-pix_fmt", "yuv420p",
 			"-g", fmt.Sprintf("%d", fps*2), // GOP size: 2 seconds
+		)
+		
+		// Audio encoding options
+		args = append(args,
 			"-c:a", "aac",
 			"-b:a", "128k",
 			"-ar", "48000",
 			"-f", "flv", // FLV container for RTMP
-		}
+			rtmpURL,
+		)
 		
-		// Add duration limit if specified
-		if duration > 0 {
-			args = append([]string{"-t", fmt.Sprintf("%d", duration)}, args...)
-		}
-		
-		// Add tune for zerolatency if using software encoder
-		if codec == "libx264" {
-			args = append(args, "-tune", "zerolatency")
-		}
-		
-		args = append(args, rtmpURL)
+		log.Printf("RTMP command built with %d optimization flags applied", len(ffmpegOpt.ExtraFlags))
 		
 	} else {
 		// File transcoding mode
