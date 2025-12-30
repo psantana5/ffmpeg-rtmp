@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -35,24 +36,39 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string, ipAddresses ..
 
 	// Parse IP addresses and DNS names
 	var ips []net.IP
-	var dnsNames []string
+	dnsNamesMap := make(map[string]bool)
+	ipsMap := make(map[string]bool)
 	
 	// Always include localhost IPs
-	ips = append(ips, net.ParseIP("127.0.0.1"))
-	ips = append(ips, net.ParseIP("::1"))
+	ipsMap["127.0.0.1"] = true
+	ipsMap["::1"] = true
 	
 	// Always include common DNS names
-	dnsNames = append(dnsNames, commonName, "localhost")
+	dnsNamesMap[commonName] = true
+	dnsNamesMap["localhost"] = true
 	
 	// Add user-provided values (could be IPs or hostnames)
 	for _, value := range ipAddresses {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
 		if ip := net.ParseIP(value); ip != nil {
 			// It's an IP address
-			ips = append(ips, ip)
-		} else if value != "" {
+			ipsMap[ip.String()] = true
+		} else {
 			// It's a hostname
-			dnsNames = append(dnsNames, value)
+			dnsNamesMap[value] = true
 		}
+	}
+	
+	// Convert maps to slices
+	var dnsNames []string
+	for name := range dnsNamesMap {
+		dnsNames = append(dnsNames, name)
+	}
+	for ipStr := range ipsMap {
+		ips = append(ips, net.ParseIP(ipStr))
 	}
 
 	template := x509.Certificate{
