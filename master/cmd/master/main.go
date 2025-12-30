@@ -171,9 +171,13 @@ func main() {
 	handler.RegisterRoutes(router)
 
 	// Add metrics endpoint if enabled
+	var metricsExporter *prometheus.MasterExporter
 	if *enableMetrics {
 		log.Println("✓ Prometheus metrics endpoint enabled")
-		metricsExporter := prometheus.NewMasterExporter(dataStore)
+		metricsExporter = prometheus.NewMasterExporter(dataStore)
+		
+		// Set metrics recorder in handler
+		handler.SetMetricsRecorder(metricsExporter)
 		
 		// Create separate server for metrics
 		metricsRouter := mux.NewRouter()
