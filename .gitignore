@@ -57,7 +57,7 @@ results/*
 plots/*
 models/*/checkpoint_*
 models/*/training_history.json
-
+tests/*
 # Temporary files
 *.tmp
 *.bak
