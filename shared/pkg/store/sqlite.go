@@ -863,10 +863,10 @@ func (s *SQLiteStore) RetryJob(jobID string, errorMsg string) error {
 
 	// Update job: increment retry_count, set status to pending, clear node_id and started_at, update error
 	_, err = tx.Exec(`
-		UPDATE jobs 
-		SET status = ?, 
-		    retry_count = ?, 
-		    node_id = NULL, 
+		UPDATE jobs
+		SET status = ?,
+		    retry_count = ?,
+		    node_id = NULL,
 		    started_at = NULL,
 		    error = ?
 		WHERE id = ?

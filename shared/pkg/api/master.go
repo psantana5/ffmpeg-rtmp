@@ -280,14 +280,24 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 			if err := h.store.RetryJob(result.JobID, result.Error); err != nil {
 				log.Printf("Error re-queuing job for retry: %v", err)
 			} else {
+				// Get updated job to report correct retry count
+				updatedJob, err := h.store.GetJob(result.JobID)
+				if err != nil {
+					log.Printf("Error getting updated job: %v", err)
+				}
+				retryCount := job.RetryCount + 1
+				if err == nil {
+					retryCount = updatedJob.RetryCount
+				}
+				
 				log.Printf("Job %s failed on node %s (attempt %d/%d) - re-queued for retry",
-					result.JobID, result.NodeID, job.RetryCount, h.maxRetries)
+					result.JobID, result.NodeID, retryCount, h.maxRetries)
 				
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]interface{}{
 					"status":      "retrying",
-					"retry":       job.RetryCount + 1,
+					"retry":       retryCount,
 					"max_retries": h.maxRetries,
 				})
 				return
