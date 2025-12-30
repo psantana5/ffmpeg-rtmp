@@ -73,7 +73,7 @@ func (s *SQLiteStore) initSchema() error {
 		id TEXT PRIMARY KEY,
 		scenario TEXT NOT NULL,
 		confidence TEXT,
-		engine TEXT DEFAULT 'auto',
+		engine TEXT NOT NULL DEFAULT 'auto',
 		parameters TEXT,
 		status TEXT NOT NULL,
 		queue TEXT DEFAULT 'default',
