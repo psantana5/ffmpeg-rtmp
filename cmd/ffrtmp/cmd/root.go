@@ -87,7 +87,7 @@ func initConfig() {
 
 	// Set default if still empty
 	if masterURL == "" {
-		masterURL = "http://localhost:8080"
+		masterURL = "https://localhost:8080"
 	}
 }
 
