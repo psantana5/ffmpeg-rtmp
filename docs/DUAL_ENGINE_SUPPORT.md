@@ -169,7 +169,39 @@ POST /jobs
 
 ## Monitoring
 
-### Engine Metrics
+### VictoriaMetrics Integration
+
+Engine metrics are automatically exported to VictoriaMetrics via Prometheus format:
+
+**Available Metrics**:
+- `ffrtmp_jobs_by_engine{engine="ffmpeg|gstreamer|auto"}` - Total jobs by engine preference
+- `ffrtmp_jobs_completed_by_engine{engine="ffmpeg|gstreamer"}` - Completed jobs by actual engine used
+
+These metrics are scraped from the master node's `/metrics` endpoint (default port 9090).
+
+### Grafana Dashboards
+
+The **Distributed Scheduler** dashboard includes engine visualization panels:
+
+1. **Jobs by Engine Preference** (Pie Chart)
+   - Shows distribution of job engine preferences (auto/ffmpeg/gstreamer)
+   - Located in the distributed-scheduler dashboard
+
+2. **Completed Jobs by Engine** (Time Series)
+   - Shows actual engine usage over time
+   - Helps track FFmpeg vs GStreamer adoption
+   - Color-coded: FFmpeg (blue), GStreamer (green)
+
+**Accessing Grafana**:
+```bash
+# Default URL
+http://master-node:3000
+
+# View distributed-scheduler dashboard
+http://master-node:3000/d/distributed-scheduler
+```
+
+### Engine Metrics in Job Results
 
 Job results include engine information:
 
