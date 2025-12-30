@@ -12,7 +12,7 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application file
-COPY src/exporters/qoe/qoe_exporter.py /app/
+COPY master/exporters/qoe/qoe_exporter.py /app/
 
 RUN chmod +x /app/qoe_exporter.py
 
