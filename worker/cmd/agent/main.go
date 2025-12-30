@@ -126,7 +126,7 @@ func main() {
 		
 		// Auto-enable InsecureSkipVerify for localhost when no CA is provided
 		// This handles common development scenarios with self-signed certificates
-		isLocalhost := strings.Contains(*masterURL, "localhost") || strings.Contains(*masterURL, "127.0.0.1")
+		isLocalhost := isLocalhostURL(*masterURL)
 		
 		if *insecureSkipVerify {
 			log.Println("WARNING: TLS certificate verification disabled (insecure)")
@@ -284,16 +284,37 @@ func main() {
 	}
 }
 
+// isLocalhostURL checks if a URL points to localhost
+// Returns true only if the hostname component is localhost, 127.0.0.1, or ::1
+func isLocalhostURL(rawURL string) bool {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	
+	// Get hostname without port
+	hostname := parsedURL.Hostname()
+	
+	// Check for localhost variations
+	return hostname == "localhost" || 
+		   hostname == "127.0.0.1" || 
+		   hostname == "::1"
+}
+
 // isMasterAsWorker checks if the agent is trying to register on the same machine as master
 func isMasterAsWorker(masterURL, hostname string) bool {
-	// Check if master URL contains localhost or 127.0.0.1
-	if strings.Contains(masterURL, "localhost") || strings.Contains(masterURL, "127.0.0.1") {
+	// Check if master URL points to localhost
+	if isLocalhostURL(masterURL) {
 		return true
 	}
 
 	// Check if master URL contains the local hostname
-	if strings.Contains(masterURL, hostname) {
-		return true
+	parsedURL, err := url.Parse(masterURL)
+	if err == nil {
+		urlHostname := parsedURL.Hostname()
+		if urlHostname == hostname {
+			return true
+		}
 	}
 
 	return false
