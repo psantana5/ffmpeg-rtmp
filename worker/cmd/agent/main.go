@@ -308,8 +308,30 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
-	// Execute the actual job based on parameters
-	metrics, analyzerOutput, err := executeFFmpegJob(job, client, ffmpegOpt)
+	// Check if engine parameter is specified
+	var engine string = "ffmpeg" // default
+	if job.Parameters != nil {
+		if engineParam, ok := job.Parameters["engine"].(string); ok && engineParam != "" {
+			engine = engineParam
+		}
+	}
+
+	// Validate engine and execute job
+	var metrics map[string]interface{}
+	var analyzerOutput map[string]interface{}
+	var err error
+
+	switch engine {
+	case "ffmpeg", "auto":
+		// Execute using FFmpeg
+		metrics, analyzerOutput, err = executeFFmpegJob(job, client, ffmpegOpt)
+	case "gstreamer":
+		// GStreamer not yet implemented
+		err = fmt.Errorf("GStreamer engine is not yet implemented. Please use 'ffmpeg' or 'auto' engine")
+	default:
+		// Unknown engine
+		err = fmt.Errorf("unknown encoding engine '%s'. Supported engines: ffmpeg, gstreamer (not yet implemented), auto", engine)
+	}
 	
 	duration := time.Since(startTime).Seconds()
 	
@@ -323,6 +345,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 			CompletedAt: time.Now(),
 			Metrics: map[string]interface{}{
 				"duration": duration,
+				"engine":   engine,
 			},
 		}
 	}
@@ -333,8 +356,9 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 	metrics["duration"] = duration
 	metrics["scenario"] = job.Scenario
+	metrics["engine"] = engine
 
-	log.Printf("Job %s completed successfully in %.2f seconds", job.ID, duration)
+	log.Printf("Job %s completed successfully in %.2f seconds using %s engine", job.ID, duration, engine)
 	return &models.JobResult{
 		JobID:          job.ID,
 		NodeID:         client.GetNodeID(),

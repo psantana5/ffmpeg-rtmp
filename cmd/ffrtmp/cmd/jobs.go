@@ -21,6 +21,7 @@ var (
 	confidence string
 	queue      string
 	priority   string
+	engine     string
 	
 	// Job status flags
 	followStatus bool
@@ -92,6 +93,7 @@ func init() {
 	jobsSubmitCmd.Flags().StringVar(&confidence, "confidence", "auto", "confidence level (auto, high, medium, low)")
 	jobsSubmitCmd.Flags().StringVar(&queue, "queue", "default", "queue type (live, default, batch)")
 	jobsSubmitCmd.Flags().StringVar(&priority, "priority", "medium", "priority level (high, medium, low)")
+	jobsSubmitCmd.Flags().StringVar(&engine, "engine", "ffmpeg", "encoding engine (ffmpeg, gstreamer)")
 	jobsSubmitCmd.MarkFlagRequired("scenario")
 	
 	// Flags for job status
@@ -133,6 +135,9 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 	}
 	if bitrate != "" {
 		params["bitrate"] = bitrate
+	}
+	if engine != "" && engine != "ffmpeg" {
+		params["engine"] = engine
 	}
 
 	req := jobRequest{
