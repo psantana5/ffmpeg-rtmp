@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,7 @@ var (
 	masterURL    string
 	outputFormat string
 	cfgFile      string
+	apiKey       string
 )
 
 // rootCmd represents the base command
@@ -58,6 +61,10 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
+	
+	// Bind specific environment variables
+	viper.BindEnv("api_key", "MASTER_API_KEY")
+	viper.BindEnv("master_url", "MASTER_URL")
 
 	// If a config file is found, read it in
 	if err := viper.ReadInConfig(); err == nil {
@@ -65,6 +72,17 @@ func initConfig() {
 		if viper.GetString("master_url") != "" && masterURL == "" {
 			masterURL = viper.GetString("master_url")
 		}
+		if viper.GetString("api_key") != "" && apiKey == "" {
+			apiKey = viper.GetString("api_key")
+		}
+	}
+	
+	// Check environment variables if not set from config
+	if apiKey == "" && viper.GetString("api_key") != "" {
+		apiKey = viper.GetString("api_key")
+	}
+	if masterURL == "" && viper.GetString("master_url") != "" {
+		masterURL = viper.GetString("master_url")
 	}
 
 	// Set default if still empty
@@ -81,4 +99,23 @@ func GetMasterURL() string {
 // IsJSONOutput returns true if JSON output is requested
 func IsJSONOutput() bool {
 	return outputFormat == "json"
+}
+
+// GetAPIKey returns the configured API key
+func GetAPIKey() string {
+	return apiKey
+}
+
+// CreateAuthenticatedRequest creates an HTTP request with authentication header if API key is configured
+func CreateAuthenticatedRequest(method, url string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
+	return req, nil
 }

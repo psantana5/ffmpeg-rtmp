@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -37,6 +38,7 @@ func NewMasterHandlerWithRetry(s store.Store, maxRetries int) *MasterHandler {
 // RegisterRoutes registers all API routes
 func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/nodes/register", h.RegisterNode).Methods("POST")
+	r.HandleFunc("/nodes/{id}", h.GetNodeDetails).Methods("GET")
 	r.HandleFunc("/nodes", h.ListNodes).Methods("GET")
 	r.HandleFunc("/nodes/{id}/heartbeat", h.NodeHeartbeat).Methods("POST")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
@@ -44,6 +46,9 @@ func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	// Register specific routes before parameterized routes
 	r.HandleFunc("/jobs/next", h.GetNextJob).Methods("GET")
 	r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
+	r.HandleFunc("/jobs/{id}/pause", h.PauseJob).Methods("POST")
+	r.HandleFunc("/jobs/{id}/resume", h.ResumeJob).Methods("POST")
+	r.HandleFunc("/jobs/{id}/cancel", h.CancelJob).Methods("POST")
 	r.HandleFunc("/results", h.ReceiveResults).Methods("POST")
 	r.HandleFunc("/health", h.Health).Methods("GET")
 }
@@ -58,18 +63,19 @@ func (h *MasterHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
 
 	// Create new node
 	node := &models.Node{
-		ID:            uuid.New().String(),
-		Address:       reg.Address,
-		Type:          reg.Type,
-		CPUThreads:    reg.CPUThreads,
-		CPUModel:      reg.CPUModel,
-		HasGPU:        reg.HasGPU,
-		GPUType:       reg.GPUType,
-		RAMBytes:      reg.RAMBytes,
-		Labels:        reg.Labels,
-		Status:        "available",
-		LastHeartbeat: time.Now(),
-		RegisteredAt:  time.Now(),
+		ID:              uuid.New().String(),
+		Address:         reg.Address,
+		Type:            reg.Type,
+		CPUThreads:      reg.CPUThreads,
+		CPUModel:        reg.CPUModel,
+		HasGPU:          reg.HasGPU,
+		GPUType:         reg.GPUType,
+		GPUCapabilities: reg.GPUCapabilities,
+		RAMTotalBytes:   reg.RAMTotalBytes,
+		Labels:          reg.Labels,
+		Status:          "available",
+		LastHeartbeat:   time.Now(),
+		RegisteredAt:    time.Now(),
 	}
 
 	if err := h.store.RegisterNode(node); err != nil {
@@ -127,9 +133,19 @@ func (h *MasterHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		Scenario:   req.Scenario,
 		Confidence: req.Confidence,
 		Parameters: req.Parameters,
+		Queue:      req.Queue,
+		Priority:   req.Priority,
 		Status:     models.JobStatusPending,
 		CreatedAt:  time.Now(),
 		RetryCount: 0,
+	}
+
+	// Set defaults for queue and priority
+	if job.Queue == "" {
+		job.Queue = "default"
+	}
+	if job.Priority == "" {
+		job.Priority = "medium"
 	}
 
 	if err := h.store.CreateJob(job); err != nil {
@@ -270,6 +286,101 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
+	})
+}
+
+// GetNodeDetails retrieves detailed information about a specific node
+func (h *MasterHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	nodeID := vars["id"]
+
+	node, err := h.store.GetNode(nodeID)
+	if err != nil {
+		if err == store.ErrNodeNotFound {
+			http.Error(w, "Node not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error getting node: %v", err)
+		http.Error(w, "Failed to get node", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(node)
+}
+
+// PauseJob pauses a running job
+func (h *MasterHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	if err := h.store.PauseJob(jobID); err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error pausing job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to pause job: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Job %s paused", jobID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "paused",
+		"job_id": jobID,
+	})
+}
+
+// ResumeJob resumes a paused job
+func (h *MasterHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	if err := h.store.ResumeJob(jobID); err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error resuming job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to resume job: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Job %s resumed", jobID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "resumed",
+		"job_id": jobID,
+	})
+}
+
+// CancelJob cancels a job
+func (h *MasterHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	if err := h.store.CancelJob(jobID); err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error canceling job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to cancel job: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Job %s canceled", jobID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "canceled",
+		"job_id": jobID,
 	})
 }
 

@@ -12,9 +12,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/psantana5/ffmpeg-rtmp/master/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
-	"github.com/psantana5/ffmpeg-rtmp/pkg/metrics"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
@@ -35,6 +36,7 @@ func main() {
 	maxRetries := flag.Int("max-retries", 3, "Maximum job retry attempts on failure")
 	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
 	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
+	schedulerInterval := flag.Duration("scheduler-interval", 5*time.Second, "Background scheduler check interval")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -170,12 +172,12 @@ func main() {
 
 	// Add metrics endpoint if enabled
 	if *enableMetrics {
-		log.Println("✓ Metrics endpoint enabled")
-		metricsCollector := metrics.NewCollector(dataStore)
+		log.Println("✓ Prometheus metrics endpoint enabled")
+		metricsExporter := prometheus.NewMasterExporter(dataStore)
 		
 		// Create separate server for metrics
 		metricsRouter := mux.NewRouter()
-		metricsRouter.Handle("/metrics", metricsCollector).Methods("GET")
+		metricsRouter.Handle("/metrics", metricsExporter).Methods("GET")
 		metricsRouter.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -199,6 +201,11 @@ func main() {
 			}
 		}()
 	}
+
+	// Start background scheduler
+	sched := scheduler.New(dataStore, *schedulerInterval)
+	sched.Start()
+	log.Printf("✓ Background scheduler started (interval: %v)", *schedulerInterval)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -273,6 +280,9 @@ func main() {
 	<-stop
 
 	log.Println("Shutting down gracefully...")
+
+	// Stop scheduler first
+	sched.Stop()
 
 	// Give outstanding requests 30 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

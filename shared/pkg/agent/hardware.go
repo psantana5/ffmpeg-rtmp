@@ -38,7 +38,7 @@ func DetectHardware() (*models.NodeCapabilities, error) {
 
 	// Detect RAM
 	ramBytes := detectRAM()
-	caps.RAMBytes = ramBytes
+	caps.RAMTotalBytes = ramBytes
 
 	// Add OS label
 	caps.Labels["os"] = runtime.GOOS
