@@ -72,7 +72,7 @@ API endpoints:
 
 In a new terminal:
 ```bash
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 ```
 
 Response:
@@ -85,7 +85,7 @@ Response:
 #### Development Mode (Master as Worker)
 
 ```bash
-./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+./bin/agent --register --master https://localhost:8080 --allow-master-as-worker
 ```
 
 You'll see a warning:
@@ -120,7 +120,7 @@ No warning! Agent will register and start polling.
 ### Step 5: List Registered Nodes
 
 ```bash
-curl http://localhost:8080/nodes | jq
+curl -k https://localhost:8080/nodes | jq
 ```
 
 Response:
@@ -153,7 +153,7 @@ Response:
 
 ```bash
 # Create a 1080p test job
-curl -X POST http://localhost:8080/jobs \
+curl -k -X POST https://localhost:8080/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "1080p-h264",
@@ -185,7 +185,7 @@ Response:
 
 ```bash
 # 720p job
-curl -X POST http://localhost:8080/jobs \
+curl -k -X POST https://localhost:8080/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "720p-h264",
@@ -193,7 +193,7 @@ curl -X POST http://localhost:8080/jobs \
   }'
 
 # 4K job
-curl -X POST http://localhost:8080/jobs \
+curl -k -X POST https://localhost:8080/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "4K60-h264",
@@ -214,7 +214,7 @@ Results sent for job 660e8400-e29b-41d4-a716-446655440001 (status: completed)
 ### Step 9: Monitor Job Status
 
 ```bash
-curl http://localhost:8080/jobs | jq
+curl -k https://localhost:8080/jobs | jq
 ```
 
 You'll see jobs with status:
@@ -296,7 +296,7 @@ docker run -p 8080:8080 ffmpeg-rtmp/master
 
 # Agent
 docker run ffmpeg-rtmp/agent \
-  --master http://master:8080 \
+  --master https://master:8080 \
   --register
 ```
 
@@ -306,20 +306,20 @@ docker run ffmpeg-rtmp/agent \
 
 ```bash
 # Nodes
-curl http://localhost:8080/nodes | jq '.count'
+curl -k https://localhost:8080/nodes | jq '.count'
 
 # Jobs
-curl http://localhost:8080/jobs | jq '.count'
+curl -k https://localhost:8080/jobs | jq '.count'
 
 # Filter by status
-curl http://localhost:8080/jobs | jq '.jobs[] | select(.status=="running")'
+curl -k https://localhost:8080/jobs | jq '.jobs[] | select(.status=="running")'
 ```
 
 ### Health Checks
 
 ```bash
 # Master
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 
 # Should return: {"status":"healthy"}
 ```
@@ -343,17 +343,17 @@ sudo ufw allow 8080/tcp
 
 ```bash
 # Check nodes are registered and available
-curl http://localhost:8080/nodes | jq '.nodes[] | {id, status}'
+curl -k https://localhost:8080/nodes | jq '.nodes[] | {id, status}'
 
 # Check jobs exist
-curl http://localhost:8080/jobs | jq '.count'
+curl -k https://localhost:8080/jobs | jq '.count'
 ```
 
 ### Master-as-Worker Blocked
 
 Use the `--allow-master-as-worker` flag in development:
 ```bash
-./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+./bin/agent --register --master https://localhost:8080 --allow-master-as-worker
 ```
 
 ## Next Steps

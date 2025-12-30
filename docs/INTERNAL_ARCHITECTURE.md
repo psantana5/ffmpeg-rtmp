@@ -104,7 +104,7 @@ make build-master
 ./bin/master --port 8080 > master.log 2>&1 &
 
 # Verify master is running
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 ```
 
 **Step 3: Start Monitoring Stack**

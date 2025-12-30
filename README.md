@@ -238,8 +238,8 @@ sudo systemctl start ffmpeg-agent     # Start agent service
 sudo systemctl status ffmpeg-master   # Check status
 
 # Monitor
-curl http://localhost:8080/nodes      # List registered agents
-curl http://localhost:8080/jobs       # List jobs
+curl -k https://localhost:8080/nodes      # List registered agents
+curl -k https://localhost:8080/jobs       # List jobs
 journalctl -u ffmpeg-master -f        # View master logs
 journalctl -u ffmpeg-agent -f         # View agent logs
 ```

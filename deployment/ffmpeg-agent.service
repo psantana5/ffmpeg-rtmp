@@ -11,7 +11,7 @@ Group=ffmpeg
 WorkingDirectory=/opt/ffmpeg-rtmp
 
 # Environment: Set master URL
-Environment="MASTER_URL=http://master.example.com:8080"
+Environment="MASTER_URL=https://master.example.com:8080"
 Environment="POLL_INTERVAL=10s"
 Environment="HEARTBEAT_INTERVAL=30s"
 

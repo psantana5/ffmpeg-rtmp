@@ -188,7 +188,7 @@ sudo chown -R ffmpeg:ffmpeg /opt/ffmpeg-rtmp
 
 ```bash
 # Test connectivity
-curl http://master.example.com:8080/health
+curl -k https://master.example.com:8080/health
 
 # Check DNS resolution
 nslookup master.example.com
@@ -220,11 +220,13 @@ sudo ufw enable
 
 ### TLS/HTTPS
 
-The service files assume HTTP. For production:
+The master server uses TLS by default with self-signed certificates. For production:
 
-1. **Deploy nginx reverse proxy** with TLS termination
-2. **Use Let's Encrypt** for certificates
-3. **Update MASTER_URL** in agent service to use `https://`
+1. **Use proper certificates** (not self-signed) for the master server
+2. **Or deploy nginx reverse proxy** with TLS termination for easier certificate management
+3. **Agents can skip certificate verification** with `--insecure-skip-verify` flag (development only)
+
+Note: The nginx example below shows TLS termination, where nginx handles HTTPS and proxies to the master's HTTP endpoint (disable TLS on master with `--tls=false`).
 
 Example nginx config:
 ```nginx
@@ -342,7 +344,7 @@ sudo systemctl start ffmpeg-master
 
 # Verify
 sudo systemctl status ffmpeg-master
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 ```
 
 ### Update Agent
