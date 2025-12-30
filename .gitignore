@@ -96,8 +96,9 @@ cpu_exporter
 gpu_exporter
 ffmpeg_exporter
 
+master.*db*
 # Distributed compute binaries
-bin/
+bin/*
 .ffmpeg-agent/
 /agent
 /master
