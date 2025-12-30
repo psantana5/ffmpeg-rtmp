@@ -126,10 +126,12 @@ func TestRouteOrdering(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", w.Code)
 		}
 
-		// Response should be for GetNextJob, not GetJob
-		bodyStr := w.Body.String()
-		if strings.Contains(bodyStr, "job not found") {
-			t.Error("Response suggests /jobs/next was handled by GetJob handler")
+		// Response should contain a job field (GetNextJob response structure)
+		var response map[string]interface{}
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err == nil {
+			if _, hasJobField := response["job"]; !hasJobField {
+				t.Error("Response missing 'job' field - may have been handled by wrong route")
+			}
 		}
 	})
 }
@@ -156,9 +158,9 @@ func TestJobLifecycle(t *testing.T) {
 		t.Fatalf("Failed to parse created job: %v", err)
 	}
 
-	// Retrieve the job
+	// Retrieve the job using the proper router setup
 	router := mux.NewRouter()
-	router.HandleFunc("/jobs/{id}", handler.GetJob).Methods("GET")
+	handler.RegisterRoutes(router)
 
 	req2 := httptest.NewRequest("GET", "/jobs/"+createdJob.ID, nil)
 	w2 := httptest.NewRecorder()
