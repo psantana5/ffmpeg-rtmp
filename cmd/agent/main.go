@@ -29,8 +29,14 @@ func main() {
 
 	// Get API key from flag or environment variable
 	apiKey := *apiKeyFlag
+	apiKeySource := ""
 	if apiKey == "" {
 		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+		if apiKey != "" {
+			apiKeySource = "environment variable"
+		}
+	} else {
+		apiKeySource = "command-line flag"
 	}
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
@@ -93,7 +99,7 @@ func main() {
 	// Set API key if provided
 	if apiKey != "" {
 		client.SetAPIKey(apiKey)
-		log.Println("API authentication enabled")
+		log.Printf("API authentication enabled (source: %s)", apiKeySource)
 	} else {
 		log.Println("WARNING: No API key provided (authentication disabled)")
 	}

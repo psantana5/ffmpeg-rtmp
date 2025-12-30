@@ -16,9 +16,8 @@ import (
 )
 
 // GenerateSelfSignedCert generates a self-signed certificate for testing/development
-// ipAddresses is an optional list of IP addresses to include in the certificate SANs
-// Additional hostnames can be provided after IP addresses
-func GenerateSelfSignedCert(certFile, keyFile, commonName string, ipAddresses ...string) error {
+// sans accepts both IP addresses and hostnames to include in the certificate SANs
+func GenerateSelfSignedCert(certFile, keyFile, commonName string, sans ...string) error {
 	// Generate private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -48,14 +47,14 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string, ipAddresses ..
 	dnsNamesMap["localhost"] = true
 	
 	// Add user-provided values (could be IPs or hostnames)
-	for _, value := range ipAddresses {
+	for _, value := range sans {
 		value = strings.TrimSpace(value)
 		if value == "" {
 			continue
 		}
 		if ip := net.ParseIP(value); ip != nil {
-			// It's an IP address
-			ipsMap[ip.String()] = true
+			// It's an IP address - use original value to preserve format
+			ipsMap[value] = true
 		} else {
 			// It's a hostname
 			dnsNamesMap[value] = true
