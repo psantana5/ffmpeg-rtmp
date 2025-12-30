@@ -20,6 +20,17 @@ This project is organized into three main directories for clarity:
 
 See [FOLDER_ORGANIZATION.md](docs/FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) for visual diagrams.
 
+## Quick Start (Local Development)
+
+**For local testing**, use the automated script to run both master and agent on your machine:
+
+```bash
+# One-command setup: builds, runs, and verifies everything
+./scripts/run_local_stack.sh
+```
+
+This will compile all binaries, start master+agent, and display helpful commands. See [docs/LOCAL_STACK_GUIDE.md](docs/LOCAL_STACK_GUIDE.md) for details.
+
 ## Quick Start (Production - Distributed Mode)
 
 The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
