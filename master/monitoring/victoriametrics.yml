@@ -1,0 +1,83 @@
+global:
+  scrape_interval: 1s
+  scrape_timeout: 1s
+  external_labels:
+    cluster: 'ffmpeg-rtmp'
+    environment: 'development'
+
+scrape_configs:
+  - job_name: 'nginx-rtmp'
+    static_configs:
+      - targets: ['nginx-exporter:9728']
+        labels:
+          service: 'nginx-rtmp'
+
+  - job_name: 'cpu-power-go'
+    static_configs:
+      - targets: ['cpu-exporter-go:9500']
+        labels:
+          service: 'power-monitoring'
+          exporter: 'go'
+
+  - job_name: 'docker-stats'
+    static_configs:
+      - targets: ['docker-stats-exporter:9501']
+        labels:
+          service: 'docker-overhead'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'host'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'containers'
+
+  - job_name: 'dcgm'
+    static_configs:
+      - targets: ['dcgm-exporter:9400']
+        labels:
+          service: 'gpu'
+          exporter: 'dcgm'
+
+  - job_name: 'gpu-exporter-go'
+    static_configs:
+      - targets: ['gpu-exporter-go:9505']
+        labels:
+          service: 'gpu'
+          exporter: 'go'
+
+  - job_name: 'results-exporter'
+    static_configs:
+      - targets: ['results-exporter:9502']
+        labels:
+          service: 'analysis'
+
+  - job_name: 'qoe-exporter'
+    static_configs:
+      - targets: ['qoe-exporter:9503']
+        labels:
+          service: 'quality'
+
+  - job_name: 'cost-exporter'
+    static_configs:
+      - targets: ['cost-exporter:9504']
+        labels:
+          service: 'cost-analysis'
+
+  - job_name: 'exporter-health'
+    static_configs:
+      - targets: ['exporter-health-checker:9600']
+        labels:
+          service: 'monitoring'
+
+  - job_name: 'ffmpeg-stats'
+    static_configs:
+      - targets: ['ffmpeg-exporter:9506']
+        labels:
+          service: 'encoding'
+          exporter: 'ffmpeg'
