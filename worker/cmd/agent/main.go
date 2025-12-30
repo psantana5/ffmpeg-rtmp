@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,6 +66,16 @@ func main() {
 	}
 	log.Printf("  Node Type: %s", nodeType)
 	log.Printf("  OS/Arch: %s/%s", caps.Labels["os"], caps.Labels["arch"])
+
+	// Optimize FFmpeg parameters based on hardware
+	log.Println("Optimizing FFmpeg parameters for this hardware...")
+	ffmpegOpt := agent.OptimizeFFmpegParameters(caps, nodeType)
+	log.Printf("  Recommended Encoder: %s", ffmpegOpt.Encoder)
+	log.Printf("  Recommended Preset: %s", ffmpegOpt.Preset)
+	if ffmpegOpt.HWAccel != "none" {
+		log.Printf("  Hardware Acceleration: %s", ffmpegOpt.HWAccel)
+	}
+	log.Printf("  Optimization Reason: %s", ffmpegOpt.Reason)
 
 	// Create client with TLS support if certificates provided
 	var client *agent.Client
@@ -219,8 +230,9 @@ func main() {
 
 		log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
 
-		// Execute job
-		result := executeJob(job, client.GetNodeID())
+		// Execute job with hardware-optimized parameters
+		// Pass client to access master URL for RTMP streaming
+		result := executeJob(job, client, ffmpegOpt)
 
 		// Send results
 		if err := client.SendResults(result); err != nil {
@@ -262,12 +274,12 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, nodeID string) *models.JobResult {
+func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) *models.JobResult {
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
 	// Execute the actual job based on parameters
-	metrics, analyzerOutput, err := executeFFmpegJob(job)
+	metrics, analyzerOutput, err := executeFFmpegJob(job, client, ffmpegOpt)
 	
 	duration := time.Since(startTime).Seconds()
 	
@@ -275,7 +287,7 @@ func executeJob(job *models.Job, nodeID string) *models.JobResult {
 		log.Printf("Job %s failed: %v", job.ID, err)
 		return &models.JobResult{
 			JobID:       job.ID,
-			NodeID:      nodeID,
+			NodeID:      client.GetNodeID(),
 			Status:      models.JobStatusFailed,
 			Error:       err.Error(),
 			CompletedAt: time.Now(),
@@ -295,7 +307,7 @@ func executeJob(job *models.Job, nodeID string) *models.JobResult {
 	log.Printf("Job %s completed successfully in %.2f seconds", job.ID, duration)
 	return &models.JobResult{
 		JobID:          job.ID,
-		NodeID:         nodeID,
+		NodeID:         client.GetNodeID(),
 		Status:         models.JobStatusCompleted,
 		CompletedAt:    time.Now(),
 		Metrics:        metrics,
@@ -304,11 +316,58 @@ func executeJob(job *models.Job, nodeID string) *models.JobResult {
 }
 
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
-func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+func executeFFmpegJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
 	// Extract parameters from job
 	params := job.Parameters
 	if params == nil {
 		params = make(map[string]interface{})
+	}
+
+	// Apply hardware-optimized parameters (job parameters take precedence)
+	params = agent.ApplyOptimizationToParameters(params, ffmpegOpt)
+	
+	log.Printf("Using optimized FFmpeg parameters: encoder=%s, preset=%s", 
+		params["codec"], params["preset"])
+
+	// Determine output mode: RTMP streaming or file output
+	outputMode := "file" // default
+	if mode, ok := params["output_mode"].(string); ok {
+		outputMode = mode
+	}
+
+	// Get RTMP URL if streaming mode
+	rtmpURL := ""
+	if outputMode == "rtmp" || outputMode == "stream" {
+		if rtmpURLParam, ok := params["rtmp_url"].(string); ok && rtmpURLParam != "" {
+			rtmpURL = rtmpURLParam
+		} else {
+			// Default: construct RTMP URL pointing to master node
+			// Get master URL from client (which was configured with --master flag)
+			masterURL := client.GetMasterURL()
+			masterHost := "localhost"
+			
+			if masterURL != "" {
+				parsedURL, err := url.Parse(masterURL)
+				if err == nil && parsedURL.Host != "" {
+					// Extract hostname (remove API port)
+					host := parsedURL.Host
+					if colonIdx := strings.Index(host, ":"); colonIdx > 0 {
+						host = host[:colonIdx]
+					}
+					masterHost = host
+				}
+			}
+			
+			streamKey := job.ID
+			if key, ok := params["stream_key"].(string); ok && key != "" {
+				streamKey = key
+			}
+			// RTMP server runs on master at port 1935
+			rtmpURL = fmt.Sprintf("rtmp://%s:1935/live/%s", masterHost, streamKey)
+		}
+		log.Printf("RTMP streaming mode enabled: %s", rtmpURL)
+		log.Printf("  Master URL source: %s (from --master flag)", client.GetMasterURL())
+		log.Printf("  Streaming to master node RTMP server")
 	}
 
 	// Get input file (use test pattern if not specified)
@@ -317,7 +376,7 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 		inputFile = input
 	}
 
-	// Get output file
+	// Get output file (only used in file mode)
 	outputFile := filepath.Join(os.TempDir(), fmt.Sprintf("job_%s_output.mp4", job.ID))
 	if output, ok := params["output"].(string); ok && output != "" {
 		outputFile = output
@@ -356,15 +415,25 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 		duration = d
 	}
 
-	// Create test input if it doesn't exist
-	if _, statErr := os.Stat(inputFile); os.IsNotExist(statErr) {
-		log.Printf("Input file %s not found, creating test video...", inputFile)
-		if err := createTestVideo(inputFile, duration); err != nil {
-			return nil, nil, fmt.Errorf("failed to create test input: %w", err)
+	// Create test input file only if in file mode and input doesn't exist
+	if outputMode != "rtmp" && outputMode != "stream" {
+		if _, statErr := os.Stat(inputFile); os.IsNotExist(statErr) {
+			log.Printf("Input file %s not found, creating test video...", inputFile)
+			if err := createTestVideo(inputFile, duration); err != nil {
+				return nil, nil, fmt.Errorf("failed to create test input: %w", err)
+			}
 		}
+		log.Printf("Transcoding: %s -> %s", inputFile, outputFile)
+	} else {
+		log.Printf("Streaming mode: generating test pattern and streaming to %s", 
+			func() string {
+				if rtmpURL != "" {
+					return rtmpURL
+				}
+				return "RTMP server"
+			}())
 	}
-
-	log.Printf("Transcoding: %s -> %s", inputFile, outputFile)
+	
 	log.Printf("  Codec: %s, Bitrate: %s, Preset: %s", codec, bitrate, preset)
 
 	// Verify FFmpeg is available
@@ -373,21 +442,126 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 		return nil, nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
 	}
 
-	// Build FFmpeg command
-	args := []string{
-		"-i", inputFile,
-		"-c:v", codec,
-		"-b:v", bitrate,
-		"-preset", preset,
-		"-y", // Overwrite output
-	}
+	// Build FFmpeg command based on output mode
+	var args []string
+	
+	if outputMode == "rtmp" || outputMode == "stream" {
+		// RTMP Streaming mode - generate test source and stream
+		log.Printf("Building RTMP streaming command with hardware optimizations...")
+		
+		// Get resolution and framerate for test source
+		resolution := "1280x720"
+		if res, ok := params["resolution"].(string); ok && res != "" {
+			resolution = res
+		}
+		
+		fps := 30
+		if f, ok := params["fps"].(float64); ok {
+			fps = int(f)
+		} else if f, ok := params["fps"].(int); ok {
+			fps = f
+		}
+		
+		// Calculate buffer size (2x bitrate for streaming)
+		bufsize := bitrate
+		if strings.HasSuffix(bitrate, "k") {
+			bitrateNum := bitrate[:len(bitrate)-1]
+			bufsize = fmt.Sprintf("%sk", bitrateNum) // Can multiply by 2 here if needed
+		}
+		
+		// Build streaming command with hardware optimizations
+		args = []string{
+			"-re", // Read input at native framerate (important for streaming)
+			"-f", "lavfi",
+			"-i", fmt.Sprintf("testsrc=size=%s:rate=%d", resolution, fps),
+			"-f", "lavfi",
+			"-i", "sine=frequency=1000:sample_rate=48000",
+		}
+		
+		// Add duration limit if specified (before encoding options)
+		if duration > 0 {
+			args = append(args, "-t", fmt.Sprintf("%d", duration))
+		}
+		
+		// Video encoding options with hardware optimization
+		args = append(args, "-c:v", codec, "-preset", preset)
+		
+		// Apply hardware-optimized extra flags from ffmpegOpt
+		log.Printf("Applying hardware optimization flags to RTMP stream...")
+		for key, value := range ffmpegOpt.ExtraFlags {
+			switch key {
+			case "tune":
+				// Apply tune for software encoders
+				if codec == "libx264" || codec == "libx265" {
+					args = append(args, "-tune", value)
+					log.Printf("  Added -tune %s (from hardware optimization)", value)
+				}
+			case "threads":
+				args = append(args, "-threads", value)
+				log.Printf("  Added -threads %s (from hardware optimization)", value)
+			case "rc", "spatial-aq", "temporal-aq", "bf", "zerolatency":
+				// NVENC-specific flags
+				if strings.Contains(codec, "nvenc") {
+					args = append(args, fmt.Sprintf("-%s", key), value)
+					log.Printf("  Added -%s %s (NVENC optimization)", key, value)
+				}
+			case "aq-mode", "no-sao", "bframes", "rd":
+				// HEVC-specific flags
+				if codec == "libx265" {
+					args = append(args, "-x265-params", fmt.Sprintf("%s=%s", key, value))
+					log.Printf("  Added x265 param %s=%s (from hardware optimization)", key, value)
+				}
+			case "me":
+				// Motion estimation for x264
+				if codec == "libx264" {
+					args = append(args, "-me_method", value)
+					log.Printf("  Added -me_method %s (from hardware optimization)", value)
+				}
+			case "g":
+				// GOP size - already handled below
+				continue
+			}
+		}
+		
+		// Streaming-specific encoding options
+		args = append(args,
+			"-b:v", bitrate,
+			"-maxrate", bitrate,
+			"-bufsize", bufsize,
+			"-pix_fmt", "yuv420p",
+			"-g", fmt.Sprintf("%d", fps*2), // GOP size: 2 seconds
+		)
+		
+		// Audio encoding options
+		args = append(args,
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-ar", "48000",
+			"-f", "flv", // FLV container for RTMP
+			rtmpURL,
+		)
+		
+		log.Printf("RTMP command built with %d optimization flags applied", len(ffmpegOpt.ExtraFlags))
+		
+	} else {
+		// File transcoding mode
+		log.Printf("Building file transcoding command...")
+		
+		args = []string{
+			"-i", inputFile,
+			"-c:v", codec,
+			"-b:v", bitrate,
+			"-preset", preset,
+			"-y", // Overwrite output
+		}
 
-	// Add duration limit if specified
-	if duration > 0 {
-		args = append([]string{"-t", fmt.Sprintf("%d", duration)}, args...)
-	}
+		// Add duration limit if specified
+		if duration > 0 {
+			args = append([]string{"-t", fmt.Sprintf("%d", duration)}, args...)
+		}
 
-	args = append(args, outputFile)
+		args = append(args, outputFile)
+	}
 
 	// Execute FFmpeg
 	cmd := exec.Command(ffmpegPath, args...)
@@ -406,29 +580,46 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 	}
 	execDuration := time.Since(startTime).Seconds()
 
-	// Verify output was created
-	outputInfo, err := os.Stat(outputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("output file not created: %w", err)
+	// Verify output (different for streaming vs file mode)
+	var outputSize int64
+	if outputMode == "rtmp" || outputMode == "stream" {
+		// For RTMP streaming, we can't verify file output
+		// Just log that streaming completed
+		log.Printf("✓ RTMP streaming completed: %s (%.2f seconds)", rtmpURL, execDuration)
+		outputSize = 0 // Not applicable for streaming
+	} else {
+		// Verify output file was created
+		outputInfo, err := os.Stat(outputFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("output file not created: %w", err)
+		}
+		outputSize = outputInfo.Size()
+		log.Printf("✓ Transcoding completed: %s (%.2f MB in %.2f seconds)", 
+			outputFile, float64(outputSize)/1024/1024, execDuration)
 	}
 
-	log.Printf("✓ Transcoding completed: %s (%.2f MB in %.2f seconds)", 
-		outputFile, float64(outputInfo.Size())/1024/1024, execDuration)
-
 	// Parse FFmpeg output for metrics
-	metrics = parseFFmpegMetrics(stderr.String(), execDuration, outputInfo.Size())
+	metrics = parseFFmpegMetrics(stderr.String(), execDuration, outputSize)
 
 	// Generate analyzer output
 	analyzerOutput = map[string]interface{}{
-		"scenario":      job.Scenario,
-		"input_file":    inputFile,
-		"output_file":   outputFile,
-		"output_size":   outputInfo.Size(),
-		"codec":         codec,
-		"bitrate":       bitrate,
-		"preset":        preset,
-		"exec_duration": execDuration,
-		"status":        "success",
+		"scenario":            job.Scenario,
+		"output_mode":         outputMode,
+		"codec":               codec,
+		"bitrate":             bitrate,
+		"preset":              preset,
+		"exec_duration":       execDuration,
+		"status":              "success",
+		"optimization_reason": ffmpegOpt.Reason,
+		"hwaccel":             ffmpegOpt.HWAccel,
+	}
+	
+	if outputMode == "rtmp" || outputMode == "stream" {
+		analyzerOutput["rtmp_url"] = rtmpURL
+	} else {
+		analyzerOutput["input_file"] = inputFile
+		analyzerOutput["output_file"] = outputFile
+		analyzerOutput["output_size"] = outputSize
 	}
 
 	return metrics, analyzerOutput, nil
