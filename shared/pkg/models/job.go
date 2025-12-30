@@ -24,6 +24,7 @@ type Job struct {
 	ID               string                 `json:"id"`
 	Scenario         string                 `json:"scenario"`   // e.g., "4K60-h264"
 	Confidence       string                 `json:"confidence"` // "auto", "high", "medium", "low"
+	Engine           string                 `json:"engine,omitempty"`      // "auto", "ffmpeg", "gstreamer"
 	Parameters       map[string]interface{} `json:"parameters,omitempty"`
 	Status           JobStatus              `json:"status"`
 	Queue            string                 `json:"queue,omitempty"`    // "live", "default", "batch"
@@ -42,6 +43,7 @@ type Job struct {
 type JobRequest struct {
 	Scenario   string                 `json:"scenario"`
 	Confidence string                 `json:"confidence,omitempty"`
+	Engine     string                 `json:"engine,omitempty"`   // "auto", "ffmpeg", "gstreamer"
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	Queue      string                 `json:"queue,omitempty"`    // "live", "default", "batch"
 	Priority   string                 `json:"priority,omitempty"` // "high", "medium", "low"
