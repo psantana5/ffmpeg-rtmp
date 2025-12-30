@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/metrics"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
@@ -20,18 +21,26 @@ import (
 func main() {
 	// Command-line flags
 	port := flag.String("port", "8080", "Master node port")
-	dbPath := flag.String("db", "", "SQLite database path (empty for in-memory)")
-	useTLS := flag.Bool("tls", false, "Enable TLS")
+	dbPath := flag.String("db", "master.db", "SQLite database path (default: master.db, use empty string for in-memory)")
+	useTLS := flag.Bool("tls", true, "Enable TLS (default: true)")
 	certFile := flag.String("cert", "certs/master.crt", "TLS certificate file")
 	keyFile := flag.String("key", "certs/master.key", "TLS key file")
 	caFile := flag.String("ca", "", "CA certificate file for mTLS")
 	requireClientCert := flag.Bool("mtls", false, "Require client certificate (mTLS)")
 	generateCert := flag.Bool("generate-cert", false, "Generate self-signed certificate")
-	apiKey := flag.String("api-key", "", "API key for authentication (leave empty to disable)")
+	apiKey := flag.String("api-key", os.Getenv("MASTER_API_KEY"), "API key for authentication (default: from MASTER_API_KEY env var)")
+	maxRetries := flag.Int("max-retries", 3, "Maximum job retry attempts on failure")
+	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
+	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
 	flag.Parse()
 
 	log.Println("Starting FFmpeg RTMP Distributed Master Node (Production Mode)")
 	log.Printf("Port: %s", *port)
+	log.Printf("Max Retries: %d", *maxRetries)
+	log.Printf("Metrics Enabled: %v", *enableMetrics)
+	if *enableMetrics {
+		log.Printf("Metrics Port: %s", *metricsPort)
+	}
 
 	// Generate self-signed certificate if requested
 	if *generateCert {
@@ -59,21 +68,28 @@ func main() {
 		}
 		dataStore = sqliteStore
 		defer sqliteStore.Close()
+		log.Println("✓ Persistent storage enabled (data will survive restarts)")
 	} else {
-		log.Println("Using in-memory store (data will not persist)")
+		log.Println("WARNING: Using in-memory store (data will not persist)")
+		log.Println("Consider using --db flag with a database path for production")
 		dataStore = store.NewMemoryStore()
 	}
 
 	// Setup authentication if API key provided
 	if *apiKey != "" {
-		log.Println("API authentication enabled")
-		log.Printf("Using API key for authentication")
+		log.Println("✓ API authentication enabled")
 	} else {
-		log.Println("WARNING: API authentication disabled (not recommended for production)")
+		log.Println("ERROR: No API key provided")
+		log.Println("For production, you must provide an API key:")
+		log.Println("  1. Set environment variable: export MASTER_API_KEY=your-secure-key")
+		log.Println("  2. Or use flag: --api-key=your-secure-key")
+		log.Println("To generate a secure key:")
+		log.Println("  openssl rand -base64 32")
+		log.Fatalf("API key required for production deployment")
 	}
 
-	// Create API handler
-	handler := api.NewMasterHandler(dataStore)
+	// Create API handler with retry support
+	handler := api.NewMasterHandlerWithRetry(dataStore, *maxRetries)
 
 	// Create router
 	router := mux.NewRouter()
@@ -109,6 +125,38 @@ func main() {
 
 	handler.RegisterRoutes(router)
 
+	// Add metrics endpoint if enabled
+	if *enableMetrics {
+		log.Println("✓ Metrics endpoint enabled")
+		metricsCollector := metrics.NewCollector(dataStore)
+		
+		// Create separate server for metrics
+		metricsRouter := mux.NewRouter()
+		metricsRouter.Handle("/metrics", metricsCollector).Methods("GET")
+		metricsRouter.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"healthy"}`))
+		}).Methods("GET")
+		
+		metricsSrv := &http.Server{
+			Addr:         ":" + *metricsPort,
+			Handler:      metricsRouter,
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+		
+		// Start metrics server in background
+		go func() {
+			log.Printf("Metrics server listening on :%s", *metricsPort)
+			log.Println("  GET  /metrics (Prometheus format)")
+			log.Println("  GET  /health")
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("Metrics server error: %v", err)
+			}
+		}()
+	}
+
 	// Create HTTP server
 	srv := &http.Server{
 		Addr:         ":" + *port,
@@ -120,9 +168,22 @@ func main() {
 
 	// Setup TLS if enabled
 	if *useTLS {
-		log.Println("TLS enabled")
+		log.Println("✓ TLS enabled")
 		if *requireClientCert {
-			log.Println("mTLS enabled - requiring client certificates")
+			log.Println("✓ mTLS enabled - requiring client certificates")
+		}
+
+		// Check if certificates exist
+		if _, err := os.Stat(*certFile); os.IsNotExist(err) {
+			log.Printf("Certificate file not found: %s", *certFile)
+			log.Println("Generating self-signed certificate...")
+			if err := os.MkdirAll("certs", 0755); err != nil {
+				log.Fatalf("Failed to create certs directory: %v", err)
+			}
+			if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master"); err != nil {
+				log.Fatalf("Failed to generate certificate: %v", err)
+			}
+			log.Println("✓ Self-signed certificate generated")
 		}
 
 		tlsConfig, err := tlsutil.LoadTLSConfig(*certFile, *keyFile, *caFile, *requireClientCert)
@@ -131,7 +192,9 @@ func main() {
 		}
 		srv.TLSConfig = tlsConfig
 	} else {
-		log.Println("WARNING: TLS disabled (not recommended for production)")
+		log.Println("WARNING: TLS disabled")
+		log.Println("This is NOT recommended for production!")
+		log.Println("Enable with --tls flag or set --tls=false explicitly to suppress this warning")
 	}
 
 	// Setup graceful shutdown
