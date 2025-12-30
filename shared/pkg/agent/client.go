@@ -25,7 +25,7 @@ func NewClient(masterURL string) *Client {
 	return &Client{
 		masterURL: masterURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second,
 		},
 	}
 }
@@ -35,7 +35,7 @@ func NewClientWithTLS(masterURL string, tlsConfig *tls.Config) *Client {
 	return &Client{
 		masterURL: masterURL,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: tlsConfig,
 			},
