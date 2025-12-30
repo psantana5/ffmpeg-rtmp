@@ -10,6 +10,16 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
+## 📁 Project Organization
+
+This project is organized into three main directories for clarity:
+
+- **[`master/`](master/)** - Master node components (orchestration, monitoring, visualization)
+- **[`worker/`](worker/)** - Worker node components (transcoding, hardware metrics)
+- **[`shared/`](shared/)** - Shared libraries, scripts, and documentation
+
+See [FOLDER_ORGANIZATION.md](FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md) for visual diagrams.
+
 ## Quick Start (Production - Distributed Mode)
 
 The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
