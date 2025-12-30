@@ -275,18 +275,13 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("Error getting job for retry check: %v", err)
 		} else if job.RetryCount < h.maxRetries {
-			// Re-queue job for retry
-			job.RetryCount++
-			job.Status = models.JobStatusPending
-			job.NodeID = ""
-			job.StartedAt = nil
-			job.Error = result.Error // Store error from previous attempt
-			
-			if err := h.store.CreateJob(job); err != nil {
+			// Re-queue job for retry using the RetryJob method
+			retryMsg := fmt.Sprintf("Retry %d/%d: %s", job.RetryCount+1, h.maxRetries, result.Error)
+			if err := h.store.RetryJob(result.JobID, retryMsg); err != nil {
 				log.Printf("Error re-queuing job for retry: %v", err)
 			} else {
 				log.Printf("Job %s failed on node %s (attempt %d/%d) - re-queued for retry",
-					result.JobID, result.NodeID, job.RetryCount, h.maxRetries)
+					result.JobID, result.NodeID, job.RetryCount+1, h.maxRetries)
 				
 				// Still update the original job status to track the failure
 				if err := h.store.UpdateJobStatus(result.JobID, models.JobStatusFailed, result.Error); err != nil {

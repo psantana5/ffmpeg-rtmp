@@ -375,3 +375,37 @@ return false, nil // Workers available
 job.Status = models.JobStatusQueued
 return true, nil
 }
+
+// RetryJob resets a failed job for retry by updating its status to pending,
+// clearing node assignment, and incrementing retry count
+func (s *MemoryStore) RetryJob(jobID string, errorMsg string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	// Increment retry count
+	job.RetryCount++
+	
+	// Reset job to pending
+	job.Status = models.JobStatusPending
+	job.Error = errorMsg
+	
+	// Clear node assignment
+	oldNodeID := job.NodeID
+	job.NodeID = ""
+	job.StartedAt = nil
+	
+	// Update the node that was running the job back to available
+	if oldNodeID != "" {
+		if node, ok := s.nodes[oldNodeID]; ok {
+			node.Status = "available"
+			node.CurrentJobID = ""
+		}
+	}
+	
+	return nil
+}

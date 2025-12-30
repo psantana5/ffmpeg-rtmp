@@ -796,6 +796,7 @@ type Store interface {
 	CancelJob(id string) error
 	GetQueuedJobs(queue string, priority string) []*models.Job
 	TryQueuePendingJob(jobID string) (bool, error)
+	RetryJob(jobID string, errorMsg string) error
 }
 
 // Ensure both implementations satisfy the interface
@@ -839,4 +840,52 @@ return false, err
 
 rows, _ := result.RowsAffected()
 return rows > 0, nil
+}
+
+// RetryJob resets a failed job for retry by updating its status to pending,
+// clearing node assignment, and incrementing retry count
+func (s *SQLiteStore) RetryJob(jobID string, errorMsg string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Get current job to check retry count
+	var retryCount int
+	err = tx.QueryRow("SELECT retry_count FROM jobs WHERE id = ?", jobID).Scan(&retryCount)
+	if err != nil {
+		return fmt.Errorf("failed to get job for retry: %w", err)
+	}
+
+	// Update job: increment retry_count, set status to pending, clear node_id and started_at, update error
+	_, err = tx.Exec(`
+		UPDATE jobs 
+		SET status = ?, 
+		    retry_count = ?, 
+		    node_id = NULL, 
+		    started_at = NULL,
+		    error = ?
+		WHERE id = ?
+	`, models.JobStatusPending, retryCount+1, errorMsg, jobID)
+	
+	if err != nil {
+		return fmt.Errorf("failed to update job for retry: %w", err)
+	}
+
+	// Update the node that was running the job back to available
+	_, err = tx.Exec(`
+		UPDATE nodes 
+		SET status = 'available', current_job_id = NULL 
+		WHERE current_job_id = ?
+	`, jobID)
+	
+	if err != nil {
+		return fmt.Errorf("failed to update node status: %w", err)
+	}
+
+	return tx.Commit()
 }
