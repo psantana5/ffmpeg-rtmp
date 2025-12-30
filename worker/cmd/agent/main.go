@@ -327,7 +327,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		metrics, analyzerOutput, err = executeFFmpegJob(job, client, ffmpegOpt)
 	case "gstreamer":
 		// GStreamer not yet implemented
-		err = fmt.Errorf("GStreamer engine is not yet implemented. Please use 'ffmpeg' or 'auto' engine")
+		err = fmt.Errorf("GStreamer engine is not yet implemented. Supported engines: ffmpeg, auto")
 	default:
 		// Unknown engine
 		err = fmt.Errorf("unknown encoding engine '%s'. Supported engines: ffmpeg, gstreamer (not yet implemented), auto", engine)
