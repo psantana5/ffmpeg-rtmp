@@ -19,6 +19,7 @@ var (
 	duration   int
 	bitrate    string
 	confidence string
+	engine     string
 	queue      string
 	priority   string
 	engine     string
@@ -91,6 +92,7 @@ func init() {
 	jobsSubmitCmd.Flags().IntVar(&duration, "duration", 0, "duration in seconds")
 	jobsSubmitCmd.Flags().StringVar(&bitrate, "bitrate", "", "target bitrate (e.g., 10M)")
 	jobsSubmitCmd.Flags().StringVar(&confidence, "confidence", "auto", "confidence level (auto, high, medium, low)")
+	jobsSubmitCmd.Flags().StringVar(&engine, "engine", "auto", "transcoding engine (auto, ffmpeg, gstreamer)")
 	jobsSubmitCmd.Flags().StringVar(&queue, "queue", "default", "queue type (live, default, batch)")
 	jobsSubmitCmd.Flags().StringVar(&priority, "priority", "medium", "priority level (high, medium, low)")
 	jobsSubmitCmd.Flags().StringVar(&engine, "engine", "ffmpeg", "encoding engine (ffmpeg, gstreamer, auto)")
@@ -103,6 +105,7 @@ func init() {
 type jobRequest struct {
 	Scenario   string                 `json:"scenario"`
 	Confidence string                 `json:"confidence,omitempty"`
+	Engine     string                 `json:"engine,omitempty"`
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	Queue      string                 `json:"queue,omitempty"`
 	Priority   string                 `json:"priority,omitempty"`
@@ -112,6 +115,7 @@ type jobResponse struct {
 	ID          string                 `json:"id"`
 	Scenario    string                 `json:"scenario"`
 	Confidence  string                 `json:"confidence"`
+	Engine      string                 `json:"engine,omitempty"`
 	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 	Status      string                 `json:"status"`
 	Queue       string                 `json:"queue,omitempty"`
@@ -144,6 +148,7 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 	req := jobRequest{
 		Scenario:   scenario,
 		Confidence: confidence,
+		Engine:     engine,
 		Queue:      queue,
 		Priority:   priority,
 	}

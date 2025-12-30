@@ -132,6 +132,7 @@ func (h *MasterHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		ID:         uuid.New().String(),
 		Scenario:   req.Scenario,
 		Confidence: req.Confidence,
+		Engine:     req.Engine,
 		Parameters: req.Parameters,
 		Queue:      req.Queue,
 		Priority:   req.Priority,
@@ -140,12 +141,26 @@ func (h *MasterHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		RetryCount: 0,
 	}
 
-	// Set defaults for queue and priority
+	// Set defaults for queue, priority, and engine
 	if job.Queue == "" {
 		job.Queue = "default"
 	}
 	if job.Priority == "" {
 		job.Priority = "medium"
+	}
+	if job.Engine == "" {
+		job.Engine = "auto"
+	}
+
+	// Validate engine value
+	validEngines := map[string]bool{
+		"auto":       true,
+		"ffmpeg":     true,
+		"gstreamer":  true,
+	}
+	if !validEngines[job.Engine] {
+		http.Error(w, fmt.Sprintf("Invalid engine '%s'. Valid values: auto, ffmpeg, gstreamer", job.Engine), http.StatusBadRequest)
+		return
 	}
 
 	if err := h.store.CreateJob(job); err != nil {

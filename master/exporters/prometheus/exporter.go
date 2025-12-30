@@ -45,9 +45,25 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	queueLength := 0
 	var totalDuration float64
 	jobCount := 0
+	
+	// Count jobs by engine (new)
+	jobsByEngine := map[string]int{
+		"ffmpeg":    0,
+		"gstreamer": 0,
+		"auto":      0,
+	}
+	completedByEngine := map[string]int{
+		"ffmpeg":    0,
+		"gstreamer": 0,
+	}
 
 	for _, job := range jobs {
 		jobsByState[job.Status]++
+		
+		// Track engine distribution
+		if job.Engine != "" {
+			jobsByEngine[job.Engine]++
+		}
 		
 		if job.Status == models.JobStatusProcessing || job.Status == models.JobStatusAssigned {
 			activeJobs++
@@ -63,6 +79,12 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				duration := job.CompletedAt.Sub(job.CreatedAt).Seconds()
 				totalDuration += duration
 				jobCount++
+			}
+			
+			// Track completed jobs by actual engine used (from job results)
+			// Note: This is the engine that was actually selected, not the preference
+			if job.Status == models.JobStatusCompleted && job.Engine != "" && job.Engine != "auto" {
+				completedByEngine[job.Engine]++
 			}
 		}
 	}
@@ -166,6 +188,19 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Always export all queue types (even if count is 0)
 	for _, queueType := range []string{"live", "default", "batch"} {
 		fmt.Fprintf(w, "ffrtmp_queue_by_type{type=\"%s\"} %d\n", queueType, queueByType[queueType])
+	}
+	
+	// Engine metrics (new)
+	fmt.Fprintf(w, "\n# HELP ffrtmp_jobs_by_engine Total jobs by transcoding engine preference\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_jobs_by_engine counter\n")
+	for _, engine := range []string{"ffmpeg", "gstreamer", "auto"} {
+		fmt.Fprintf(w, "ffrtmp_jobs_by_engine{engine=\"%s\"} %d\n", engine, jobsByEngine[engine])
+	}
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_jobs_completed_by_engine Completed jobs by actual engine used\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_jobs_completed_by_engine counter\n")
+	for _, engine := range []string{"ffmpeg", "gstreamer"} {
+		fmt.Fprintf(w, "ffrtmp_jobs_completed_by_engine{engine=\"%s\"} %d\n", engine, completedByEngine[engine])
 	}
 }
 
