@@ -21,7 +21,7 @@ services:
     image: prom/alertmanager:latest
     container_name: alertmanager
     volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./master/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
     ports:
@@ -53,7 +53,7 @@ services:
     image: victoriametrics/victoria-metrics:latest
     container_name: victoriametrics
     volumes:
-      - ./victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
+      - ./master/monitoring/victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
       - victoriametrics-data:/storage
     command:
       - "--storageDataPath=/storage"
@@ -83,7 +83,7 @@ services:
       - GF_INSTALL_PLUGINS=grafana-clock-panel
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./master/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - victoriametrics
     restart: unless-stopped
@@ -93,7 +93,7 @@ services:
   cpu-exporter-go:
     build: 
       context: .
-      dockerfile: src/exporters/cpu_exporter/Dockerfile
+      dockerfile: worker/exporters/cpu_exporter/Dockerfile
     container_name: cpu-exporter-go
     privileged: true
     volumes:
@@ -108,7 +108,7 @@ services:
       - CPU_EXPORTER_PORT=9500
 
   docker-stats-exporter:
-    build: ./src/exporters/docker_stats
+    build: ./worker/exporters/docker_stats
     container_name: docker-stats-exporter
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -179,7 +179,7 @@ services:
   gpu-exporter-go:
     build:
       context: .
-      dockerfile: src/exporters/gpu_exporter/Dockerfile
+      dockerfile: worker/exporters/gpu_exporter/Dockerfile
     container_name: gpu-exporter-go
     profiles:
       - nvidia
@@ -195,7 +195,7 @@ services:
       - GPU_EXPORTER_PORT=9505
 
   results-exporter:
-    build: ./src/exporters/results
+    build: ./master/exporters/results
     container_name: results-exporter
     volumes:
       - ./test_results:/results
@@ -217,11 +217,11 @@ services:
   qoe-exporter:
     build:
       context: .
-      dockerfile: src/exporters/qoe/Dockerfile
+      dockerfile: master/exporters/qoe/Dockerfile
     container_name: qoe-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./advisor:/app/advisor:ro
+      - ./shared/advisor:/app/advisor:ro
     ports:
       - "9503:9503"
     restart: unless-stopped
@@ -239,11 +239,11 @@ services:
   cost-exporter:
     build:
       context: .
-      dockerfile: src/exporters/cost/Dockerfile
+      dockerfile: master/exporters/cost/Dockerfile
     container_name: cost-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./advisor:/app/advisor:ro
+      - ./shared/advisor:/app/advisor:ro
       - ./pricing_config.json:/app/pricing_config.json:ro
     ports:
       - "9504:9504"
@@ -267,7 +267,7 @@ services:
       retries: 3
 
   exporter-health-checker:
-    build: ./src/exporters/health_checker
+    build: ./master/exporters/health_checker
     container_name: exporter-health-checker
     ports:
       - "9600:9600"
@@ -286,7 +286,7 @@ services:
   ffmpeg-exporter:
     build:
       context: .
-      dockerfile: src/exporters/ffmpeg_exporter/Dockerfile
+      dockerfile: worker/exporters/ffmpeg_exporter/Dockerfile
     container_name: ffmpeg-exporter
     ports:
       - "9506:9506"
