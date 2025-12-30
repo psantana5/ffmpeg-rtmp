@@ -18,9 +18,6 @@ import (
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
 
-// Global variable to store master URL for RTMP streaming
-var globalMasterURL string
-
 func main() {
 	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
 	register := flag.Bool("register", false, "Register with master node")
@@ -48,9 +45,6 @@ func main() {
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
 	log.Printf("Master URL: %s", *masterURL)
-
-	// Store master URL globally for RTMP streaming
-	globalMasterURL = *masterURL
 
 	// Detect hardware capabilities
 	log.Println("Detecting hardware capabilities...")
@@ -237,7 +231,8 @@ func main() {
 		log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
 
 		// Execute job with hardware-optimized parameters
-		result := executeJob(job, client.GetNodeID(), ffmpegOpt)
+		// Pass client to access master URL for RTMP streaming
+		result := executeJob(job, client, ffmpegOpt)
 
 		// Send results
 		if err := client.SendResults(result); err != nil {
@@ -279,12 +274,12 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, nodeID string, ffmpegOpt *agent.FFmpegOptimization) *models.JobResult {
+func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) *models.JobResult {
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
 	// Execute the actual job based on parameters
-	metrics, analyzerOutput, err := executeFFmpegJob(job, ffmpegOpt)
+	metrics, analyzerOutput, err := executeFFmpegJob(job, client, ffmpegOpt)
 	
 	duration := time.Since(startTime).Seconds()
 	
@@ -292,7 +287,7 @@ func executeJob(job *models.Job, nodeID string, ffmpegOpt *agent.FFmpegOptimizat
 		log.Printf("Job %s failed: %v", job.ID, err)
 		return &models.JobResult{
 			JobID:       job.ID,
-			NodeID:      nodeID,
+			NodeID:      client.GetNodeID(),
 			Status:      models.JobStatusFailed,
 			Error:       err.Error(),
 			CompletedAt: time.Now(),
@@ -312,7 +307,7 @@ func executeJob(job *models.Job, nodeID string, ffmpegOpt *agent.FFmpegOptimizat
 	log.Printf("Job %s completed successfully in %.2f seconds", job.ID, duration)
 	return &models.JobResult{
 		JobID:          job.ID,
-		NodeID:         nodeID,
+		NodeID:         client.GetNodeID(),
 		Status:         models.JobStatusCompleted,
 		CompletedAt:    time.Now(),
 		Metrics:        metrics,
@@ -321,7 +316,7 @@ func executeJob(job *models.Job, nodeID string, ffmpegOpt *agent.FFmpegOptimizat
 }
 
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
-func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+func executeFFmpegJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
 	// Extract parameters from job
 	params := job.Parameters
 	if params == nil {
@@ -347,12 +342,14 @@ func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (met
 			rtmpURL = rtmpURLParam
 		} else {
 			// Default: construct RTMP URL pointing to master node
-			// Parse master URL to get host
+			// Get master URL from client (which was configured with --master flag)
+			masterURL := client.GetMasterURL()
 			masterHost := "localhost"
-			if globalMasterURL != "" {
-				parsedURL, err := url.Parse(globalMasterURL)
+			
+			if masterURL != "" {
+				parsedURL, err := url.Parse(masterURL)
 				if err == nil && parsedURL.Host != "" {
-					// Extract hostname (remove port if present)
+					// Extract hostname (remove API port)
 					host := parsedURL.Host
 					if colonIdx := strings.Index(host, ":"); colonIdx > 0 {
 						host = host[:colonIdx]
@@ -369,6 +366,7 @@ func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (met
 			rtmpURL = fmt.Sprintf("rtmp://%s:1935/live/%s", masterHost, streamKey)
 		}
 		log.Printf("RTMP streaming mode enabled: %s", rtmpURL)
+		log.Printf("  Master URL source: %s (from --master flag)", client.GetMasterURL())
 		log.Printf("  Streaming to master node RTMP server")
 	}
 

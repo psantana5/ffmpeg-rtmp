@@ -185,3 +185,10 @@ func (c *Client) SendResults(result *models.JobResult) error {
 func (c *Client) GetNodeID() string {
 	return c.nodeID
 }
+
+// GetMasterURL returns the master node URL
+// This is used by workers to construct RTMP streaming URLs
+// since the RTMP server runs on the master node
+func (c *Client) GetMasterURL() string {
+	return c.masterURL
+}
