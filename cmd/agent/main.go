@@ -24,6 +24,7 @@ func main() {
 	certFile := flag.String("cert", "", "TLS client certificate file (for mTLS)")
 	keyFile := flag.String("key", "", "TLS client key file (for mTLS)")
 	caFile := flag.String("ca", "", "CA certificate file to verify server")
+	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
 	flag.Parse()
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
@@ -58,13 +59,29 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to load TLS config: %v", err)
 		}
+		if *insecureSkipVerify {
+			log.Println("WARNING: TLS certificate verification disabled (insecure)")
+			tlsConfig.InsecureSkipVerify = true
+		}
 		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
 		log.Println("TLS enabled")
+	} else if strings.HasPrefix(*masterURL, "https://") {
+		// HTTPS without client certificates - create TLS config with optional skip verify
+		log.Println("Initializing TLS client for HTTPS...")
+		tlsConfig, err := tlsutil.LoadClientTLSConfig("", "", *caFile)
+		if err != nil {
+			log.Fatalf("Failed to load TLS config: %v", err)
+		}
+		if *insecureSkipVerify {
+			log.Println("WARNING: TLS certificate verification disabled (insecure)")
+			tlsConfig.InsecureSkipVerify = true
+		}
+		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
+		if *caFile == "" && !*insecureSkipVerify {
+			log.Println("WARNING: Using HTTPS without CA certificate - server certificate must be signed by a trusted CA")
+		}
 	} else {
 		client = agent.NewClient(*masterURL)
-		if strings.HasPrefix(*masterURL, "https://") {
-			log.Println("WARNING: Using HTTPS without client certificate")
-		}
 	}
 
 	// Set API key if provided

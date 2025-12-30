@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +28,8 @@ func main() {
 	caFile := flag.String("ca", "", "CA certificate file for mTLS")
 	requireClientCert := flag.Bool("mtls", false, "Require client certificate (mTLS)")
 	generateCert := flag.Bool("generate-cert", false, "Generate self-signed certificate")
+	certIPs := flag.String("cert-ips", "", "Comma-separated list of IP addresses to include in certificate SANs (e.g., '192.168.0.51,10.0.0.5')")
+	certHosts := flag.String("cert-hosts", "", "Comma-separated list of hostnames to include in certificate SANs (e.g., 'depa,server1')")
 	apiKey := flag.String("api-key", "", "API key for authentication (leave empty to disable)")
 	flag.Parse()
 
@@ -39,12 +42,37 @@ func main() {
 		if err := os.MkdirAll("certs", 0755); err != nil {
 			log.Fatalf("Failed to create certs directory: %v", err)
 		}
-		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master"); err != nil {
+		
+		// Parse IP addresses and hostnames from comma-separated strings
+		var sans []string
+		if *certIPs != "" {
+			ips := strings.Split(*certIPs, ",")
+			for _, ip := range ips {
+				ip = strings.TrimSpace(ip)
+				if ip != "" {
+					sans = append(sans, ip)
+				}
+			}
+		}
+		if *certHosts != "" {
+			hosts := strings.Split(*certHosts, ",")
+			for _, host := range hosts {
+				host = strings.TrimSpace(host)
+				if host != "" {
+					sans = append(sans, host)
+				}
+			}
+		}
+		
+		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master", sans...); err != nil {
 			log.Fatalf("Failed to generate certificate: %v", err)
 		}
 		log.Println("Certificate generated successfully")
 		log.Printf("  Certificate: %s", *certFile)
 		log.Printf("  Key: %s", *keyFile)
+		if len(sans) > 0 {
+			log.Printf("  Additional SANs: %v", sans)
+		}
 		return // Exit after generating certificate
 	}
 

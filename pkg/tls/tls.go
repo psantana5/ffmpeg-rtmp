@@ -9,12 +9,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"time"
 )
 
 // GenerateSelfSignedCert generates a self-signed certificate for testing/development
-func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
+// ipAddresses is an optional list of IP addresses to include in the certificate SANs
+// Additional hostnames can be provided after IP addresses
+func GenerateSelfSignedCert(certFile, keyFile, commonName string, ipAddresses ...string) error {
 	// Generate private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -30,6 +33,28 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
 		return fmt.Errorf("failed to generate serial number: %w", err)
 	}
 
+	// Parse IP addresses and DNS names
+	var ips []net.IP
+	var dnsNames []string
+	
+	// Always include localhost IPs
+	ips = append(ips, net.ParseIP("127.0.0.1"))
+	ips = append(ips, net.ParseIP("::1"))
+	
+	// Always include common DNS names
+	dnsNames = append(dnsNames, commonName, "localhost")
+	
+	// Add user-provided values (could be IPs or hostnames)
+	for _, value := range ipAddresses {
+		if ip := net.ParseIP(value); ip != nil {
+			// It's an IP address
+			ips = append(ips, ip)
+		} else if value != "" {
+			// It's a hostname
+			dnsNames = append(dnsNames, value)
+		}
+	}
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -41,7 +66,8 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		DNSNames:              []string{commonName, "localhost"},
+		DNSNames:              dnsNames,
+		IPAddresses:           ips,
 	}
 
 	// Create certificate
