@@ -66,6 +66,16 @@ func main() {
 	log.Printf("  Node Type: %s", nodeType)
 	log.Printf("  OS/Arch: %s/%s", caps.Labels["os"], caps.Labels["arch"])
 
+	// Optimize FFmpeg parameters based on hardware
+	log.Println("Optimizing FFmpeg parameters for this hardware...")
+	ffmpegOpt := agent.OptimizeFFmpegParameters(caps, nodeType)
+	log.Printf("  Recommended Encoder: %s", ffmpegOpt.Encoder)
+	log.Printf("  Recommended Preset: %s", ffmpegOpt.Preset)
+	if ffmpegOpt.HWAccel != "none" {
+		log.Printf("  Hardware Acceleration: %s", ffmpegOpt.HWAccel)
+	}
+	log.Printf("  Optimization Reason: %s", ffmpegOpt.Reason)
+
 	// Create client with TLS support if certificates provided
 	var client *agent.Client
 	if *certFile != "" && *keyFile != "" {
@@ -219,8 +229,8 @@ func main() {
 
 		log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
 
-		// Execute job
-		result := executeJob(job, client.GetNodeID())
+		// Execute job with hardware-optimized parameters
+		result := executeJob(job, client.GetNodeID(), ffmpegOpt)
 
 		// Send results
 		if err := client.SendResults(result); err != nil {
@@ -262,12 +272,12 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, nodeID string) *models.JobResult {
+func executeJob(job *models.Job, nodeID string, ffmpegOpt *agent.FFmpegOptimization) *models.JobResult {
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
 	// Execute the actual job based on parameters
-	metrics, analyzerOutput, err := executeFFmpegJob(job)
+	metrics, analyzerOutput, err := executeFFmpegJob(job, ffmpegOpt)
 	
 	duration := time.Since(startTime).Seconds()
 	
@@ -304,12 +314,18 @@ func executeJob(job *models.Job, nodeID string) *models.JobResult {
 }
 
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
-func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+func executeFFmpegJob(job *models.Job, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
 	// Extract parameters from job
 	params := job.Parameters
 	if params == nil {
 		params = make(map[string]interface{})
 	}
+
+	// Apply hardware-optimized parameters (job parameters take precedence)
+	params = agent.ApplyOptimizationToParameters(params, ffmpegOpt)
+	
+	log.Printf("Using optimized FFmpeg parameters: encoder=%s, preset=%s", 
+		params["codec"], params["preset"])
 
 	// Get input file (use test pattern if not specified)
 	inputFile := filepath.Join(os.TempDir(), "test_input.mp4")
@@ -420,15 +436,17 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 
 	// Generate analyzer output
 	analyzerOutput = map[string]interface{}{
-		"scenario":      job.Scenario,
-		"input_file":    inputFile,
-		"output_file":   outputFile,
-		"output_size":   outputInfo.Size(),
-		"codec":         codec,
-		"bitrate":       bitrate,
-		"preset":        preset,
-		"exec_duration": execDuration,
-		"status":        "success",
+		"scenario":            job.Scenario,
+		"input_file":          inputFile,
+		"output_file":         outputFile,
+		"output_size":         outputInfo.Size(),
+		"codec":               codec,
+		"bitrate":             bitrate,
+		"preset":              preset,
+		"exec_duration":       execDuration,
+		"status":              "success",
+		"optimization_reason": ffmpegOpt.Reason,
+		"hwaccel":             ffmpegOpt.HWAccel,
 	}
 
 	return metrics, analyzerOutput, nil
