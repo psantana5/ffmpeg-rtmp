@@ -47,6 +47,10 @@ type TranscodingParams struct {
 	PixelFormat  string            `json:"pixel_format"`  // Output pixel format
 }
 
+// FFmpegParams is an alias for TranscodingParams for clearer API naming
+// This provides better semantic clarity when building FFmpeg commands
+type FFmpegParams = TranscodingParams
+
 // CalculateOptimalFFmpegParams determines the best FFmpeg parameters for given inputs
 func CalculateOptimalFFmpegParams(
 	worker WorkerCapabilities,
@@ -478,4 +482,304 @@ func addSpecialFlags(params *TranscodingParams, worker WorkerCapabilities, conte
 	params.ExtraParams["g"] = fmt.Sprintf("%d", gopSize)
 	params.Reasoning = append(params.Reasoning,
 		fmt.Sprintf("GOP size set to %d: 2 seconds for good seek performance", gopSize))
+}
+
+// RTMPConfig contains configuration for RTMP streaming
+type RTMPConfig struct {
+	MasterHost string // Master node hostname or IP (e.g., "10.0.1.5", "master.local")
+	StreamKey  string // Unique stream identifier
+	InputFile  string // Input video file path
+}
+
+// BuildFFmpegCommand constructs a complete FFmpeg command for RTMP streaming
+// with all hardware optimizations applied. The command is validated for the
+// chosen codec to ensure all flags are compatible.
+//
+// Parameters:
+//   - params: Optimized FFmpeg parameters from CalculateOptimalFFmpegParams
+//   - config: RTMP streaming configuration
+//
+// Returns:
+//   - Complete FFmpeg command as a slice of arguments (ready for exec.Command)
+//   - Error if validation fails or configuration is invalid
+func BuildFFmpegCommand(params *FFmpegParams, config RTMPConfig) ([]string, error) {
+	// Validate required configuration
+	if config.MasterHost == "" {
+		return nil, fmt.Errorf("master host is required (do not use localhost)")
+	}
+	if config.StreamKey == "" {
+		return nil, fmt.Errorf("stream key is required")
+	}
+	if config.InputFile == "" {
+		return nil, fmt.Errorf("input file is required")
+	}
+
+	// Build RTMP URL - RTMP server runs on master node at port 1935
+	rtmpURL := fmt.Sprintf("rtmp://%s:1935/live/%s", config.MasterHost, config.StreamKey)
+
+	// Start building command arguments
+	args := []string{
+		"-re", // Read input at native frame rate (important for streaming)
+		"-i", config.InputFile,
+	}
+
+	// Add codec selection
+	// Note: FFmpeg uses -c:v for video codec
+	args = append(args, "-c:v", params.Encoder)
+
+	// Add preset
+	args = append(args, "-preset", params.Preset)
+
+	// Add pixel format if specified
+	if params.PixelFormat != "" {
+		args = append(args, "-pix_fmt", params.PixelFormat)
+	}
+
+	// Add rate control: CRF or bitrate
+	// CRF is preferred for quality-based encoding
+	if params.CRF > 0 {
+		// Validate CRF flag based on encoder type
+		if err := validateCRFForEncoder(params.Encoder, params.CRF); err != nil {
+			return nil, err
+		}
+		args = append(args, "-crf", fmt.Sprintf("%d", params.CRF))
+	} else if params.Bitrate != "" {
+		args = append(args, "-b:v", params.Bitrate)
+	}
+
+	// Add thread count if specified
+	if params.Threads > 0 {
+		args = append(args, "-threads", fmt.Sprintf("%d", params.Threads))
+	}
+
+	// Add encoder-specific extra parameters
+	// These are validated based on the encoder type
+	if err := addEncoderSpecificFlags(&args, params); err != nil {
+		return nil, err
+	}
+
+	// Add output format and destination
+	args = append(args, "-f", "flv", rtmpURL)
+
+	return args, nil
+}
+
+// validateCRFForEncoder ensures CRF values are appropriate for the encoder
+func validateCRFForEncoder(encoder string, crf int) error {
+	switch encoder {
+	case "libx264", "h264_nvenc":
+		// H.264 CRF range: 0-51 (typical: 18-28)
+		if crf < 0 || crf > 51 {
+			return fmt.Errorf("CRF %d out of range for %s (valid: 0-51)", crf, encoder)
+		}
+	case "libx265", "hevc_nvenc":
+		// H.265 CRF range: 0-51 (typical: 20-32 due to better compression)
+		if crf < 0 || crf > 51 {
+			return fmt.Errorf("CRF %d out of range for %s (valid: 0-51)", crf, encoder)
+		}
+	case "h264_qsv", "hevc_qsv":
+		// QSV uses global_quality instead, but we still validate range
+		if crf < 0 || crf > 51 {
+			return fmt.Errorf("CRF %d out of range for %s (valid: 0-51)", crf, encoder)
+		}
+	default:
+		// For other encoders, allow any positive value
+		if crf < 0 {
+			return fmt.Errorf("CRF must be non-negative")
+		}
+	}
+	return nil
+}
+
+// addEncoderSpecificFlags adds codec-specific flags to the FFmpeg command
+// and validates they are compatible with the chosen encoder
+func addEncoderSpecificFlags(args *[]string, params *FFmpegParams) error {
+	isNVENC := params.Encoder == "h264_nvenc" || params.Encoder == "hevc_nvenc"
+	isQSV := params.Encoder == "h264_qsv" || params.Encoder == "hevc_qsv"
+	isX264 := params.Encoder == "libx264"
+	isX265 := params.Encoder == "libx265"
+
+	for key, value := range params.ExtraParams {
+		// Validate and transform flags based on encoder type
+		switch key {
+		case "tune":
+			// tune is valid for libx264/libx265 but not NVENC/QSV
+			if isNVENC || isQSV {
+				// Skip tune for hardware encoders
+				continue
+			}
+			*args = append(*args, "-tune", value)
+
+		case "rc":
+			// Rate control mode - NVENC specific
+			if !isNVENC {
+				// Skip rc for non-NVENC encoders
+				continue
+			}
+			*args = append(*args, "-rc", value)
+
+		case "spatial-aq", "temporal-aq":
+			// Adaptive quantization - NVENC specific
+			if !isNVENC {
+				continue
+			}
+			*args = append(*args, "-"+key, value)
+
+		case "zerolatency":
+			// Low latency mode - NVENC specific
+			if !isNVENC {
+				continue
+			}
+			*args = append(*args, "-zerolatency", value)
+
+		case "bf", "bframes":
+			// B-frames: different flags for different encoders
+			if isNVENC {
+				*args = append(*args, "-bf", value)
+			} else if isX264 || isX265 {
+				*args = append(*args, "-bf", value)
+			} else if isQSV {
+				*args = append(*args, "-bf", value)
+			}
+
+		case "aq-mode":
+			// AQ mode - libx265 specific
+			if !isX265 {
+				continue
+			}
+			*args = append(*args, "-x265-params", fmt.Sprintf("aq-mode=%s", value))
+
+		case "no-sao":
+			// SAO filter - libx265 specific
+			if !isX265 {
+				continue
+			}
+			if value == "1" {
+				*args = append(*args, "-x265-params", "no-sao=1")
+			}
+
+		case "rd":
+			// Rate-distortion optimization - libx265 specific
+			if !isX265 {
+				continue
+			}
+			*args = append(*args, "-x265-params", fmt.Sprintf("rd=%s", value))
+
+		case "me":
+			// Motion estimation - libx264 specific
+			if !isX264 {
+				continue
+			}
+			*args = append(*args, "-me_method", value)
+
+		case "g":
+			// GOP size - universal
+			*args = append(*args, "-g", value)
+
+		case "threads":
+			// Thread count - already handled separately, skip here
+			continue
+
+		default:
+			// Unknown parameter - log warning but don't fail
+			// This allows for future extensibility
+			continue
+		}
+	}
+
+	return nil
+}
+
+// GetRTMPURLFromMasterURL extracts the hostname from a master API URL
+// and constructs the RTMP streaming URL
+//
+// Example:
+//   - Input: "https://10.0.1.5:8080" -> Output: "10.0.1.5"
+//   - Input: "http://master.local:8080" -> Output: "master.local"
+//   - Input: "https://master.example.com:443/api" -> Output: "master.example.com"
+func GetRTMPURLFromMasterURL(masterURL string) (string, error) {
+	if masterURL == "" {
+		return "", fmt.Errorf("master URL cannot be empty")
+	}
+
+	// Check for localhost - this is an error as workers must stream to master
+	if masterURL == "localhost" || masterURL == "127.0.0.1" || masterURL == "::1" {
+		return "", fmt.Errorf("cannot use localhost for RTMP streaming - must specify master host")
+	}
+
+	// Try to parse as URL
+	if len(masterURL) > 4 && (masterURL[:4] == "http" || masterURL[:5] == "https") {
+		// Parse full URL
+		var host string
+
+		// Find the host:port part after ://
+		schemeEnd := 0
+		if idx := len("http://"); len(masterURL) > idx && masterURL[:idx] == "http://" {
+			schemeEnd = idx
+		} else if idx := len("https://"); len(masterURL) > idx && masterURL[:idx] == "https://" {
+			schemeEnd = idx
+		}
+
+		if schemeEnd == 0 {
+			return "", fmt.Errorf("invalid URL scheme")
+		}
+
+		// Extract everything after scheme
+		remaining := masterURL[schemeEnd:]
+
+		// Find end of host:port (either / or end of string)
+		endIdx := len(remaining)
+		if idx := 0; idx < len(remaining) {
+			for i, ch := range remaining {
+				if ch == '/' {
+					endIdx = i
+					break
+				}
+			}
+		}
+
+		hostPort := remaining[:endIdx]
+
+		// Split host and port
+		colonIdx := -1
+		for i := len(hostPort) - 1; i >= 0; i-- {
+			if hostPort[i] == ':' {
+				colonIdx = i
+				break
+			}
+		}
+
+		if colonIdx > 0 {
+			host = hostPort[:colonIdx]
+		} else {
+			host = hostPort
+		}
+
+		if host == "" {
+			return "", fmt.Errorf("could not extract host from URL")
+		}
+
+		// Validate extracted host is not localhost
+		if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+			return "", fmt.Errorf("cannot use localhost for RTMP streaming - must specify master host")
+		}
+
+		return host, nil
+	}
+
+	// Not a URL, treat as hostname directly
+	// Remove port if present
+	colonIdx := -1
+	for i := len(masterURL) - 1; i >= 0; i-- {
+		if masterURL[i] == ':' {
+			colonIdx = i
+			break
+		}
+	}
+
+	if colonIdx > 0 {
+		return masterURL[:colonIdx], nil
+	}
+
+	return masterURL, nil
 }
