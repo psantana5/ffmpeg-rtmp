@@ -14,13 +14,23 @@ import (
 
 // MasterHandler handles master node API requests
 type MasterHandler struct {
-	store store.Store
+	store      store.Store
+	maxRetries int
 }
 
 // NewMasterHandler creates a new master handler
 func NewMasterHandler(s store.Store) *MasterHandler {
 	return &MasterHandler{
-		store: s,
+		store:      s,
+		maxRetries: 0, // No retries by default
+	}
+}
+
+// NewMasterHandlerWithRetry creates a new master handler with retry support
+func NewMasterHandlerWithRetry(s store.Store, maxRetries int) *MasterHandler {
+	return &MasterHandler{
+		store:      s,
+		maxRetries: maxRetries,
 	}
 }
 
@@ -179,6 +189,45 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
+	}
+
+	// Handle retry logic for failed jobs
+	if result.Status == models.JobStatusFailed && h.maxRetries > 0 {
+		job, err := h.store.GetJob(result.JobID)
+		if err != nil {
+			log.Printf("Error getting job for retry check: %v", err)
+		} else if job.RetryCount < h.maxRetries {
+			// Re-queue job for retry
+			job.RetryCount++
+			job.Status = models.JobStatusPending
+			job.NodeID = ""
+			job.StartedAt = nil
+			job.Error = result.Error // Store error from previous attempt
+			
+			if err := h.store.CreateJob(job); err != nil {
+				log.Printf("Error re-queuing job for retry: %v", err)
+			} else {
+				log.Printf("Job %s failed on node %s (attempt %d/%d) - re-queued for retry",
+					result.JobID, result.NodeID, job.RetryCount, h.maxRetries)
+				
+				// Still update the original job status to track the failure
+				if err := h.store.UpdateJobStatus(result.JobID, models.JobStatusFailed, result.Error); err != nil {
+					log.Printf("Error updating original job status: %v", err)
+				}
+				
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"status":  "retrying",
+					"retry":   job.RetryCount,
+					"max_retries": h.maxRetries,
+				})
+				return
+			}
+		} else {
+			log.Printf("Job %s failed after %d attempts - max retries reached",
+				result.JobID, job.RetryCount)
+		}
 	}
 
 	// Update job status
