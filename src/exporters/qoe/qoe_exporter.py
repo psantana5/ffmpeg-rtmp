@@ -220,7 +220,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='QoE Metrics Prometheus Exporter')
-    parser.add_argument('--port', type=int, default=9504, help='Port to listen on (default: 9504)')
+    parser.add_argument('--port', type=int, default=9503, help='Port to listen on (default: 9503)')
     parser.add_argument(
         '--results-dir',
         type=Path,
