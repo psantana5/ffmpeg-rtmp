@@ -73,6 +73,7 @@ func (s *SQLiteStore) initSchema() error {
 		id TEXT PRIMARY KEY,
 		scenario TEXT NOT NULL,
 		confidence TEXT,
+		engine TEXT DEFAULT 'auto',
 		parameters TEXT,
 		status TEXT NOT NULL,
 		queue TEXT DEFAULT 'default',
@@ -258,13 +259,16 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	if job.Priority == "" {
 		job.Priority = "medium"
 	}
+	if job.Engine == "" {
+		job.Engine = "auto"
+	}
 
 	_, err = s.db.Exec(`
 		INSERT INTO jobs 
-		(id, scenario, confidence, parameters, status, queue, priority, progress, node_id, 
+		(id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
 		 created_at, started_at, completed_at, retry_count, error, state_transitions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, job.ID, job.Scenario, job.Confidence, string(params), job.Status, job.Queue,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, job.ID, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
 		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt,
 		job.CompletedAt, job.RetryCount, job.Error, string(transitions))
 
@@ -278,10 +282,10 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var startedAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
-		SELECT id, scenario, confidence, parameters, status, queue, priority, progress, node_id,
+		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, completed_at, retry_count, error, state_transitions
 		FROM jobs WHERE id = ?
-	`, id).Scan(&job.ID, &job.Scenario, &job.Confidence, &paramsJSON, &job.Status,
+	`, id).Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt, 
 		&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
 
@@ -317,7 +321,7 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 // GetAllJobs returns all jobs
 func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	rows, err := s.db.Query(`
-		SELECT id, scenario, confidence, parameters, status, queue, priority, progress, node_id,
+		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, completed_at, retry_count, error, state_transitions
 		FROM jobs ORDER BY created_at DESC
 	`)
@@ -332,7 +336,7 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 		var paramsJSON, transitionsJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
 
-		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &paramsJSON,
+		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt,
 			&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
 			continue
@@ -395,7 +399,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	var startedAt, completedAt sql.NullTime
 
 	query := `
-		SELECT id, scenario, confidence, parameters, status, queue, priority, progress, node_id,
+		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, completed_at, retry_count, error, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?)
@@ -417,7 +421,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	`
 
 	err = tx.QueryRow(query, models.JobStatusPending, models.JobStatusQueued).Scan(
-		&job.ID, &job.Scenario, &job.Confidence, &paramsJSON, &job.Status, &job.Queue,
+		&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status, &job.Queue,
 		&job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt, &startedAt, &completedAt,
 		&job.RetryCount, &job.Error, &transitionsJSON)
 
@@ -714,7 +718,7 @@ func (s *SQLiteStore) CancelJob(id string) error {
 // GetQueuedJobs returns jobs in a specific queue with priority filtering
 func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job {
 	query := `
-		SELECT id, scenario, confidence, parameters, status, queue, priority, progress, node_id,
+		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, completed_at, retry_count, error, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?) AND queue = ?
@@ -740,7 +744,7 @@ func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job
 		var paramsJSON, transitionsJSON sql.NullString
 		var startedAt, completedAt sql.NullTime
 
-		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &paramsJSON,
+		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &job.NodeID,
 			&job.CreatedAt, &startedAt, &completedAt, &job.RetryCount, &job.Error,
 			&transitionsJSON); err != nil {

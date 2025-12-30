@@ -13,10 +13,16 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 )
 
+// MetricsRecorder is an interface for recording metrics
+type MetricsRecorder interface {
+	RecordScheduleAttempt(result string)
+}
+
 // MasterHandler handles master node API requests
 type MasterHandler struct {
-	store      store.Store
-	maxRetries int
+	store           store.Store
+	maxRetries      int
+	metricsRecorder MetricsRecorder
 }
 
 // NewMasterHandler creates a new master handler
@@ -33,6 +39,11 @@ func NewMasterHandlerWithRetry(s store.Store, maxRetries int) *MasterHandler {
 		store:      s,
 		maxRetries: maxRetries,
 	}
+}
+
+// SetMetricsRecorder sets the metrics recorder for the handler
+func (h *MasterHandler) SetMetricsRecorder(recorder MetricsRecorder) {
+	h.metricsRecorder = recorder
 }
 
 // RegisterRoutes registers all API routes
@@ -218,16 +229,28 @@ func (h *MasterHandler) GetNextJob(w http.ResponseWriter, r *http.Request) {
 	job, err := h.store.GetNextJob(nodeID)
 	if err != nil {
 		if err == store.ErrJobNotFound {
-			// No jobs available
+			// No jobs available - record failed scheduling attempt
+			if h.metricsRecorder != nil {
+				h.metricsRecorder.RecordScheduleAttempt("no_jobs")
+			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"job": nil,
 			})
 			return
 		}
+		// Record failed scheduling attempt due to error
+		if h.metricsRecorder != nil {
+			h.metricsRecorder.RecordScheduleAttempt("error")
+		}
 		log.Printf("Error getting next job: %v", err)
 		http.Error(w, "Failed to get next job", http.StatusInternalServerError)
 		return
+	}
+
+	// Record successful scheduling attempt
+	if h.metricsRecorder != nil {
+		h.metricsRecorder.RecordScheduleAttempt("success")
 	}
 
 	log.Printf("Job %s assigned to node %s", job.ID, nodeID)
