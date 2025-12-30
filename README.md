@@ -145,6 +145,32 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 
 See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
+## ⚡ NEW: Dual Transcoding Engine Support
+
+**Choose the best transcoding engine for your workload:**
+
+- **FFmpeg** (default) - Versatile, mature, excellent for file transcoding
+- **GStreamer** (new) - Optimized for low-latency live streaming
+- **Intelligent Auto-Selection** - System picks the best engine automatically
+- **Hardware Acceleration** - NVIDIA NVENC, Intel QSV/VAAPI support for both engines
+
+```bash
+# Auto-select best engine (default)
+ffrtmp jobs submit --scenario live-stream --engine auto
+
+# Force specific engine
+ffrtmp jobs submit --scenario transcode --engine ffmpeg
+ffrtmp jobs submit --scenario live-rtmp --engine gstreamer
+```
+
+**Auto-selection logic:**
+- LIVE queue → GStreamer (low latency)
+- FILE/batch → FFmpeg (better for offline)
+- RTMP streaming → GStreamer
+- GPU+NVENC+streaming → GStreamer
+
+See **[docs/DUAL_ENGINE_SUPPORT.md](docs/DUAL_ENGINE_SUPPORT.md)** for complete documentation.
+
 ## What's New: Go Exporters + VictoriaMetrics (v2.0)
 
 This project now features **production-ready Go exporters** that have replaced Python exporters for all critical telemetry:
@@ -210,6 +236,7 @@ See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detai
 Documentation organized by topic:
 
 ### Deployment & Operations
+- **[Dual Engine Support](docs/DUAL_ENGINE_SUPPORT.md)** - ⚡ NEW: FFmpeg + GStreamer engine selection guide
 - **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
 - **[Deployment Modes](shared/docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
 - **[Internal Architecture](shared/docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference

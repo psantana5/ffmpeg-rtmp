@@ -19,6 +19,7 @@ var (
 	duration   int
 	bitrate    string
 	confidence string
+	engine     string
 	queue      string
 	priority   string
 	
@@ -90,6 +91,7 @@ func init() {
 	jobsSubmitCmd.Flags().IntVar(&duration, "duration", 0, "duration in seconds")
 	jobsSubmitCmd.Flags().StringVar(&bitrate, "bitrate", "", "target bitrate (e.g., 10M)")
 	jobsSubmitCmd.Flags().StringVar(&confidence, "confidence", "auto", "confidence level (auto, high, medium, low)")
+	jobsSubmitCmd.Flags().StringVar(&engine, "engine", "auto", "transcoding engine (auto, ffmpeg, gstreamer)")
 	jobsSubmitCmd.Flags().StringVar(&queue, "queue", "default", "queue type (live, default, batch)")
 	jobsSubmitCmd.Flags().StringVar(&priority, "priority", "medium", "priority level (high, medium, low)")
 	jobsSubmitCmd.MarkFlagRequired("scenario")
@@ -101,6 +103,7 @@ func init() {
 type jobRequest struct {
 	Scenario   string                 `json:"scenario"`
 	Confidence string                 `json:"confidence,omitempty"`
+	Engine     string                 `json:"engine,omitempty"`
 	Parameters map[string]interface{} `json:"parameters,omitempty"`
 	Queue      string                 `json:"queue,omitempty"`
 	Priority   string                 `json:"priority,omitempty"`
@@ -110,6 +113,7 @@ type jobResponse struct {
 	ID          string                 `json:"id"`
 	Scenario    string                 `json:"scenario"`
 	Confidence  string                 `json:"confidence"`
+	Engine      string                 `json:"engine,omitempty"`
 	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 	Status      string                 `json:"status"`
 	Queue       string                 `json:"queue,omitempty"`
@@ -134,10 +138,15 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 	if bitrate != "" {
 		params["bitrate"] = bitrate
 	}
+	// Always include engine parameter for explicit tracking
+	if engine != "" {
+		params["engine"] = engine
+	}
 
 	req := jobRequest{
 		Scenario:   scenario,
 		Confidence: confidence,
+		Engine:     engine,
 		Queue:      queue,
 		Priority:   priority,
 	}
@@ -159,7 +168,7 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	// Send request
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
@@ -250,7 +259,7 @@ func fetchJobStatus(jobID string) (*jobResponse, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master API: %w", err)
@@ -358,7 +367,7 @@ func controlJob(jobID, action string) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
