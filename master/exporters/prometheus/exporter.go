@@ -65,11 +65,13 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			jobsByEngine[job.Engine]++
 		}
 		
+		// Count active jobs (processing or assigned)
 		if job.Status == models.JobStatusProcessing || job.Status == models.JobStatusAssigned {
 			activeJobs++
 		}
 		
-		if job.Status == models.JobStatusQueued {
+		// Count queued jobs (includes both pending and queued states)
+		if job.Status == models.JobStatusQueued || job.Status == models.JobStatusPending {
 			queueLength++
 		}
 
@@ -174,7 +176,8 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"batch":   0,
 	}
 	for _, job := range jobs {
-		if job.Status == models.JobStatusQueued {
+		// Count jobs in queue (both pending and queued states)
+		if job.Status == models.JobStatusQueued || job.Status == models.JobStatusPending {
 			queueByPriority[job.Priority]++
 			queueByType[job.Queue]++
 		}
