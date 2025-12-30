@@ -41,6 +41,7 @@ func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/nodes/{id}/heartbeat", h.NodeHeartbeat).Methods("POST")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
 	r.HandleFunc("/jobs", h.ListJobs).Methods("GET")
+	r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
 	r.HandleFunc("/jobs/next", h.GetNextJob).Methods("GET")
 	r.HandleFunc("/results", h.ReceiveResults).Methods("POST")
 	r.HandleFunc("/health", h.Health).Methods("GET")
@@ -152,6 +153,26 @@ func (h *MasterHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 		"jobs":  jobs,
 		"count": len(jobs),
 	})
+}
+
+// GetJob retrieves a specific job by ID
+func (h *MasterHandler) GetJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	job, err := h.store.GetJob(jobID)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error getting job: %v", err)
+		http.Error(w, "Failed to get job", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(job)
 }
 
 // GetNextJob retrieves the next pending job for a node
