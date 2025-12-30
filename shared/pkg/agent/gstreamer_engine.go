@@ -41,13 +41,6 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		params = make(map[string]interface{})
 	}
 
-	// Determine output mode (currently GStreamer only supports RTMP streaming)
-	_ = "rtmp" // GStreamer is primarily for streaming
-	if mode, ok := params["output_mode"].(string); ok && mode != "" {
-		// Future: handle different output modes
-		_ = mode
-	}
-
 	// Get RTMP URL
 	rtmpURL := ""
 	if rtmpURLParam, ok := params["rtmp_url"].(string); ok && rtmpURLParam != "" {
@@ -88,19 +81,6 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		bitrateStr := strings.TrimSuffix(b, "k")
 		bitrateStr = strings.TrimSuffix(bitrateStr, "K")
 		fmt.Sscanf(bitrateStr, "%d", &bitrate)
-	}
-
-	// Future: Use resolution and fps for custom test patterns
-	_ = "1280x720" // Default resolution
-	if res, ok := params["resolution"].(string); ok && res != "" {
-		_ = res
-	}
-
-	_ = 30 // Default FPS
-	if f, ok := params["fps"].(float64); ok {
-		_ = int(f)
-	} else if f, ok := params["fps"].(int); ok {
-		_ = f
 	}
 
 	// Select encoder based on hardware capabilities

@@ -21,6 +21,14 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/worker/exporters/prometheus"
 )
 
+// workerContext holds shared worker state
+type workerContext struct {
+	caps           *models.NodeCapabilities
+	nodeType       models.NodeType
+	engineSelector *agent.EngineSelector
+	client         *agent.Client
+}
+
 func main() {
 	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
 	register := flag.Bool("register", false, "Register with master node")
@@ -250,6 +258,14 @@ func main() {
 	ticker := time.NewTicker(*pollInterval)
 	defer ticker.Stop()
 
+	// Create worker context
+	ctx := &workerContext{
+		caps:           caps,
+		nodeType:       nodeType,
+		engineSelector: engineSelector,
+		client:         client,
+	}
+
 	for range ticker.C {
 		job, err := client.GetNextJob()
 		if err != nil {
@@ -265,9 +281,8 @@ func main() {
 		log.Printf("Received job: %s (scenario: %s, engine: %s)", job.ID, job.Scenario, job.Engine)
 
 		// Execute job with engine selection
-		// Pass client to access master URL for RTMP streaming
 		metricsExporter.SetActiveJobs(1)
-		result := executeJob(job, client, engineSelector)
+		result := executeJob(job, ctx)
 		metricsExporter.SetActiveJobs(0)
 
 		// Send results
@@ -310,22 +325,22 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, client *agent.Client, engineSelector *agent.EngineSelector) *models.JobResult {
+func executeJob(job *models.Job, ctx *workerContext) *models.JobResult {
 	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
 	startTime := time.Now()
 
 	// Select the appropriate engine for this job
-	engine, reason := engineSelector.SelectEngine(job)
+	engine, reason := ctx.engineSelector.SelectEngine(job)
 	log.Printf("Selected engine: %s", engine.Name())
 	log.Printf("Selection reason: %s", reason)
 
 	// Build command using selected engine
-	args, err := engine.BuildCommand(job, client.GetMasterURL())
+	args, err := engine.BuildCommand(job, ctx.client.GetMasterURL())
 	if err != nil {
 		log.Printf("Job %s failed to build command: %v", job.ID, err)
 		return &models.JobResult{
 			JobID:       job.ID,
-			NodeID:      client.GetNodeID(),
+			NodeID:      ctx.client.GetNodeID(),
 			Status:      models.JobStatusFailed,
 			Error:       fmt.Sprintf("Failed to build command: %v", err),
 			CompletedAt: time.Now(),
@@ -340,9 +355,9 @@ func executeJob(job *models.Job, client *agent.Client, engineSelector *agent.Eng
 	var analyzerOutput map[string]interface{}
 	
 	if engine.Name() == "ffmpeg" {
-		metrics, analyzerOutput, err = executeFFmpegCommand(job, client, args)
+		metrics, analyzerOutput, err = executeFFmpegCommand(job, ctx.client, args)
 	} else if engine.Name() == "gstreamer" {
-		metrics, analyzerOutput, err = executeGStreamerCommand(job, client, args)
+		metrics, analyzerOutput, err = executeGStreamerCommand(job, ctx, args)
 	} else {
 		err = fmt.Errorf("unknown engine: %s", engine.Name())
 	}
@@ -353,7 +368,7 @@ func executeJob(job *models.Job, client *agent.Client, engineSelector *agent.Eng
 		log.Printf("Job %s failed: %v", job.ID, err)
 		return &models.JobResult{
 			JobID:       job.ID,
-			NodeID:      client.GetNodeID(),
+			NodeID:      ctx.client.GetNodeID(),
 			Status:      models.JobStatusFailed,
 			Error:       err.Error(),
 			CompletedAt: time.Now(),
@@ -375,7 +390,7 @@ func executeJob(job *models.Job, client *agent.Client, engineSelector *agent.Eng
 	log.Printf("Job %s completed successfully in %.2f seconds using %s", job.ID, duration, engine.Name())
 	return &models.JobResult{
 		JobID:          job.ID,
-		NodeID:         client.GetNodeID(),
+		NodeID:         ctx.client.GetNodeID(),
 		Status:         models.JobStatusCompleted,
 		CompletedAt:    time.Now(),
 		Metrics:        metrics,
@@ -830,24 +845,22 @@ func executeFFmpegCommand(job *models.Job, client *agent.Client, args []string) 
 }
 
 // executeGStreamerCommand executes GStreamer with pre-built command arguments
-func executeGStreamerCommand(job *models.Job, client *agent.Client, args []string) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+func executeGStreamerCommand(job *models.Job, ctx *workerContext, args []string) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
 	// Verify GStreamer is available
 	gstLaunchPath, err := exec.LookPath("gst-launch-1.0")
 	if err != nil {
 		// Fallback to FFmpeg if GStreamer not available
 		log.Printf("GStreamer not found, falling back to FFmpeg")
 		
-		// Create FFmpeg engine and rebuild command
-		caps, _ := agent.DetectHardware()
-		nodeType := agent.DetectNodeType(caps.CPUThreads, caps.RAMTotalBytes)
-		ffmpegEngine := agent.NewFFmpegEngine(caps, nodeType)
+		// Use cached capabilities from context
+		ffmpegEngine := agent.NewFFmpegEngine(ctx.caps, ctx.nodeType)
 		
-		ffmpegArgs, err := ffmpegEngine.BuildCommand(job, client.GetMasterURL())
+		ffmpegArgs, err := ffmpegEngine.BuildCommand(job, ctx.client.GetMasterURL())
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to build FFmpeg fallback command: %w", err)
 		}
 		
-		return executeFFmpegCommand(job, client, ffmpegArgs)
+		return executeFFmpegCommand(job, ctx.client, ffmpegArgs)
 	}
 
 	// Execute GStreamer

@@ -18,6 +18,8 @@ func TestEngineSelector_SelectEngine(t *testing.T) {
 	}
 
 	selector := NewEngineSelector(caps, models.NodeTypeDesktop)
+	// Override GStreamer check to simulate it being available
+	selector.gstreamerCheckOverride = func() bool { return true }
 
 	tests := []struct {
 		name           string

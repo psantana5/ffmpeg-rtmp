@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"log"
+	"os/exec"
 
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 )
@@ -12,6 +13,8 @@ type EngineSelector struct {
 	ffmpegEngine    *FFmpegEngine
 	gstreamerEngine *GStreamerEngine
 	caps            *models.NodeCapabilities
+	// gstreamerCheckOverride allows tests to override GStreamer availability check
+	gstreamerCheckOverride func() bool
 }
 
 // NewEngineSelector creates a new engine selector
@@ -25,14 +28,19 @@ func NewEngineSelector(caps *models.NodeCapabilities, nodeType models.NodeType) 
 
 // SelectEngine selects the best engine for a job based on preferences and capabilities
 func (s *EngineSelector) SelectEngine(job *models.Job) (Engine, string) {
-	// 1. Check job preference for engine
+	// 1. Check job.Engine field first (set via API/CLI)
+	if job.Engine != "" && job.Engine != "auto" {
+		return s.selectByPreference(job, job.Engine)
+	}
+
+	// 2. Check job preference in parameters (legacy support)
 	if job.Parameters != nil {
-		if enginePref, ok := job.Parameters["engine"].(string); ok && enginePref != "" {
+		if enginePref, ok := job.Parameters["engine"].(string); ok && enginePref != "" && enginePref != "auto" {
 			return s.selectByPreference(job, enginePref)
 		}
 	}
 
-	// 2. Auto selection based on scenario and queue type
+	// 3. Auto selection based on scenario and queue type
 	return s.autoSelectEngine(job)
 }
 
@@ -71,6 +79,19 @@ func (s *EngineSelector) selectByPreference(job *models.Job, preference string) 
 
 // autoSelectEngine automatically selects the best engine based on job characteristics
 func (s *EngineSelector) autoSelectEngine(job *models.Job) (Engine, string) {
+	// Check job.Engine field first (from API), then fall back to parameters
+	enginePreference := job.Engine
+	if enginePreference == "" && job.Parameters != nil {
+		if pref, ok := job.Parameters["engine"].(string); ok {
+			enginePreference = pref
+		}
+	}
+	
+	// If explicit preference set, use it
+	if enginePreference != "" && enginePreference != "auto" {
+		return s.selectByPreference(job, enginePreference)
+	}
+
 	// Determine output mode
 	outputMode := "file" // default
 	if job.Parameters != nil {
@@ -138,15 +159,14 @@ func (s *EngineSelector) autoSelectEngine(job *models.Job) (Engine, string) {
 
 // isGStreamerAvailable checks if GStreamer is available on the system
 func (s *EngineSelector) isGStreamerAvailable() bool {
-	// For now, we'll assume GStreamer might not be available
-	// In a real implementation, this would check for gst-launch-1.0 binary
-	// For this implementation, we'll return true to allow testing
-	// In production, add actual binary check:
-	// _, err := exec.LookPath("gst-launch-1.0")
-	// return err == nil
+	// Allow test override
+	if s.gstreamerCheckOverride != nil {
+		return s.gstreamerCheckOverride()
+	}
 	
-	// For now, return true to allow engine selection to work
-	return true
+	// Check for gst-launch-1.0 binary
+	_, err := exec.LookPath("gst-launch-1.0")
+	return err == nil
 }
 
 // GetAvailableEngines returns a list of available engines
