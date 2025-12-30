@@ -294,9 +294,18 @@ class TestRunner:
 
             for service_name, url in services.items():
                 try:
+                    # Try HTTP first
                     result = subprocess.run(
                         f"curl -sf {url}", shell=True, capture_output=True, timeout=5
                     )
+                    
+                    # If HTTP fails and it's port 8080, try HTTPS (in case master server is running)
+                    if result.returncode != 0 and ":8080" in url:
+                        https_url = url.replace("http://", "https://")
+                        result = subprocess.run(
+                            f"curl -sfk {https_url}", shell=True, capture_output=True, timeout=5
+                        )
+                    
                     if result.returncode != 0:
                         all_ready = False
                         logger.debug(f"{service_name} not ready yet")
