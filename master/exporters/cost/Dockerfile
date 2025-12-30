@@ -12,7 +12,7 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application file
-COPY src/exporters/cost/cost_exporter.py /app/
+COPY master/exporters/cost/cost_exporter.py /app/
 
 RUN chmod +x /app/cost_exporter.py
 
