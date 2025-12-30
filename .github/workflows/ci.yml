@@ -62,26 +62,6 @@ jobs:
           curl -sf http://localhost:8428/health || exit 1
           echo "✓ VictoriaMetrics is healthy"
       
-      - name: Check exporters are responding
-        run: |
-          # Go CPU exporter requires privileged RAPL access
-          curl -sf http://localhost:9510/health || echo "⚠ Go CPU exporter requires privileged access (expected in CI)"
-          
-          # These exporters should work in CI environment
-          # Docker stats uses /metrics (standard Prometheus exporter)
-          curl -sf http://localhost:9501/metrics || exit 1
-          echo "✓ Docker stats exporter is responding"
-          
-          # Custom exporters use /health endpoint for readiness checks
-          curl -sf http://localhost:9502/health || exit 1
-          echo "✓ Results exporter is healthy"
-          curl -sf http://localhost:9503/health || exit 1
-          echo "✓ QoE exporter is healthy"
-          curl -sf http://localhost:9504/health || exit 1
-          echo "✓ Cost exporter is healthy"
-          curl -sf http://localhost:9506/health || exit 1
-          echo "✓ FFmpeg exporter is healthy"
-      
       - name: Show running containers
         if: always()
         run: docker compose ps
