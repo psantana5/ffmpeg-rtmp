@@ -6,6 +6,26 @@ global:
     environment: 'development'
 
 scrape_configs:
+  # === NEW: Distributed System Metrics ===
+  - job_name: 'ffrtmp-master'
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+        labels:
+          service: 'distributed-master'
+          component: 'scheduler'
+
+  - job_name: 'ffrtmp-workers'
+    static_configs:
+      - targets: 
+        - 'host.docker.internal:9091'
+        # Add more worker nodes as needed:
+        # - 'worker2:9091'
+        # - 'worker3:9091'
+        labels:
+          service: 'distributed-worker'
+          component: 'compute'
+
+  # === Original Exporters ===
   - job_name: 'nginx-rtmp'
     static_configs:
       - targets: ['nginx-exporter:9728']
