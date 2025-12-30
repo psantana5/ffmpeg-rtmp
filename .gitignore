@@ -3,6 +3,9 @@
 venv
 env/
 ENV/
+models/
+*/__pycache__
+src/exporters/results/__pycache__
 __pycache__/
 *.py[cod]
 *$py.class
@@ -47,6 +50,7 @@ cov.xml
 *.swo
 *~
 .DS_Store
+
 
 # RTMP streams
 streams/*
