@@ -74,32 +74,22 @@ func (s *Scheduler) processPendingJobs() {
 
 	log.Printf("📅 Scheduler: Found %d pending jobs", len(pendingJobs))
 
-	// Get all available nodes
-	nodes := s.store.GetAllNodes()
-	log.Printf("📅 Scheduler: Total nodes registered: %d", len(nodes))
-
-	availableNodes := []*models.Node{}
-	for _, node := range nodes {
-		log.Printf("📅 Scheduler: Node %s status: %s", node.ID, node.Status)
-		if node.Status == "available" {
-			availableNodes = append(availableNodes, node)
+	// Use atomic TryQueuePendingJob to avoid race conditions
+	queuedCount := 0
+	for _, job := range pendingJobs {
+		queued, err := s.store.TryQueuePendingJob(job.ID)
+		if err != nil {
+			log.Printf("❌ Scheduler: failed to queue job %s: %v", job.ID, err)
+			continue
+		}
+		if queued {
+			queuedCount++
+			log.Printf("📋 Scheduler: Job %s queued (no workers available)", job.ID)
 		}
 	}
 
-	log.Printf("📅 Scheduler: Available nodes: %d", len(availableNodes))
-
-	// If no available workers, queue all pending jobs
-	if len(availableNodes) == 0 {
-		log.Printf("📋 Scheduler: No available workers - queuing %d pending jobs", len(pendingJobs))
-		for _, job := range pendingJobs {
-			if err := s.store.UpdateJobStatus(job.ID, models.JobStatusQueued, ""); err != nil {
-				log.Printf("❌ Scheduler: failed to queue job %s: %v", job.ID, err)
-			} else {
-				log.Printf("📋 Scheduler: Job %s queued (no workers available)", job.ID)
-			}
-		}
-	} else {
-		log.Printf("📅 Scheduler: %d workers available - jobs will be picked up via GetNextJob", len(availableNodes))
+	if queuedCount > 0 {
+		log.Printf("📋 Scheduler: Queued %d jobs (no workers available)", queuedCount)
 	}
 }
 

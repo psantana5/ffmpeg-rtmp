@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -14,6 +15,7 @@ import (
 // SQLiteStore is a SQLite-based implementation of the data store
 type SQLiteStore struct {
 	db *sql.DB
+	mu sync.Mutex
 }
 
 // NewSQLiteStore creates a new SQLite store
@@ -789,8 +791,48 @@ type Store interface {
 	ResumeJob(id string) error
 	CancelJob(id string) error
 	GetQueuedJobs(queue string, priority string) []*models.Job
+	TryQueuePendingJob(jobID string) (bool, error)
 }
 
 // Ensure both implementations satisfy the interface
 var _ Store = (*MemoryStore)(nil)
 var _ Store = (*SQLiteStore)(nil)
+
+// TryQueuePendingJob atomically checks if a job is pending with no available workers and queues it
+// Returns true if job was queued, false if already queued or picked up
+func (s *SQLiteStore) TryQueuePendingJob(jobID string) (bool, error) {
+s.mu.Lock()
+defer s.mu.Unlock()
+
+// Check if job is still pending
+var status string
+err := s.db.QueryRow("SELECT status FROM jobs WHERE id = ?", jobID).Scan(&status)
+if err != nil {
+return false, err
+}
+
+if status != string(models.JobStatusPending) {
+return false, nil // Already processed
+}
+
+// Check if any workers are available
+var availableCount int
+err = s.db.QueryRow("SELECT COUNT(*) FROM nodes WHERE status = 'available'").Scan(&availableCount)
+if err != nil {
+return false, err
+}
+
+if availableCount > 0 {
+return false, nil // Workers available, let GetNextJob handle it
+}
+
+// No workers available, queue the job
+result, err := s.db.Exec("UPDATE jobs SET status = ? WHERE id = ? AND status = ?",
+models.JobStatusQueued, jobID, models.JobStatusPending)
+if err != nil {
+return false, err
+}
+
+rows, _ := result.RowsAffected()
+return rows > 0, nil
+}
