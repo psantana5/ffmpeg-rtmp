@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -13,9 +14,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/agent"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
+	"github.com/psantana5/ffmpeg-rtmp/worker/exporters/prometheus"
 )
 
 func main() {
@@ -24,11 +27,13 @@ func main() {
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")
 	allowMasterAsWorker := flag.Bool("allow-master-as-worker", false, "Allow registering master node as worker (development mode)")
+	skipConfirmation := flag.Bool("skip-confirmation", false, "Skip confirmation prompts (for automated testing)")
 	apiKeyFlag := flag.String("api-key", "", "API key for authentication (or use FFMPEG_RTMP_API_KEY env var)")
 	certFile := flag.String("cert", "", "TLS client certificate file (for mTLS)")
 	keyFile := flag.String("key", "", "TLS client key file (for mTLS)")
 	caFile := flag.String("ca", "", "CA certificate file to verify server")
 	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
+	metricsPort := flag.String("metrics-port", "9091", "Prometheus metrics port")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -54,11 +59,11 @@ func main() {
 	}
 
 	// Determine node type
-	nodeType := agent.DetectNodeType(caps.CPUThreads, caps.RAMBytes)
+	nodeType := agent.DetectNodeType(caps.CPUThreads, caps.RAMTotalBytes)
 
 	log.Println("Hardware detected:")
 	log.Printf("  CPU: %s (%d threads)", caps.CPUModel, caps.CPUThreads)
-	log.Printf("  RAM: %s", agent.FormatRAM(caps.RAMBytes))
+	log.Printf("  RAM: %s", agent.FormatRAM(caps.RAMTotalBytes))
 	if caps.HasGPU {
 		log.Printf("  GPU: %s", caps.GPUType)
 	} else {
@@ -76,6 +81,26 @@ func main() {
 		log.Printf("  Hardware Acceleration: %s", ffmpegOpt.HWAccel)
 	}
 	log.Printf("  Optimization Reason: %s", ffmpegOpt.Reason)
+
+	// Start Prometheus metrics exporter
+	hostname, _ := os.Hostname()
+	nodeID := fmt.Sprintf("%s:%d", hostname, *metricsPort)
+	metricsExporter := prometheus.NewWorkerExporter(nodeID, caps.HasGPU)
+	
+	metricsRouter := mux.NewRouter()
+	metricsRouter.Handle("/metrics", metricsExporter).Methods("GET")
+	metricsRouter.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"healthy"}`))
+	}).Methods("GET")
+	
+	go func() {
+		log.Printf("✓ Prometheus metrics endpoint: http://localhost:%s/metrics", *metricsPort)
+		if err := http.ListenAndServe(":"+*metricsPort, metricsRouter); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
 
 	// Create client with TLS support if certificates provided
 	var client *agent.Client
@@ -152,10 +177,12 @@ func main() {
 				os.Exit(1)
 			}
 
-			// Ask for confirmation
-			if !confirmMasterAsWorker() {
-				log.Println("Registration cancelled by user.")
-				os.Exit(0)
+			// Ask for confirmation (skip in automated testing)
+			if !*skipConfirmation {
+				if !confirmMasterAsWorker() {
+					log.Println("Registration cancelled by user.")
+					os.Exit(0)
+				}
 			}
 
 			log.Println("✓ Proceeding with master-as-worker configuration...")
@@ -173,14 +200,14 @@ func main() {
 		}
 
 		reg := &models.NodeRegistration{
-			Address:    hostname,
-			Type:       nodeType,
-			CPUThreads: caps.CPUThreads,
-			CPUModel:   caps.CPUModel,
-			HasGPU:     caps.HasGPU,
-			GPUType:    caps.GPUType,
-			RAMBytes:   caps.RAMBytes,
-			Labels:     caps.Labels,
+			Address:       hostname,
+			Type:          nodeType,
+			CPUThreads:    caps.CPUThreads,
+			CPUModel:      caps.CPUModel,
+			HasGPU:        caps.HasGPU,
+			GPUType:       caps.GPUType,
+			RAMTotalBytes: caps.RAMTotalBytes,
+			Labels:        caps.Labels,
 		}
 
 		node, err := client.Register(reg)
@@ -207,6 +234,7 @@ func main() {
 				log.Printf("Heartbeat failed: %v", err)
 			} else {
 				log.Println("Heartbeat sent")
+				metricsExporter.IncrementHeartbeat()
 			}
 		}
 	}()
@@ -232,7 +260,9 @@ func main() {
 
 		// Execute job with hardware-optimized parameters
 		// Pass client to access master URL for RTMP streaming
+		metricsExporter.SetActiveJobs(1)
 		result := executeJob(job, client, ffmpegOpt)
+		metricsExporter.SetActiveJobs(0)
 
 		// Send results
 		if err := client.SendResults(result); err != nil {

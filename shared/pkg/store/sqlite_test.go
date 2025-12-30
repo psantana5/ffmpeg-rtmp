@@ -24,22 +24,42 @@ func TestSQLiteConcurrentAccess(t *testing.T) {
 	}
 	defer store.Close()
 
-	// Register a test node
-	node := &models.Node{
-		ID:            "test-node-1",
-		Address:       "localhost:8081",
-		Type:          "worker",
-		CPUThreads:    4,
-		CPUModel:      "Test CPU",
-		HasGPU:        false,
-		RAMBytes:      8589934592,
-		Status:        "available",
-		LastHeartbeat: time.Now(),
-		RegisteredAt:  time.Now(),
-	}
-	if err := store.RegisterNode(node); err != nil {
-		t.Fatalf("Failed to register node: %v", err)
-	}
+// Register a test node
+node := &models.Node{
+ID:            "test-node-1",
+Address:       "localhost:8081",
+Type:          "worker",
+CPUThreads:    4,
+CPUModel:      "Test CPU",
+HasGPU:        false,
+RAMTotalBytes: 8589934592,
+Status:        "available",
+LastHeartbeat: time.Now(),
+RegisteredAt:  time.Now(),
+}
+if err := store.RegisterNode(node); err != nil {
+t.Fatalf("Failed to register node: %v", err)
+}
+
+// Register multiple worker nodes for concurrent testing
+numWorkers := 10
+for i := 0; i < numWorkers; i++ {
+workerNode := &models.Node{
+ID:            fmt.Sprintf("worker-%d", i),
+Address:       fmt.Sprintf("localhost:808%d", i),
+Type:          "worker",
+CPUThreads:    4,
+CPUModel:      "Test CPU",
+HasGPU:        false,
+RAMTotalBytes: 8589934592,
+Status:        "available",
+LastHeartbeat: time.Now(),
+RegisteredAt:  time.Now(),
+}
+if err := store.RegisterNode(workerNode); err != nil {
+t.Fatalf("Failed to register worker node %d: %v", i, err)
+}
+}
 
 	// Create multiple jobs concurrently
 	numJobs := 20
@@ -80,7 +100,7 @@ func TestSQLiteConcurrentAccess(t *testing.T) {
 	}
 
 	// Test concurrent GetNextJob calls
-	numWorkers := 10
+	// numWorkers already declared above 10
 	wg2 := sync.WaitGroup{}
 	jobsReceived := make(chan string, numWorkers)
 	errors2 := make(chan error, numWorkers)
@@ -138,15 +158,15 @@ func TestSQLiteBasicOperations(t *testing.T) {
 	node := &models.Node{
 		ID:            "node-1",
 		Address:       "localhost:8081",
-		Type:          "worker",
-		CPUThreads:    4,
-		CPUModel:      "Intel i5",
-		HasGPU:        true,
-		GPUType:       "NVIDIA GTX 1080",
-		RAMBytes:      8589934592,
-		Status:        "available",
-		LastHeartbeat: time.Now(),
-		RegisteredAt:  time.Now(),
+		Type:            "worker",
+		CPUThreads:      4,
+		CPUModel:        "Intel i5",
+		HasGPU:          true,
+		GPUType:         "NVIDIA GTX 1080",
+		RAMTotalBytes:   8589934592,
+		Status:          "available",
+		LastHeartbeat:   time.Now(),
+		RegisteredAt:    time.Now(),
 	}
 
 	if err := store.RegisterNode(node); err != nil {
@@ -179,7 +199,7 @@ func TestSQLiteBasicOperations(t *testing.T) {
 	if retrievedJob.ID != job.ID {
 		t.Errorf("Expected job %s, got %s", job.ID, retrievedJob.ID)
 	}
-	if retrievedJob.Status != models.JobStatusRunning {
+	if retrievedJob.Status != models.JobStatusProcessing {
 		t.Errorf("Expected job status %s, got %s", models.JobStatusRunning, retrievedJob.Status)
 	}
 

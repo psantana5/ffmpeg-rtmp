@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/psantana5/ffmpeg-rtmp/master/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
-	"github.com/psantana5/ffmpeg-rtmp/pkg/metrics"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
@@ -170,12 +170,12 @@ func main() {
 
 	// Add metrics endpoint if enabled
 	if *enableMetrics {
-		log.Println("✓ Metrics endpoint enabled")
-		metricsCollector := metrics.NewCollector(dataStore)
+		log.Println("✓ Prometheus metrics endpoint enabled")
+		metricsExporter := prometheus.NewMasterExporter(dataStore)
 		
 		// Create separate server for metrics
 		metricsRouter := mux.NewRouter()
-		metricsRouter.Handle("/metrics", metricsCollector).Methods("GET")
+		metricsRouter.Handle("/metrics", metricsExporter).Methods("GET")
 		metricsRouter.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

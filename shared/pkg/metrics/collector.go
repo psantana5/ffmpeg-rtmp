@@ -94,7 +94,7 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	nodesWithGPU := 0
 	for _, node := range nodes {
 		totalCPUThreads += node.CPUThreads
-		totalRAMBytes += node.RAMBytes
+		totalRAMBytes += node.RAMTotalBytes
 		if node.HasGPU {
 			nodesWithGPU++
 		}

@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -206,4 +207,141 @@ func (s *MemoryStore) UpdateJobStatus(id string, status models.JobStatus, errorM
 	}
 
 	return nil
+}
+
+// UpdateJobProgress updates the progress percentage of a job
+func (s *MemoryStore) UpdateJobProgress(id string, progress int) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 100 {
+		progress = 100
+	}
+
+	job.Progress = progress
+	return nil
+}
+
+// AddStateTransition adds a state transition to a job's history
+func (s *MemoryStore) AddStateTransition(id string, from, to models.JobStatus, reason string) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	transition := models.StateTransition{
+		From:      from,
+		To:        to,
+		Timestamp: time.Now(),
+		Reason:    reason,
+	}
+
+	job.StateTransitions = append(job.StateTransitions, transition)
+	job.Status = to
+
+	return nil
+}
+
+// PauseJob pauses a running job
+func (s *MemoryStore) PauseJob(id string) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	if job.Status != models.JobStatusProcessing && job.Status != models.JobStatusRunning {
+		return fmt.Errorf("cannot pause job in status: %s", job.Status)
+	}
+
+	return s.AddStateTransition(id, job.Status, models.JobStatusPaused, "User requested pause")
+}
+
+// ResumeJob resumes a paused job
+func (s *MemoryStore) ResumeJob(id string) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	if job.Status != models.JobStatusPaused {
+		return fmt.Errorf("cannot resume job in status: %s", job.Status)
+	}
+
+	return s.AddStateTransition(id, job.Status, models.JobStatusProcessing, "User requested resume")
+}
+
+// CancelJob cancels a job
+func (s *MemoryStore) CancelJob(id string) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	if job.Status == models.JobStatusCompleted || job.Status == models.JobStatusFailed || job.Status == models.JobStatusCanceled {
+		return fmt.Errorf("cannot cancel job in status: %s", job.Status)
+	}
+
+	// Add state transition
+	transition := models.StateTransition{
+		From:      job.Status,
+		To:        models.JobStatusCanceled,
+		Timestamp: time.Now(),
+		Reason:    "User requested cancel",
+	}
+	job.StateTransitions = append(job.StateTransitions, transition)
+	job.Status = models.JobStatusCanceled
+
+	// Free up node if assigned
+	if job.NodeID != "" {
+		s.nodesMu.Lock()
+		if node, ok := s.nodes[job.NodeID]; ok {
+			node.Status = "available"
+			node.CurrentJobID = ""
+		}
+		s.nodesMu.Unlock()
+	}
+
+	// Set completed_at
+	now := time.Now()
+	job.CompletedAt = &now
+
+	return nil
+}
+
+// GetQueuedJobs returns jobs in a specific queue with priority filtering
+func (s *MemoryStore) GetQueuedJobs(queue string, priority string) []*models.Job {
+	s.jobsMu.RLock()
+	defer s.jobsMu.RUnlock()
+
+	var jobs []*models.Job
+	for _, job := range s.jobs {
+		if (job.Status == models.JobStatusPending || job.Status == models.JobStatusQueued) &&
+			job.Queue == queue {
+			if priority == "" || job.Priority == priority {
+				jobs = append(jobs, job)
+			}
+		}
+	}
+
+	return jobs
 }
