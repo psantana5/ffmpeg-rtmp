@@ -61,6 +61,10 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
+	
+	// Bind specific environment variables
+	viper.BindEnv("api_key", "MASTER_API_KEY")
+	viper.BindEnv("master_url", "MASTER_URL")
 
 	// If a config file is found, read it in
 	if err := viper.ReadInConfig(); err == nil {
@@ -71,6 +75,14 @@ func initConfig() {
 		if viper.GetString("api_key") != "" && apiKey == "" {
 			apiKey = viper.GetString("api_key")
 		}
+	}
+	
+	// Check environment variables if not set from config
+	if apiKey == "" && viper.GetString("api_key") != "" {
+		apiKey = viper.GetString("api_key")
+	}
+	if masterURL == "" && viper.GetString("master_url") != "" {
+		masterURL = viper.GetString("master_url")
 	}
 
 	// Set default if still empty
