@@ -5,16 +5,18 @@ WORKDIR /build
 
 # Copy go mod files
 COPY go.mod go.sum* ./
+COPY shared/pkg/go.mod shared/pkg/go.sum* ./shared/pkg/
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY src/exporters/ffmpeg_exporter/ ./src/exporters/ffmpeg_exporter/
+COPY worker/exporters/ffmpeg_exporter/ ./worker/exporters/ffmpeg_exporter/
+COPY shared/pkg/ ./shared/pkg/
 
 # Build the exporter as a static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" \
-    -o ffmpeg_exporter ./src/exporters/ffmpeg_exporter/
+    -o ffmpeg_exporter ./worker/exporters/ffmpeg_exporter/
 
 # Runtime stage - use scratch for minimal image
 FROM scratch

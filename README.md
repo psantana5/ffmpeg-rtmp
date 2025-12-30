@@ -10,6 +10,16 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
+## 📁 Project Organization
+
+This project is organized into three main directories for clarity:
+
+- **[`master/`](master/)** - Master node components (orchestration, monitoring, visualization)
+- **[`worker/`](worker/)** - Worker node components (transcoding, hardware metrics)
+- **[`shared/`](shared/)** - Shared libraries, scripts, and documentation
+
+See [FOLDER_ORGANIZATION.md](FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md) for visual diagrams.
+
 ## Quick Start (Production - Distributed Mode)
 
 The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
@@ -213,11 +223,11 @@ Documentation organized by topic:
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
 ### Technical Reference
-- **[Architecture Overview](docs/architecture.md)** - System design and data flow
-- **[Exporters Overview](src/exporters/README.md)** - Metrics collectors
-- **[Go Exporters Details](src/exporters/README_GO.md)** - Go exporter API and internals
-- **[Energy Advisor](advisor/README.md)** - ML models and efficiency scoring
-- **[Go Exporters Migration](docs/go-exporters-migration.md)** - Python to Go migration guide
+- **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
+- **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
+- **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
+- **[Energy Advisor](shared/advisor/README.md)** - ML models and efficiency scoring
+- **[Documentation Index](shared/docs/)** - All technical documentation
 
 ## Common Commands
 
@@ -332,7 +342,9 @@ See [LICENSE](LICENSE) file for details.
 
 ## Quick Links
 
-- [Full Documentation](docs/)
-- [Test Runner Guide](scripts/README.md)
-- [Exporter Documentation](src/exporters/README.md)
-- [Energy Advisor](advisor/README.md)
+- [Master Node Setup](master/README.md)
+- [Worker Node Setup](worker/README.md)
+- [Shared Components](shared/README.md)
+- [Full Documentation](shared/docs/)
+- [Scripts Documentation](shared/scripts/README.md)
+- [Folder Organization Guide](FOLDER_ORGANIZATION.md)

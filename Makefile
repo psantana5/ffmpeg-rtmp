@@ -145,11 +145,11 @@ build-distributed: build-master build-agent
 build-master:
 	@mkdir -p bin
 	@echo "Building master node..."
-	go build -o bin/master ./cmd/master
+	go build -o bin/master ./master/cmd/master
 	@echo "✓ Master binary created: bin/master"
 
 build-agent:
 	@mkdir -p bin
 	@echo "Building compute agent..."
-	go build -o bin/agent ./cmd/agent
+	go build -o bin/agent ./worker/cmd/agent
 	@echo "✓ Agent binary created: bin/agent"
