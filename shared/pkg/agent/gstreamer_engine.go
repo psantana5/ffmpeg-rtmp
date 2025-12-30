@@ -145,6 +145,7 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		pipeline = append(pipeline,
 			"x264enc",
 			fmt.Sprintf("bitrate=%d", bitrate),
+			"pass=cbr",
 			"tune=zerolatency",
 			"speed-preset=ultrafast",
 			"key-int-max=60",
@@ -152,11 +153,16 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		)
 	}
 
-	// Add muxer and RTMP sink
+	// Add muxer and RTMP sink with buffer tuning for low latency
 	pipeline = append(pipeline,
 		"video/x-h264,profile=baseline", "!",
-		"flvmux", "name=mux", "!",
-		"rtmpsink", fmt.Sprintf("location=%s", rtmpURL),
+		"flvmux", "name=mux", "streamable=true", "!",
+		"rtmpsink",
+		fmt.Sprintf("location=%s", rtmpURL),
+		"sync=false",
+		"async=false",
+		"max-lateness=0",
+		"qos=true",
 	)
 
 	return pipeline, nil

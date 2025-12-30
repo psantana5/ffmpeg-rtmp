@@ -278,7 +278,7 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 // GetJob retrieves a job by ID
 func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var job models.Job
-	var paramsJSON, transitionsJSON sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
 	var startedAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
@@ -286,7 +286,7 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 		       created_at, started_at, completed_at, retry_count, error, state_transitions
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
-		&job.Queue, &job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt, 
+		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
 		&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
@@ -294,6 +294,11 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle nullable node_id
+	if nodeIDNull.Valid {
+		job.NodeID = nodeIDNull.String
 	}
 
 	if paramsJSON.Valid {
@@ -333,13 +338,18 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
-		var paramsJSON, transitionsJSON sql.NullString
+		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
 		var startedAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
-			&job.Status, &job.Queue, &job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt,
+			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt,
 			&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
 			continue
+		}
+
+		// Handle nullable node_id
+		if nodeIDNull.Valid {
+			job.NodeID = nodeIDNull.String
 		}
 
 		if paramsJSON.Valid {
@@ -395,7 +405,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	// Queue priority: live=3, default=2, batch=1
 	// Priority: high=3, medium=2, low=1
 	var job models.Job
-	var paramsJSON, transitionsJSON sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
 	var startedAt, completedAt sql.NullTime
 
 	query := `
@@ -422,7 +432,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 
 	err = tx.QueryRow(query, models.JobStatusPending, models.JobStatusQueued).Scan(
 		&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status, &job.Queue,
-		&job.Priority, &job.Progress, &job.NodeID, &job.CreatedAt, &startedAt, &completedAt,
+		&job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, &startedAt, &completedAt,
 		&job.RetryCount, &job.Error, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
@@ -430,6 +440,11 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle nullable node_id
+	if nodeIDNull.Valid {
+		job.NodeID = nodeIDNull.String
 	}
 
 	if paramsJSON.Valid {
@@ -741,14 +756,19 @@ func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
-		var paramsJSON, transitionsJSON sql.NullString
+		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
 		var startedAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
-			&job.Status, &job.Queue, &job.Priority, &job.Progress, &job.NodeID,
+			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull,
 			&job.CreatedAt, &startedAt, &completedAt, &job.RetryCount, &job.Error,
 			&transitionsJSON); err != nil {
 			continue
+		}
+
+		// Handle nullable node_id
+		if nodeIDNull.Valid {
+			job.NodeID = nodeIDNull.String
 		}
 
 		if paramsJSON.Valid {
