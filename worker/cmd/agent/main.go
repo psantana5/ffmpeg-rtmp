@@ -123,12 +123,23 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to load TLS config: %v", err)
 		}
+		
+		// Auto-enable InsecureSkipVerify for localhost when no CA is provided
+		// This handles common development scenarios with self-signed certificates
+		isLocalhost := strings.Contains(*masterURL, "localhost") || strings.Contains(*masterURL, "127.0.0.1")
+		
 		if *insecureSkipVerify {
 			log.Println("WARNING: TLS certificate verification disabled (insecure)")
 			tlsConfig.InsecureSkipVerify = true
+		} else if *caFile == "" && isLocalhost {
+			log.Println("Using self-signed certificate mode for localhost")
+			log.Println("  → TLS certificate verification disabled for localhost/127.0.0.1")
+			log.Println("  → For production, use --ca flag to verify server certificates")
+			tlsConfig.InsecureSkipVerify = true
 		}
+		
 		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
-		if *caFile == "" && !*insecureSkipVerify {
+		if *caFile == "" && !*insecureSkipVerify && !isLocalhost {
 			log.Println("WARNING: Using HTTPS without CA certificate - server certificate must be signed by a trusted CA")
 		}
 	} else {
