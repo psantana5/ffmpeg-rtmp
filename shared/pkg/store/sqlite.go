@@ -41,16 +41,6 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// Explicitly enable WAL mode via PRAGMA
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
-	}
-	
-	// Set busy timeout via PRAGMA as well
-	if _, err := db.Exec("PRAGMA busy_timeout=10000"); err != nil {
-		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
-	}
-
 	return store, nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -311,13 +312,13 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 	}
 
 	// Get input file (use test pattern if not specified)
-	inputFile := "/tmp/test_input.mp4"
+	inputFile := filepath.Join(os.TempDir(), "test_input.mp4")
 	if input, ok := params["input"].(string); ok && input != "" {
 		inputFile = input
 	}
 
 	// Get output file
-	outputFile := fmt.Sprintf("/tmp/job_%s_output.mp4", job.ID)
+	outputFile := filepath.Join(os.TempDir(), fmt.Sprintf("job_%s_output.mp4", job.ID))
 	if output, ok := params["output"].(string); ok && output != "" {
 		outputFile = output
 	}
@@ -366,6 +367,12 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 	log.Printf("Transcoding: %s -> %s", inputFile, outputFile)
 	log.Printf("  Codec: %s, Bitrate: %s, Preset: %s", codec, bitrate, preset)
 
+	// Verify FFmpeg is available
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return nil, nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
+	}
+
 	// Build FFmpeg command
 	args := []string{
 		"-i", inputFile,
@@ -383,7 +390,7 @@ func executeFFmpegJob(job *models.Job) (metrics map[string]interface{}, analyzer
 	args = append(args, outputFile)
 
 	// Execute FFmpeg
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(ffmpegPath, args...)
 	
 	// Capture output for metrics
 	var stdout, stderr bytes.Buffer
@@ -433,6 +440,12 @@ func createTestVideo(outputPath string, duration int) error {
 		duration = 10 // Default 10 seconds
 	}
 
+	// Verify FFmpeg is available
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return fmt.Errorf("ffmpeg not found in PATH: %w", err)
+	}
+
 	args := []string{
 		"-f", "lavfi",
 		"-i", fmt.Sprintf("testsrc=duration=%d:size=1280x720:rate=30", duration),
@@ -443,8 +456,14 @@ func createTestVideo(outputPath string, duration int) error {
 		outputPath,
 	}
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(ffmpegPath, args...)
+	
+	// Capture output for error reporting
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	
 	if err := cmd.Run(); err != nil {
+		log.Printf("FFmpeg stderr: %s", stderr.String())
 		return fmt.Errorf("failed to create test video: %w", err)
 	}
 
