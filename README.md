@@ -18,7 +18,7 @@ This project is organized into three main directories for clarity:
 - **[`worker/`](worker/)** - Worker node components (transcoding, hardware metrics)
 - **[`shared/`](shared/)** - Shared libraries, scripts, and documentation
 
-See [FOLDER_ORGANIZATION.md](FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md) for visual diagrams.
+See [FOLDER_ORGANIZATION.md](docs/FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) for visual diagrams.
 
 ## Quick Start (Production - Distributed Mode)
 
@@ -130,7 +130,7 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 # View dashboards at http://localhost:3000
 ```
 
-**See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+**See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
 
 ## What's New: Production-Ready v2.2
 
@@ -143,7 +143,7 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 - **✅ Prometheus Metrics** - Built-in metrics endpoint on port 9090
 - **✅ Structured Logging** - Production-grade logging support
 
-See [docs/PRODUCTION_FEATURES.md](docs/PRODUCTION_FEATURES.md) for complete feature guide.
+See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
 ## What's New: Go Exporters + VictoriaMetrics (v2.0)
 
@@ -203,24 +203,24 @@ Docker Compose stack on single machine:
 
 **Local Testing mode is for development only. Use Distributed Compute mode for production.**
 
-See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and architecture diagrams.
+See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and architecture diagrams.
 
 ## Documentation
 
 Documentation organized by topic:
 
 ### Deployment & Operations
-- **[Production Features](docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
-- **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
-- **[Internal Architecture](docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
-- **[Distributed Architecture](docs/distributed_architecture_v1.md)** - Distributed compute details
+- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
+- **[Deployment Modes](shared/docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
+- **[Internal Architecture](shared/docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
+- **[Distributed Architecture](shared/docs/distributed_architecture_v1.md)** - Distributed compute details
 - **[Production Deployment](deployment/README.md)** - Systemd service templates and setup
-- **[Getting Started Guide](docs/getting-started.md)** - Initial setup walkthrough
+- **[Getting Started Guide](shared/docs/getting-started.md)** - Initial setup walkthrough
 
 ### Development & Testing
 - **[Running Tests](scripts/README.md)** - Test scenarios and batch execution
-- **[Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md)** - One-command Go exporter deployment
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[Go Exporters Quick Start](shared/docs/QUICKSTART_GO_EXPORTERS.md)** - One-command Go exporter deployment
+- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues and solutions
 
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
@@ -347,4 +347,4 @@ See [LICENSE](LICENSE) file for details.
 - [Shared Components](shared/README.md)
 - [Full Documentation](shared/docs/)
 - [Scripts Documentation](shared/scripts/README.md)
-- [Folder Organization Guide](FOLDER_ORGANIZATION.md)
+- [Folder Organization Guide](docs/FOLDER_ORGANIZATION.md)
