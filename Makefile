@@ -1,4 +1,4 @@
-.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build build-distributed build-master build-agent
+.PHONY: help up up-build down restart ps logs targets prom-reload grafana test-suite test-single test-multi test-batch analyze nvidia-up nvidia-up-build lint format test pre-commit vm-up vm-up-build build-distributed build-master build-agent build-cli
 
 COMPOSE ?= docker compose
 PYTHON ?= python3
@@ -30,6 +30,7 @@ help:
 	@echo "  make build-distributed   Build master and agent binaries"
 	@echo "  make build-master        Build master node binary"
 	@echo "  make build-agent         Build compute agent binary"
+	@echo "  make build-cli           Build ffrtmp CLI tool"
 	@echo ""
 	@echo "VictoriaMetrics"
 	@echo "  make vm-up           Start stack with VictoriaMetrics"
@@ -153,3 +154,9 @@ build-agent:
 	@echo "Building compute agent..."
 	go build -o bin/agent ./worker/cmd/agent
 	@echo "✓ Agent binary created: bin/agent"
+
+build-cli:
+	@mkdir -p bin
+	@echo "Building ffrtmp CLI..."
+	go build -o bin/ffrtmp ./cmd/ffrtmp
+	@echo "✓ CLI binary created: bin/ffrtmp"

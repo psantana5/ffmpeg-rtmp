@@ -104,8 +104,16 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Send POST request
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(reqBody))
+	// Create authenticated POST request
+	httpReq, err := CreateAuthenticatedRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	client := &http.Client{}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
 	}
@@ -154,7 +162,14 @@ func runJobsStatus(cmd *cobra.Command, args []string) error {
 	jobID := args[0]
 	url := fmt.Sprintf("%s/jobs/%s", GetMasterURL(), jobID)
 
-	resp, err := http.Get(url)
+	// Create authenticated GET request
+	httpReq, err := CreateAuthenticatedRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
 	}
