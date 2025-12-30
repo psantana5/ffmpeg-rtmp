@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	masterURL    string
-	outputFormat string
-	cfgFile      string
-	apiKey       string
-	httpClient   *http.Client
+	masterURL          string
+	outputFormat       string
+	cfgFile            string
+	apiKey             string
+	httpClient         *http.Client
+	httpClientMasterURL string // Track which masterURL the client was initialized with
 )
 
 // rootCmd represents the base command
@@ -91,9 +92,6 @@ func initConfig() {
 	if masterURL == "" {
 		masterURL = "https://localhost:8080"
 	}
-	
-	// Initialize HTTP client with TLS configuration that works for both HTTP and HTTPS
-	initHTTPClient()
 }
 
 // initHTTPClient initializes the HTTP client with appropriate TLS settings
@@ -136,9 +134,11 @@ func GetAPIKey() string {
 }
 
 // GetHTTPClient returns the configured HTTP client
+// Re-initializes if masterURL has changed since last initialization
 func GetHTTPClient() *http.Client {
-	if httpClient == nil {
+	if httpClient == nil || httpClientMasterURL != masterURL {
 		initHTTPClient()
+		httpClientMasterURL = masterURL
 	}
 	return httpClient
 }
