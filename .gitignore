@@ -94,3 +94,5 @@ ffmpeg_exporter
 # Distributed compute binaries
 bin/
 .ffmpeg-agent/
+agent
+master

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,11 +29,26 @@ func main() {
 	caFile := flag.String("ca", "", "CA certificate file for mTLS")
 	requireClientCert := flag.Bool("mtls", false, "Require client certificate (mTLS)")
 	generateCert := flag.Bool("generate-cert", false, "Generate self-signed certificate")
+	certIPs := flag.String("cert-ips", "", "Comma-separated list of IP addresses to include in certificate SANs (e.g., '192.168.0.51,10.0.0.5')")
+	certHosts := flag.String("cert-hosts", "", "Comma-separated list of hostnames to include in certificate SANs (e.g., 'depa,server1')")
+	apiKeyFlag := flag.String("api-key", "", "API key for authentication (leave empty to disable, or use FFMPEG_RTMP_API_KEY env var)")
 	apiKey := flag.String("api-key", os.Getenv("MASTER_API_KEY"), "API key for authentication (default: from MASTER_API_KEY env var)")
 	maxRetries := flag.Int("max-retries", 3, "Maximum job retry attempts on failure")
 	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
 	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
 	flag.Parse()
+
+	// Get API key from flag or environment variable
+	apiKey := *apiKeyFlag
+	apiKeySource := ""
+	if apiKey == "" {
+		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+		if apiKey != "" {
+			apiKeySource = "environment variable"
+		}
+	} else {
+		apiKeySource = "command-line flag"
+	}
 
 	log.Println("Starting FFmpeg RTMP Distributed Master Node (Production Mode)")
 	log.Printf("Port: %s", *port)
@@ -48,12 +64,37 @@ func main() {
 		if err := os.MkdirAll("certs", 0755); err != nil {
 			log.Fatalf("Failed to create certs directory: %v", err)
 		}
-		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master"); err != nil {
+		
+		// Parse IP addresses and hostnames from comma-separated strings
+		var sans []string
+		if *certIPs != "" {
+			ips := strings.Split(*certIPs, ",")
+			for _, ip := range ips {
+				ip = strings.TrimSpace(ip)
+				if ip != "" {
+					sans = append(sans, ip)
+				}
+			}
+		}
+		if *certHosts != "" {
+			hosts := strings.Split(*certHosts, ",")
+			for _, host := range hosts {
+				host = strings.TrimSpace(host)
+				if host != "" {
+					sans = append(sans, host)
+				}
+			}
+		}
+		
+		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master", sans...); err != nil {
 			log.Fatalf("Failed to generate certificate: %v", err)
 		}
 		log.Println("Certificate generated successfully")
 		log.Printf("  Certificate: %s", *certFile)
 		log.Printf("  Key: %s", *keyFile)
+		if len(sans) > 0 {
+			log.Printf("  Additional SANs: %v", sans)
+		}
 		return // Exit after generating certificate
 	}
 
@@ -76,6 +117,8 @@ func main() {
 	}
 
 	// Setup authentication if API key provided
+	if apiKey != "" {
+		log.Printf("API authentication enabled (source: %s)", apiKeySource)
 	if *apiKey != "" {
 		log.Println("✓ API authentication enabled")
 	} else {
@@ -95,7 +138,7 @@ func main() {
 	router := mux.NewRouter()
 	
 	// Add authentication middleware if API key is set
-	if *apiKey != "" {
+	if apiKey != "" {
 		router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Skip auth for health endpoint
@@ -112,7 +155,7 @@ func main() {
 				}
 
 				// Simple bearer token check with constant-time comparison
-				expectedAuth := "Bearer " + *apiKey
+				expectedAuth := "Bearer " + apiKey
 				if !auth.SecureCompare(authHeader, expectedAuth) {
 					http.Error(w, "Invalid API key", http.StatusUnauthorized)
 					return
