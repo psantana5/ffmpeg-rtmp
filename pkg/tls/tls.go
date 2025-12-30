@@ -9,12 +9,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
+	"strings"
 	"time"
 )
 
 // GenerateSelfSignedCert generates a self-signed certificate for testing/development
-func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
+// sans accepts both IP addresses and hostnames to include in the certificate SANs
+func GenerateSelfSignedCert(certFile, keyFile, commonName string, sans ...string) error {
 	// Generate private key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -30,6 +33,43 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
 		return fmt.Errorf("failed to generate serial number: %w", err)
 	}
 
+	// Parse IP addresses and DNS names
+	var ips []net.IP
+	dnsNamesMap := make(map[string]bool)
+	ipsMap := make(map[string]bool)
+	
+	// Always include localhost IPs
+	ipsMap["127.0.0.1"] = true
+	ipsMap["::1"] = true
+	
+	// Always include common DNS names
+	dnsNamesMap[commonName] = true
+	dnsNamesMap["localhost"] = true
+	
+	// Add user-provided values (could be IPs or hostnames)
+	for _, value := range sans {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if ip := net.ParseIP(value); ip != nil {
+			// It's an IP address - use original value to preserve format
+			ipsMap[value] = true
+		} else {
+			// It's a hostname
+			dnsNamesMap[value] = true
+		}
+	}
+	
+	// Convert maps to slices
+	var dnsNames []string
+	for name := range dnsNamesMap {
+		dnsNames = append(dnsNames, name)
+	}
+	for ipStr := range ipsMap {
+		ips = append(ips, net.ParseIP(ipStr))
+	}
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -41,7 +81,8 @@ func GenerateSelfSignedCert(certFile, keyFile, commonName string) error {
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		DNSNames:              []string{commonName, "localhost"},
+		DNSNames:              dnsNames,
+		IPAddresses:           ips,
 	}
 
 	// Create certificate

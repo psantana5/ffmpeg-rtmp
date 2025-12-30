@@ -20,11 +20,24 @@ func main() {
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")
 	allowMasterAsWorker := flag.Bool("allow-master-as-worker", false, "Allow registering master node as worker (development mode)")
-	apiKey := flag.String("api-key", "", "API key for authentication")
+	apiKeyFlag := flag.String("api-key", "", "API key for authentication (or use FFMPEG_RTMP_API_KEY env var)")
 	certFile := flag.String("cert", "", "TLS client certificate file (for mTLS)")
 	keyFile := flag.String("key", "", "TLS client key file (for mTLS)")
 	caFile := flag.String("ca", "", "CA certificate file to verify server")
+	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
 	flag.Parse()
+
+	// Get API key from flag or environment variable
+	apiKey := *apiKeyFlag
+	apiKeySource := ""
+	if apiKey == "" {
+		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+		if apiKey != "" {
+			apiKeySource = "environment variable"
+		}
+	} else {
+		apiKeySource = "command-line flag"
+	}
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
 	log.Printf("Master URL: %s", *masterURL)
@@ -58,19 +71,35 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to load TLS config: %v", err)
 		}
+		if *insecureSkipVerify {
+			log.Println("WARNING: TLS certificate verification disabled (insecure)")
+			tlsConfig.InsecureSkipVerify = true
+		}
 		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
 		log.Println("TLS enabled")
+	} else if strings.HasPrefix(*masterURL, "https://") {
+		// HTTPS without client certificates - create TLS config with optional skip verify
+		log.Println("Initializing TLS client for HTTPS...")
+		tlsConfig, err := tlsutil.LoadClientTLSConfig("", "", *caFile)
+		if err != nil {
+			log.Fatalf("Failed to load TLS config: %v", err)
+		}
+		if *insecureSkipVerify {
+			log.Println("WARNING: TLS certificate verification disabled (insecure)")
+			tlsConfig.InsecureSkipVerify = true
+		}
+		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
+		if *caFile == "" && !*insecureSkipVerify {
+			log.Println("WARNING: Using HTTPS without CA certificate - server certificate must be signed by a trusted CA")
+		}
 	} else {
 		client = agent.NewClient(*masterURL)
-		if strings.HasPrefix(*masterURL, "https://") {
-			log.Println("WARNING: Using HTTPS without client certificate")
-		}
 	}
 
 	// Set API key if provided
-	if *apiKey != "" {
-		client.SetAPIKey(*apiKey)
-		log.Println("API authentication enabled")
+	if apiKey != "" {
+		client.SetAPIKey(apiKey)
+		log.Printf("API authentication enabled (source: %s)", apiKeySource)
 	} else {
 		log.Println("WARNING: No API key provided (authentication disabled)")
 	}
