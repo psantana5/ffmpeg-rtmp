@@ -3,54 +3,139 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
-[![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/docker-optional-blue.svg)](https://www.docker.com/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, and **distributed compute capabilities** for scaling workloads across multiple nodes.
 
-## ⚡ Quick Start
+**Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
+
+## Quick Start (Production - Distributed Mode)
+
+The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
 
 ### Prerequisites
 
-- **Docker + Docker Compose** (required)
-- Python 3.11+ (for test automation)
-- FFmpeg (for running tests)
-- Intel CPU with RAPL support (for power monitoring)
+- **Go 1.21+** (for building binaries)
+- Python 3.10+ (for agent analysis scripts)
+- FFmpeg (for transcoding)
+- Linux with kernel 4.15+ (for RAPL power monitoring)
 
-**Note**: Go installation is **NOT required** - exporters build inside Docker automatically.
-
-### Start the Stack
+### Deploy Master Node
 
 ```bash
-# IMPORTANT: If upgrading from v1.x, clean up old containers first
-docker compose down -v
+# Clone and build
+git clone https://github.com/psantana5/ffmpeg-rtmp.git
+cd ffmpeg-rtmp
+make build-master
 
-# Build and start all services (Go exporters build automatically)
-make up-build
+# Set API key (required for production)
+export MASTER_API_KEY=$(openssl rand -base64 32)
 
-# Or manually
-docker compose up -d --build
+# Start master service with production defaults
+# TLS enabled (auto-generates cert)
+# SQLite persistence (master.db)
+# Job retry (3 attempts)
+# Prometheus metrics (:9090)
+./bin/master --port 8080 &
+
+# Start monitoring stack (VictoriaMetrics + Grafana)
+make vm-up-build
 ```
 
-**Note for v2.0 upgrade**: The `docker compose down -v` command removes old containers (prometheus, rapl-exporter) and volumes. This is required for a clean migration to VictoriaMetrics.
+### Deploy Compute Agent(s)
 
-### Access the Dashboards
+```bash
+# On compute node(s)
+git clone https://github.com/psantana5/ffmpeg-rtmp.git
+cd ffmpeg-rtmp
+make build-agent
 
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **VictoriaMetrics**: http://localhost:8428 (primary TSDB with 30-day retention)
-- **Alertmanager**: http://localhost:9093
+# Set same API key as master
+export MASTER_API_KEY="<same-key-as-master>"
 
-### Run Your First Test
+# Register and start agent (uses HTTPS with TLS)
+./bin/agent --register --master https://MASTER_IP:8080 --api-key "$MASTER_API_KEY"
+```
+
+### Submit and Run Job
+
+```bash
+# Submit job to master (requires API key)
+curl -X POST https://MASTER_IP:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario": "1080p-test",
+    "confidence": "auto",
+    "parameters": {"duration": 300, "bitrate": "5000k"}
+  }'
+
+# Agent automatically picks up and executes job
+# Failed jobs auto-retry up to 3 times
+```
+
+### Access Dashboards
+
+- **Grafana**: http://MASTER_IP:3000 (admin/admin)
+- **VictoriaMetrics**: http://MASTER_IP:8428
+- **Master API**: https://MASTER_IP:8080/nodes (view registered nodes)
+- **Prometheus Metrics**: http://MASTER_IP:9090/metrics
+
+### Production Deployment with Systemd
+
+See [deployment/README.md](deployment/README.md) for systemd service templates and production setup.
+
+---
+
+## 🔬 Quick Start (Development - Local Testing Mode)
+
+For **development and local testing only**, you can use Docker Compose to run all components on a single machine.
+
+**Important**: Docker Compose mode is **NOT recommended for production**. Use Distributed Mode above for production workloads.
+
+### Prerequisites
+
+- Docker 20.10+ and Docker Compose 2.0+
+- Python 3.10+
+- FFmpeg
+
+### Start Local Stack
+
+```bash
+# Clone repository
+git clone https://github.com/psantana5/ffmpeg-rtmp.git
+cd ffmpeg-rtmp
+
+# Start all services
+make up-build
+```
+
+### Run Local Test
 
 ```bash
 # Run a simple streaming test
 python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 
-# Analyze the results
-python3 scripts/analyze_results.py
+# View dashboards at http://localhost:3000
 ```
 
-## 🚀 What's New: Go Exporters + VictoriaMetrics (v2.0)
+**See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+
+## What's New: Production-Ready v2.2
+
+**Distributed mode now production-ready with enterprise features:**
+
+- **✅ TLS/HTTPS** - Enabled by default with auto-generated certificates
+- **✅ API Authentication** - Required via `MASTER_API_KEY` environment variable
+- **✅ SQLite Persistence** - Default storage, survives restarts
+- **✅ Automatic Job Retry** - Failed jobs retry up to 3 times
+- **✅ Prometheus Metrics** - Built-in metrics endpoint on port 9090
+- **✅ Structured Logging** - Production-grade logging support
+
+See [docs/PRODUCTION_FEATURES.md](docs/PRODUCTION_FEATURES.md) for complete feature guide.
+
+## What's New: Go Exporters + VictoriaMetrics (v2.0)
 
 This project now features **production-ready Go exporters** that have replaced Python exporters for all critical telemetry:
 
@@ -79,79 +164,163 @@ This project helps you:
 
 ## Architecture
 
-The stack includes:
+The system supports two deployment modes:
 
-- **Nginx RTMP**: Streaming server for RTMP ingest
-- **VictoriaMetrics**: Production-grade time-series database (30-day retention, primary TSDB)
-- **Grafana**: Visualization dashboards including Benchmark History
-- **Go Exporters**: 
-  - CPU power monitoring (RAPL)
-  - GPU metrics (NVML/nvidia-smi)
-  - FFmpeg encoding stats (encoder load, dropped frames, bitrate, latency)
-- **Python Exporters**: QoE metrics, Cost analysis, Results tracking
-- **Energy Advisor**: ML-based recommendations for optimal configurations
-- **Benchmark Automation**: 4 workload profiles for performance testing
-- **Distributed Compute**: Master-worker architecture for scaling across multiple nodes (NEW in v2.1)
+### 1. Distributed Compute Mode (Production)
+
+Master-agent architecture for scaling across multiple nodes:
+
+- **Master Node**: Job orchestration, metrics aggregation, dashboards
+  - Master Service (Go HTTP API)
+  - VictoriaMetrics (TSDB with 30-day retention)
+  - Grafana (visualization)
+- **Compute Agents**: Execute transcoding workloads
+  - Hardware auto-detection
+  - Job polling and execution
+  - Local metrics collection
+  - Results reporting
+
+### 2. Local Testing Mode (Development Only)
+
+Docker Compose stack on single machine:
+
+- **Nginx RTMP**: Streaming server
+- **VictoriaMetrics**: Time-series database
+- **Grafana**: Dashboards
+- **Go Exporters**: CPU (RAPL), GPU (NVML), FFmpeg stats
+- **Python Exporters**: QoE metrics, cost analysis, results tracking
+- **Alertmanager**: Alert routing
+
+**Local Testing mode is for development only. Use Distributed Compute mode for production.**
+
+See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and architecture diagrams.
 
 ## Documentation
 
-Detailed documentation is organized by topic:
+Documentation organized by topic:
 
-- **[Distributed Architecture](docs/distributed_architecture_v1.md)** - 🆕 Scale workloads across multiple nodes
-- **[Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md)** - ⚡ One-command deployment
-- **[Go Exporters Migration Guide](docs/go-exporters-migration.md)** - Python to Go migration
-- **[Getting Started Guide](docs/getting-started.md)** - Complete setup and first steps
-- **[Running Tests](scripts/README.md)** - How to run different test scenarios
-- **[Exporters](src/exporters/README.md)** - Understanding the metrics collectors
-- **[Go Exporters](src/exporters/README_GO.md)** - Go exporter details and API
-- **[Energy Advisor](advisor/README.md)** - ML models and efficiency scoring
-- **[Architecture](docs/architecture.md)** - System design and data flow
+### Deployment & Operations
+- **[Production Features](docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
+- **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
+- **[Internal Architecture](docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
+- **[Distributed Architecture](docs/distributed_architecture_v1.md)** - Distributed compute details
+- **[Production Deployment](deployment/README.md)** - Systemd service templates and setup
+- **[Getting Started Guide](docs/getting-started.md)** - Initial setup walkthrough
+
+### Development & Testing
+- **[Running Tests](scripts/README.md)** - Test scenarios and batch execution
+- **[Go Exporters Quick Start](docs/QUICKSTART_GO_EXPORTERS.md)** - One-command Go exporter deployment
 - **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+### Technical Reference
+- **[Architecture Overview](docs/architecture.md)** - System design and data flow
+- **[Exporters Overview](src/exporters/README.md)** - Metrics collectors
+- **[Go Exporters Details](src/exporters/README_GO.md)** - Go exporter API and internals
+- **[Energy Advisor](advisor/README.md)** - ML models and efficiency scoring
+- **[Go Exporters Migration](docs/go-exporters-migration.md)** - Python to Go migration guide
 
 ## Common Commands
 
+### Distributed Mode (Production)
+```bash
+# Build binaries
+make build-master          # Build master node binary
+make build-agent           # Build compute agent binary
+make build-distributed     # Build both
+
+# Run services
+./bin/master --port 8080                        # Start master
+./bin/agent --register --master http://MASTER_IP:8080  # Start agent
+
+# Production with systemd
+sudo systemctl start ffmpeg-master    # Start master service
+sudo systemctl start ffmpeg-agent     # Start agent service
+sudo systemctl status ffmpeg-master   # Check status
+
+# Monitor
+curl http://localhost:8080/nodes      # List registered agents
+curl http://localhost:8080/jobs       # List jobs
+journalctl -u ffmpeg-master -f        # View master logs
+journalctl -u ffmpeg-agent -f         # View agent logs
+```
+
+### Local Testing Mode (Development)
 ```bash
 # Stack management
-make up-build          # Start stack with rebuild
-make down              # Stop stack
-make ps                # Show container status
-make logs SERVICE=prometheus  # View logs
+make up-build              # Start Docker Compose stack
+make down                  # Stop stack
+make ps                    # Show container status
+make logs SERVICE=victoriametrics  # View specific service logs
 
-# Distributed compute
-make build-distributed # Build master and agent binaries
-./bin/master          # Start master node
-./bin/agent --help    # See agent options
-
-# Testing
-make test-single       # Run single stream test
-make test-batch        # Run batch test matrix
-make run-benchmarks    # Run automated benchmark suite
-make analyze           # Analyze latest results
+# Testing (local mode)
+make test-single           # Run single stream test
+make test-batch            # Run batch test matrix
+make run-benchmarks        # Run automated benchmark suite
+make analyze               # Analyze latest results
 
 # Development
-make lint              # Run code linting
-make format            # Format code
-make test              # Run test suite
+make lint                  # Run code linting
+make format                # Format code
+make test                  # Run test suite
 ```
 
 ## Example Use Cases
 
-### Find the Most Energy-Efficient Bitrate
+### Production: Distributed Transcoding Benchmarks
+
+Run long-duration benchmarks across multiple compute nodes:
 
 ```bash
+# Submit multiple jobs to master
+curl -X POST http://master:8080/jobs -H "Content-Type: application/json" -d '{
+  "scenario": "4K-h265", "confidence": "auto",
+  "parameters": {"duration": 3600, "bitrate": "15000k"}
+}'
+
+# Agents automatically pick up and execute jobs in parallel
+# View results in Grafana at http://master:3000
+```
+
+### Development: Find Energy-Efficient Encoding Settings
+
+Use local testing mode to iterate quickly:
+
+```bash
+# Start local stack
+make up-build
+
+# Run batch tests with different configurations
 python3 scripts/run_tests.py batch --file batch_stress_matrix.json
+
+# Analyze results and get recommendations
 python3 scripts/analyze_results.py
 ```
 
-The analyzer will rank all configurations by energy efficiency and recommend the best settings for your hardware.
+The analyzer ranks configurations by energy efficiency and recommends optimal settings.
 
-### Compare H.264 vs H.265 Power Consumption
+### Development: Compare H.264 vs H.265 Power Consumption
 
-Create a batch configuration testing both codecs at the same bitrates, run the tests, and compare results in Grafana.
+Create batch configuration testing codecs:
 
-### Monitor Production Streaming Power Usage
+```bash
+# Edit batch_stress_matrix.json with h264 and h265 scenarios
+# Run tests locally
+python3 scripts/run_tests.py batch --file codec_comparison.json
 
-Set up the stack on your streaming server and configure Prometheus alerts to notify you when power consumption exceeds thresholds.
+# Compare results in Grafana dashboards
+```
+
+### Production: Continuous CI/CD Benchmarking
+
+Deploy distributed mode with agents on your build servers:
+
+```bash
+# CI/CD pipeline submits jobs to master after each release
+curl -X POST http://master:8080/jobs -d @benchmark_config.json
+
+# Results automatically aggregated and visualized
+# Alerts fire if performance regressions detected
+```
 
 ## Contributing
 
