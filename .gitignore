@@ -96,3 +96,9 @@ bin/
 .ffmpeg-agent/
 agent
 master
+
+# Master server artifacts
+certs/
+*.db
+*.db-shm
+*.db-wal
