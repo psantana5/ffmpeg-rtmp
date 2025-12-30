@@ -5,16 +5,18 @@ WORKDIR /build
 
 # Copy go mod files
 COPY go.mod go.sum* ./
+COPY shared/pkg/go.mod shared/pkg/go.sum* ./shared/pkg/
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY src/exporters/cpu_exporter/ ./src/exporters/cpu_exporter/
+COPY worker/exporters/cpu_exporter/ ./worker/exporters/cpu_exporter/
+COPY shared/pkg/ ./shared/pkg/
 
 # Build the exporter as a static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" \
-    -o cpu_exporter ./src/exporters/cpu_exporter/
+    -o cpu_exporter ./worker/exporters/cpu_exporter/
 
 # Runtime stage - use scratch for minimal image
 FROM scratch
