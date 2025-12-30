@@ -94,11 +94,11 @@ nvidia-up-build:
 
 vm-up:
 	@mkdir -p test_results
-	$(COMPOSE) up -d prometheus victoriametrics grafana
+	$(COMPOSE) up -d victoriametrics grafana
 
 vm-up-build:
 	@mkdir -p test_results
-	$(COMPOSE) up -d --build prometheus victoriametrics grafana
+	$(COMPOSE) up -d --build victoriametrics grafana
 
 test-suite:
 	$(PYTHON) scripts/run_tests.py suite
