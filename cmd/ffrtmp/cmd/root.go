@@ -8,18 +8,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	masterURL          string
-	outputFormat       string
-	cfgFile            string
-	apiKey             string
-	httpClient         *http.Client
+	masterURL           string
+	outputFormat        string
+	cfgFile             string
+	apiKey              string
+	httpClient          *http.Client
 	httpClientMasterURL string // Track which masterURL the client was initialized with
+	httpClientMutex     sync.Mutex
 )
 
 // rootCmd represents the base command
@@ -136,6 +138,9 @@ func GetAPIKey() string {
 // GetHTTPClient returns the configured HTTP client
 // Re-initializes if masterURL has changed since last initialization
 func GetHTTPClient() *http.Client {
+	httpClientMutex.Lock()
+	defer httpClientMutex.Unlock()
+	
 	if httpClient == nil || httpClientMasterURL != masterURL {
 		initHTTPClient()
 		httpClientMasterURL = masterURL
