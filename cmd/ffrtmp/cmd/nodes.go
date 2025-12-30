@@ -51,7 +51,14 @@ type nodeInfo struct {
 func runNodesList(cmd *cobra.Command, args []string) error {
 	url := fmt.Sprintf("%s/nodes", GetMasterURL())
 
-	resp, err := http.Get(url)
+	// Create authenticated GET request
+	httpReq, err := CreateAuthenticatedRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
 	}
