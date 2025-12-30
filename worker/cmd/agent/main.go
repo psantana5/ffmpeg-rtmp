@@ -84,7 +84,7 @@ func main() {
 
 	// Start Prometheus metrics exporter
 	hostname, _ := os.Hostname()
-	nodeID := fmt.Sprintf("%s:%d", hostname, *metricsPort)
+	nodeID := fmt.Sprintf("%s:%s", hostname, *metricsPort)
 	metricsExporter := prometheus.NewWorkerExporter(nodeID, caps.HasGPU)
 	
 	metricsRouter := mux.NewRouter()
