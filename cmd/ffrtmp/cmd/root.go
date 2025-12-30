@@ -100,10 +100,10 @@ func CreateAuthenticatedRequest(method, url string, body io.Reader) (*http.Reque
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
-	
+
 	return req, nil
 }
