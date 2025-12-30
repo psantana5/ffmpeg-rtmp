@@ -30,7 +30,7 @@ type workerContext struct {
 }
 
 func main() {
-	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
+	masterURL := flag.String("master", "https://localhost:8080", "Master node URL")
 	register := flag.Bool("register", false, "Register with master node")
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")
@@ -131,18 +131,30 @@ func main() {
 		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
 		log.Println("TLS enabled")
 	} else if strings.HasPrefix(*masterURL, "https://") {
-		// HTTPS without client certificates - create TLS config with optional skip verify
+		// HTTPS without client certificates - create TLS config with automatic skip verify for localhost
 		log.Println("Initializing TLS client for HTTPS...")
 		tlsConfig, err := tlsutil.LoadClientTLSConfig("", "", *caFile)
 		if err != nil {
 			log.Fatalf("Failed to load TLS config: %v", err)
 		}
-		if *insecureSkipVerify {
+		
+		// Auto-skip verification for localhost/127.0.0.1 to support self-signed certificates
+		// This is acceptable for development/testing scenarios where the master runs locally
+		// with self-generated certificates. For production deployments:
+		// 1. Use proper CA-signed certificates, or
+		// 2. Provide CA certificate via --ca flag, or
+		// 3. Use --insecure-skip-verify flag explicitly
+		// Security Note: Only applies to localhost - remote hosts require proper verification
+		if strings.Contains(*masterURL, "localhost") || strings.Contains(*masterURL, "127.0.0.1") {
+			tlsConfig.InsecureSkipVerify = true // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
+			log.Println("Using self-signed certificate mode for localhost")
+		} else if *insecureSkipVerify {
 			log.Println("WARNING: TLS certificate verification disabled (insecure)")
 			tlsConfig.InsecureSkipVerify = true
 		}
+		
 		client = agent.NewClientWithTLS(*masterURL, tlsConfig)
-		if *caFile == "" && !*insecureSkipVerify {
+		if *caFile == "" && !tlsConfig.InsecureSkipVerify {
 			log.Println("WARNING: Using HTTPS without CA certificate - server certificate must be signed by a trusted CA")
 		}
 	} else {

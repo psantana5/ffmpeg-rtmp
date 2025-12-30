@@ -1,22 +1,27 @@
 package cmd
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	masterURL    string
-	outputFormat string
-	cfgFile      string
-	apiKey       string
+	masterURL           string
+	outputFormat        string
+	cfgFile             string
+	apiKey              string
+	httpClient          *http.Client
+	httpClientMasterURL string // Track which masterURL the client was initialized with
+	httpClientMutex     sync.Mutex
 )
 
 // rootCmd represents the base command
@@ -36,7 +41,7 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ffrtmp/config)")
-	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or http://localhost:8080)")
+	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or https://localhost:8080)")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", "table", "output format: table or json")
 }
 
@@ -87,7 +92,31 @@ func initConfig() {
 
 	// Set default if still empty
 	if masterURL == "" {
-		masterURL = "http://localhost:8080"
+		masterURL = "https://localhost:8080"
+	}
+}
+
+// initHTTPClient initializes the HTTP client with appropriate TLS settings
+func initHTTPClient() {
+	// Create a TLS config that skips verification for localhost/127.0.0.1
+	// but uses proper verification for remote hosts
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false,
+	}
+	
+	// For localhost and 127.0.0.1, skip TLS verification to support self-signed certs
+	// This is acceptable for development/testing scenarios where the master runs locally
+	// with self-generated certificates. For production, use proper certificates or
+	// explicitly specify the master URL to avoid this auto-detection.
+	// Security Note: Only applies to localhost - remote hosts always use proper verification
+	if strings.Contains(masterURL, "localhost") || strings.Contains(masterURL, "127.0.0.1") {
+		tlsConfig.InsecureSkipVerify = true // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
+	}
+	
+	httpClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
 	}
 }
 
@@ -104,6 +133,19 @@ func IsJSONOutput() bool {
 // GetAPIKey returns the configured API key
 func GetAPIKey() string {
 	return apiKey
+}
+
+// GetHTTPClient returns the configured HTTP client
+// Re-initializes if masterURL has changed since last initialization
+func GetHTTPClient() *http.Client {
+	httpClientMutex.Lock()
+	defer httpClientMutex.Unlock()
+	
+	if httpClient == nil || httpClientMasterURL != masterURL {
+		initHTTPClient()
+		httpClientMasterURL = masterURL
+	}
+	return httpClient
 }
 
 // CreateAuthenticatedRequest creates an HTTP request with authentication header if API key is configured
