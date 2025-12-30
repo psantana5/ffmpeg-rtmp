@@ -15,6 +15,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/master/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 )
@@ -35,6 +36,7 @@ func main() {
 	maxRetries := flag.Int("max-retries", 3, "Maximum job retry attempts on failure")
 	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
 	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
+	schedulerInterval := flag.Duration("scheduler-interval", 5*time.Second, "Background scheduler check interval")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -200,6 +202,11 @@ func main() {
 		}()
 	}
 
+	// Start background scheduler
+	sched := scheduler.New(dataStore, *schedulerInterval)
+	sched.Start()
+	log.Printf("✓ Background scheduler started (interval: %v)", *schedulerInterval)
+
 	// Create HTTP server
 	srv := &http.Server{
 		Addr:         ":" + *port,
@@ -273,6 +280,9 @@ func main() {
 	<-stop
 
 	log.Println("Shutting down gracefully...")
+
+	// Stop scheduler first
+	sched.Stop()
 
 	// Give outstanding requests 30 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
