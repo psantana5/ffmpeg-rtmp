@@ -123,17 +123,17 @@ The compute node agent is a Go binary that runs on worker machines. It detects h
 go build -o bin/agent ./cmd/agent
 
 # Register and start the agent
-./bin/agent --register --master http://master-ip:8080
+./bin/agent --register --master https://master-ip:8080
 
 # For development: Register master as worker (with confirmation)
-./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+./bin/agent --register --master https://localhost:8080 --allow-master-as-worker
 ```
 
 **Agent Flags:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--master` | `http://localhost:8080` | Master node URL |
+| `--master` | `https://localhost:8080` | Master node URL |
 | `--register` | `false` | Register with master node |
 | `--poll-interval` | `10s` | Job polling interval |
 | `--heartbeat-interval` | `30s` | Heartbeat interval |
@@ -287,12 +287,12 @@ Master on dedicated machine, workers on separate nodes:
 2. **Register Workers:**
    ```bash
    # On each worker node
-   ./bin/agent --register --master http://master-ip:8080
+   ./bin/agent --register --master https://master-ip:8080
    ```
 
 3. **Create Job:**
    ```bash
-   curl -X POST http://master-ip:8080/jobs \
+   curl -X POST https://master-ip:8080/jobs \
      -H "Content-Type: application/json" \
      -d '{
        "scenario": "4K60-h264",
@@ -303,10 +303,10 @@ Master on dedicated machine, workers on separate nodes:
 4. **Monitor Progress:**
    ```bash
    # List nodes
-   curl http://master-ip:8080/nodes
+   curl https://master-ip:8080/nodes
 
    # List jobs
-   curl http://master-ip:8080/jobs
+   curl https://master-ip:8080/jobs
    ```
 
 5. **View Results:**
@@ -345,7 +345,7 @@ curl http://localhost:8080/nodes | jq
 
 ```bash
 # Create a test job
-curl -X POST http://localhost:8080/jobs \
+curl -X POST https://localhost:8080/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "test-1080p",
@@ -375,7 +375,7 @@ These features are planned for future releases (v1.5+).
 
 ```bash
 # Check master is running
-curl http://master-ip:8080/health
+curl https://master-ip:8080/health
 
 # Check network connectivity
 ping master-ip
@@ -385,9 +385,9 @@ ping master-ip
 
 ### Node not receiving jobs
 
-- Verify node status is "available": `curl http://master-ip:8080/nodes`
+- Verify node status is "available": `curl https://master-ip:8080/nodes`
 - Check heartbeat is working (logs should show periodic heartbeats)
-- Ensure jobs exist in queue: `curl http://master-ip:8080/jobs`
+- Ensure jobs exist in queue: `curl https://master-ip:8080/jobs`
 
 ### Master not starting
 

@@ -78,7 +78,7 @@ Options explained:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--master` | `http://localhost:8080` | Master node URL |
+| `--master` | `https://localhost:8080` | Master node URL |
 | `--register` | `false` | Register with master |
 | `--cert` | `""` | Client certificate (for mTLS) |
 | `--key` | `""` | Client key (for mTLS) |
