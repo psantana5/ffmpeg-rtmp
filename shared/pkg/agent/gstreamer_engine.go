@@ -75,12 +75,15 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 	}
 
 	// Get encoding parameters
-	bitrate := 2000 // kbps
+	bitrate := 2000 // kbps (default)
 	if b, ok := params["bitrate"].(string); ok && b != "" {
 		// Parse bitrate (e.g., "2000k" -> 2000)
 		bitrateStr := strings.TrimSuffix(b, "k")
 		bitrateStr = strings.TrimSuffix(bitrateStr, "K")
-		fmt.Sscanf(bitrateStr, "%d", &bitrate)
+		if _, err := fmt.Sscanf(bitrateStr, "%d", &bitrate); err != nil {
+			// Failed to parse, use default
+			bitrate = 2000
+		}
 	}
 
 	// Select encoder based on hardware capabilities
