@@ -1,0 +1,17 @@
+{
+  "test_date": "2025-12-29T17:25:50.759304",
+  "scenarios": [
+    {
+      "name": "recommended_test",
+      "bitrate": "15000k",
+      "resolution": "3840x2160",
+      "fps": 30,
+      "duration": 120,
+      "encoder": "h264",
+      "preset": "fast",
+      "start_time": 1767025400.6093261,
+      "end_time": 1767025520.6095612,
+      "outputs": null
+    }
+  ]
+}

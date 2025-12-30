@@ -1,0 +1,152 @@
+# Production Streaming Benchmarks Report
+
+**Generated**: 2025-12-29 17:18:56
+**Region**: us-east-1
+**Electricity Price**: $0.120/kWh
+**CO₂ Intensity**: 390 gCO₂/kWh
+
+## Executive Summary
+
+- **Average Power**: 0.0W
+- **Average Cost**: $0.0000/hour
+- **Average CO₂**: 0.000 kg/hour
+
+
+## Detailed Results
+
+| Scenario | Resolution | FPS | Bitrate | Avg Power | Peak Power | Energy | Cost | CO₂ | VMAF |
+|----------|------------|-----|---------|-----------|------------|--------|------|-----|------|
+| 1 Streams @ 1000k | 1280x720 | 30 | 1000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 1 Streams @ 2500k | 1280x720 | 30 | 2500k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 1 Streams @ 5000k | 1280x720 | 30 | 5000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 2 Streams @ 1000k | 1280x720 | 30 | 1000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 2 Streams @ 2500k | 1280x720 | 30 | 2500k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 2 Streams @ 5000k | 1280x720 | 30 | 5000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 4 Streams @ 1000k | 1280x720 | 30 | 1000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 4 Streams @ 2500k | 1280x720 | 30 | 2500k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 4 Streams @ 5000k | 1280x720 | 30 | 5000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 8 Streams @ 1000k | 1280x720 | 30 | 1000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 8 Streams @ 2500k | 1280x720 | 30 | 2500k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| 8 Streams @ 5000k | 1280x720 | 30 | 5000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| Multi-resolution ladder test 1080p+720p+ | 1920x1080 | 30 | 2500k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+| Multi-resolution ladder test 1080p+720p+ | 1920x1080 | 30 | 5000k | 0.0W | 0.0W | 0.0000 kWh | $0.0000/h | 0.000 kg/h | N/A |
+
+## Cost Analysis by Platform
+
+### Other
+
+**1 Streams @ 1000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 1000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**1 Streams @ 2500k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 2500k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**1 Streams @ 5000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 5000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**2 Streams @ 1000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 1000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**2 Streams @ 2500k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 2500k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**2 Streams @ 5000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 5000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**4 Streams @ 1000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 1000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**4 Streams @ 2500k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 2500k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**4 Streams @ 5000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 5000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**8 Streams @ 1000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 1000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**8 Streams @ 2500k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 2500k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**8 Streams @ 5000k**
+- Resolution: 1280x720 @ 30 fps
+- Bitrate: 5000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**Multi-resolution ladder test 1080p+720p+480p @ 2500k**
+- Resolution: 1920x1080 @ 30 fps
+- Bitrate: 2500k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+**Multi-resolution ladder test 1080p+720p+480p @ 5000k**
+- Resolution: 1920x1080 @ 30 fps
+- Bitrate: 5000k
+- Power: 0.0W (peak: 0.0W)
+- Cost: $0.0000/hour ($0.00/month @ 24/7)
+- CO₂: 0.000 kg/hour (0.0 kg/month)
+
+## ROI Calculator
+
+Monthly cost projections for different server counts (24/7 operation):
+
+| Servers | Monthly Cost | Annual Cost |
+|---------|--------------|-------------|
+| 1 | $0.00 | $0.00 |
+| 10 | $0.00 | $0.00 |
+| 50 | $0.00 | $0.00 |
+| 100 | $0.00 | $0.00 |
+| 500 | $0.00 | $0.00 |
+
+## Recommendations
+
+
+---
+*Report generated by production benchmark runner*

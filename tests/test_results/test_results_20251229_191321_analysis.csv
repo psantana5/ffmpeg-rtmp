@@ -1,0 +1,2 @@
+name,bitrate,resolution,fps,duration,mean_power_w,median_power_w,total_energy_wh,predicted_mean_power_w,net_power_w,net_energy_wh,net_container_cpu_pct,docker_overhead_w,docker_overhead_pct,container_cpu_pct,container_power_w,efficiency_score,efficiency_rank,output_ladder,total_pixels
+benchmark_laptop,1000k,1280x720,30,60.00036430358887,12.99,13.01,0.2165,,,,,,,,,0.07698229407236336,1,,1658890072.265625

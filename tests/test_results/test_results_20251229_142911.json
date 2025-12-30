@@ -1,0 +1,181 @@
+{
+  "test_date": "2025-12-29T14:29:11.446297",
+  "scenarios": [
+    {
+      "name": "Baseline (Idle)",
+      "bitrate": "0k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 60,
+      "start_time": 1767012572.4006681,
+      "end_time": 1767012632.4007766,
+      "outputs": null
+    },
+    {
+      "name": "1 Streams @ 1000k",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767012644.4032645,
+      "end_time": 1767012764.4037251,
+      "outputs": null
+    },
+    {
+      "name": "1 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767012791.4703674,
+      "end_time": 1767012911.4707887,
+      "outputs": null
+    },
+    {
+      "name": "1 Streams @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767012938.5875726,
+      "end_time": 1767013058.5880215,
+      "outputs": null
+    },
+    {
+      "name": "2 Streams @ 1000k",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013087.6557918,
+      "end_time": 1767013207.6560345,
+      "outputs": null
+    },
+    {
+      "name": "2 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013241.8369498,
+      "end_time": 1767013361.8371246,
+      "outputs": null
+    },
+    {
+      "name": "2 Streams @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013395.9699564,
+      "end_time": 1767013515.9702396,
+      "outputs": null
+    },
+    {
+      "name": "4 Streams @ 1000k",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013559.1047885,
+      "end_time": 1767013679.1050155,
+      "outputs": null
+    },
+    {
+      "name": "4 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013732.4692616,
+      "end_time": 1767013852.4696577,
+      "outputs": null
+    },
+    {
+      "name": "4 Streams @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767013905.8309684,
+      "end_time": 1767014025.8311887,
+      "outputs": null
+    },
+    {
+      "name": "8 Streams @ 1000k",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767014092.1959243,
+      "end_time": 1767014212.1961482,
+      "outputs": null
+    },
+    {
+      "name": "8 Streams @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767014293.8160124,
+      "end_time": 1767014413.816224,
+      "outputs": null
+    },
+    {
+      "name": "8 Streams @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767014495.535659,
+      "end_time": 1767014615.535938,
+      "outputs": null
+    },
+    {
+      "name": "Multi-resolution ladder test 1080p+720p+480p @ 2500k",
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767014671.1508408,
+      "end_time": 1767014791.1512845,
+      "outputs": [
+        {
+          "resolution": "1920x1080",
+          "fps": 30
+        },
+        {
+          "resolution": "1280x720",
+          "fps": 30
+        },
+        {
+          "resolution": "854x480",
+          "fps": 30
+        }
+      ]
+    },
+    {
+      "name": "Multi-resolution ladder test 1080p+720p+480p @ 5000k",
+      "bitrate": "5000k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 120,
+      "start_time": 1767014816.3416362,
+      "end_time": 1767014936.3420286,
+      "outputs": [
+        {
+          "resolution": "1920x1080",
+          "fps": 30
+        },
+        {
+          "resolution": "1280x720",
+          "fps": 30
+        },
+        {
+          "resolution": "854x480",
+          "fps": 30
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+name,bitrate,resolution,fps,duration,mean_power_w,median_power_w,total_energy_wh,predicted_mean_power_w,net_power_w,net_energy_wh,net_container_cpu_pct,docker_overhead_w,docker_overhead_pct,container_cpu_pct,container_power_w,efficiency_score,efficiency_rank,output_ladder,total_pixels
+recommended_test,15000k,3840x2160,30,120.000235080719,41.97,39.86,1.399,,,,,,,20.38,8.55,0.35739814152966404,1,,29859898495.60547
