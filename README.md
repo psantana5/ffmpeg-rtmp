@@ -10,7 +10,7 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
-## ⚡ Quick Start (Production - Distributed Mode)
+## Quick Start (Production - Distributed Mode)
 
 The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
 
