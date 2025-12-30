@@ -41,6 +41,10 @@ In a new terminal:
 
 ⚠️ You'll see a warning about registering master as worker. Type `yes` to continue.
 
+**Note:** When connecting to `https://localhost` or `https://127.0.0.1` without providing a CA certificate, the agent will automatically skip TLS certificate verification for convenience in development. For production deployments with real hostnames or IPs, you must either:
+- Use `--insecure-skip-verify` flag (development only), or  
+- Provide a CA certificate with `--ca certs/ca.crt` (recommended for production)
+
 The agent will:
 - Detect your hardware (CPU, GPU, RAM)
 - Register with the master
@@ -241,6 +245,10 @@ ping master-ip
 
 **TLS certificate errors:**
 ```bash
+# For localhost development (automatic since v2.3)
+./bin/agent --register --master https://localhost:8080
+# The agent automatically skips certificate verification for localhost/127.0.0.1
+
 # Error: "certificate is valid for X, not Y"
 # Solution 1: Regenerate certificate with correct hostname/IP
 ./bin/master --generate-cert --cert-hosts "your-hostname" --cert-ips "your-ip"
