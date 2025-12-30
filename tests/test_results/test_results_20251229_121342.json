@@ -1,0 +1,15 @@
+{
+  "test_date": "2025-12-29T12:13:42.832396",
+  "scenarios": [
+    {
+      "name": "test_with_metrics",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 60,
+      "start_time": 1767006732.72318,
+      "end_time": 1767006792.7235665,
+      "outputs": null
+    }
+  ]
+}

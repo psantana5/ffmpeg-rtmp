@@ -36,7 +36,7 @@ API endpoints:
 In a new terminal:
 
 ```bash
-./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+./bin/agent --register --master https://localhost:8080 --allow-master-as-worker
 ```
 
 ⚠️ You'll see a warning about registering master as worker. Type `yes` to continue.
@@ -51,7 +51,7 @@ The agent will:
 In a third terminal:
 
 ```bash
-curl -X POST http://localhost:8080/jobs \
+curl -k -X POST https://localhost:8080/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "test-1080p",
@@ -69,13 +69,13 @@ The agent will pick up and execute the job automatically!
 
 ```bash
 # List registered nodes
-curl http://localhost:8080/nodes | jq
+curl -k https://localhost:8080/nodes | jq
 
 # List jobs
-curl http://localhost:8080/jobs | jq
+curl -k https://localhost:8080/jobs | jq
 
 # Check health
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 ```
 
 ## Production Deployment
@@ -227,7 +227,7 @@ For maximum security, require client certificates:
 **Agent can't connect:**
 ```bash
 # Check master is running
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 
 # Check network
 ping master-ip
@@ -236,7 +236,7 @@ ping master-ip
 **Master-as-worker blocked:**
 ```bash
 # Use the allow flag in development
-./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+./bin/agent --register --master https://localhost:8080 --allow-master-as-worker
 ```
 
 **TLS certificate errors:**

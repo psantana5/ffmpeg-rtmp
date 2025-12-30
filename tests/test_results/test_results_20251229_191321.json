@@ -1,0 +1,17 @@
+{
+  "test_date": "2025-12-29T19:13:21.025999",
+  "scenarios": [
+    {
+      "name": "benchmark_laptop",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 60,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767031930.862107,
+      "end_time": 1767031990.8624713,
+      "outputs": null
+    }
+  ]
+}

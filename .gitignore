@@ -1,0 +1,98 @@
+# Python
+.venv
+venv
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.pytype/
+cov.xml
+*.cover
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# RTMP streams
+streams/*
+
+# Test results and generated files
+test_results/
+results/*
+plots/*
+models/*/checkpoint_*
+models/*/training_history.json
+tests/*
+# Temporary files
+*.tmp
+*.bak
+*.cache
+tmp/
+temp/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+go.work.sum
+vendor/
+
+# Go exporters - extracted binaries (optional, for standalone deployment)
+cpu_exporter
+gpu_exporter
+ffmpeg_exporter
+
+# Distributed compute binaries
+bin/
+.ffmpeg-agent/
+/agent
+/master

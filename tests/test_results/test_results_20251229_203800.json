@@ -1,0 +1,125 @@
+{
+  "test_date": "2025-12-29T20:38:00.316560",
+  "scenarios": [
+    {
+      "name": "Baseline (Idle)",
+      "bitrate": "0k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 120,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767033591.7336133,
+      "end_time": 1767033711.7337203,
+      "outputs": null
+    },
+    {
+      "name": "1 Mbps Stream",
+      "bitrate": "1000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767033755.7709453,
+      "end_time": 1767034055.7711606,
+      "outputs": null
+    },
+    {
+      "name": "2.5 Mbps Stream",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767034130.1440153,
+      "end_time": 1767034430.1442342,
+      "outputs": null
+    },
+    {
+      "name": "5 Mbps Stream",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767034504.106299,
+      "end_time": 1767034804.1064458,
+      "outputs": null
+    },
+    {
+      "name": "10 Mbps Stream",
+      "bitrate": "10000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767034878.1071174,
+      "end_time": 1767035178.1072757,
+      "outputs": null
+    },
+    {
+      "name": "480p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "854x480",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767035251.7926784,
+      "end_time": 1767035551.7928855,
+      "outputs": null
+    },
+    {
+      "name": "720p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767035625.5630715,
+      "end_time": 1767035925.5632231,
+      "outputs": null
+    },
+    {
+      "name": "1080p @ 2.5Mbps",
+      "bitrate": "2500k",
+      "resolution": "1920x1080",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767036000.377825,
+      "end_time": 1767036300.3779588,
+      "outputs": null
+    },
+    {
+      "name": "30fps @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 30,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767036374.6653585,
+      "end_time": 1767036674.665565,
+      "outputs": null
+    },
+    {
+      "name": "60fps @ 5Mbps",
+      "bitrate": "5000k",
+      "resolution": "1280x720",
+      "fps": 60,
+      "duration": 300,
+      "encoder": "h264",
+      "preset": "veryfast",
+      "start_time": 1767036749.399467,
+      "end_time": 1767037049.3995528,
+      "outputs": null
+    }
+  ]
+}
