@@ -30,8 +30,14 @@ func main() {
 	generateCert := flag.Bool("generate-cert", false, "Generate self-signed certificate")
 	certIPs := flag.String("cert-ips", "", "Comma-separated list of IP addresses to include in certificate SANs (e.g., '192.168.0.51,10.0.0.5')")
 	certHosts := flag.String("cert-hosts", "", "Comma-separated list of hostnames to include in certificate SANs (e.g., 'depa,server1')")
-	apiKey := flag.String("api-key", "", "API key for authentication (leave empty to disable)")
+	apiKeyFlag := flag.String("api-key", "", "API key for authentication (leave empty to disable, or use FFMPEG_RTMP_API_KEY env var)")
 	flag.Parse()
+
+	// Get API key from flag or environment variable
+	apiKey := *apiKeyFlag
+	if apiKey == "" {
+		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+	}
 
 	log.Println("Starting FFmpeg RTMP Distributed Master Node (Production Mode)")
 	log.Printf("Port: %s", *port)
@@ -93,9 +99,8 @@ func main() {
 	}
 
 	// Setup authentication if API key provided
-	if *apiKey != "" {
+	if apiKey != "" {
 		log.Println("API authentication enabled")
-		log.Printf("Using API key for authentication")
 	} else {
 		log.Println("WARNING: API authentication disabled (not recommended for production)")
 	}
@@ -107,7 +112,7 @@ func main() {
 	router := mux.NewRouter()
 	
 	// Add authentication middleware if API key is set
-	if *apiKey != "" {
+	if apiKey != "" {
 		router.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Skip auth for health endpoint
@@ -124,7 +129,7 @@ func main() {
 				}
 
 				// Simple bearer token check with constant-time comparison
-				expectedAuth := "Bearer " + *apiKey
+				expectedAuth := "Bearer " + apiKey
 				if !auth.SecureCompare(authHeader, expectedAuth) {
 					http.Error(w, "Invalid API key", http.StatusUnauthorized)
 					return

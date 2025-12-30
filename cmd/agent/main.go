@@ -20,12 +20,18 @@ func main() {
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")
 	allowMasterAsWorker := flag.Bool("allow-master-as-worker", false, "Allow registering master node as worker (development mode)")
-	apiKey := flag.String("api-key", "", "API key for authentication")
+	apiKeyFlag := flag.String("api-key", "", "API key for authentication (or use FFMPEG_RTMP_API_KEY env var)")
 	certFile := flag.String("cert", "", "TLS client certificate file (for mTLS)")
 	keyFile := flag.String("key", "", "TLS client key file (for mTLS)")
 	caFile := flag.String("ca", "", "CA certificate file to verify server")
 	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
 	flag.Parse()
+
+	// Get API key from flag or environment variable
+	apiKey := *apiKeyFlag
+	if apiKey == "" {
+		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+	}
 
 	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
 	log.Printf("Master URL: %s", *masterURL)
@@ -85,8 +91,8 @@ func main() {
 	}
 
 	// Set API key if provided
-	if *apiKey != "" {
-		client.SetAPIKey(*apiKey)
+	if apiKey != "" {
+		client.SetAPIKey(apiKey)
 		log.Println("API authentication enabled")
 	} else {
 		log.Println("WARNING: No API key provided (authentication disabled)")

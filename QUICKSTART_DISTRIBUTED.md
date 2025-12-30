@@ -159,20 +159,43 @@ This creates a certificate valid for:
 - DNS names: `master`, `localhost`, `depa`, `master-node`
 - IP addresses: `127.0.0.1`, `::1`, `192.168.0.51`, `10.0.0.5`
 
+⚠️ **Note:** Certificate generation only creates the files. You must restart the master with `--tls` to use them (see next step).
+
 ### Start Master with TLS
 
+**After generating certificates**, start (or restart) the master with TLS enabled:
+
 ```bash
+# Option 1: Using environment variable (recommended for security)
+export FFMPEG_RTMP_API_KEY="your-secure-api-key"
+./bin/master --port 8080 --tls \
+  --cert certs/master.crt \
+  --key certs/master.key
+
+# Option 2: Using command-line flag (visible in process list)
 ./bin/master --port 8080 --tls \
   --cert certs/master.crt \
   --key certs/master.key \
   --api-key "your-secure-api-key"
 ```
 
+**Important:** 
+- The API key set here must be provided by all agents that connect to this master.
+- If the master was already running, **stop it and restart** with the new certificate.
+- Using the `FFMPEG_RTMP_API_KEY` environment variable is more secure than the command-line flag.
+
 ### Connect Agent with HTTPS
 
 For development with self-signed certificates:
 
 ```bash
+# Option 1: Using environment variable (recommended for security)
+export FFMPEG_RTMP_API_KEY="your-secure-api-key"
+./bin/agent --register \
+  --master https://192.168.0.51:8080 \
+  --insecure-skip-verify
+
+# Option 2: Using command-line flag (visible in process list)
 ./bin/agent --register \
   --master https://192.168.0.51:8080 \
   --api-key "your-secure-api-key" \
@@ -184,9 +207,10 @@ For development with self-signed certificates:
 For production with proper CA certificates:
 
 ```bash
+# Using environment variable (recommended)
+export FFMPEG_RTMP_API_KEY="your-secure-api-key"
 ./bin/agent --register \
   --master https://192.168.0.51:8080 \
-  --api-key "your-secure-api-key" \
   --ca certs/ca.crt
 ```
 
@@ -218,10 +242,35 @@ ping master-ip
 **TLS certificate errors:**
 ```bash
 # Error: "certificate is valid for X, not Y"
-# Solution: Regenerate certificate with correct hostname/IP
+# Solution 1: Regenerate certificate with correct hostname/IP
 ./bin/master --generate-cert --cert-hosts "your-hostname" --cert-ips "your-ip"
+
+# Solution 2: IMPORTANT - Restart the master with --tls flag to use the new certificate
+./bin/master --port 8080 --tls --cert certs/master.crt --key certs/master.key
 
 # Error: "certificate signed by unknown authority"
 # Solution: Use --insecure-skip-verify for development, or provide --ca for production
 ./bin/agent --register --master https://server:8080 --insecure-skip-verify
+```
+
+**Authentication errors:**
+```bash
+# Error: "Missing Authorization header" or "registration failed with status 401"
+# Solution: Provide the same API key that the master was started with
+export FFMPEG_RTMP_API_KEY="your-secure-api-key"
+./bin/agent --register --master https://server:8080 --insecure-skip-verify
+
+# Or using command-line flag:
+./bin/agent --register --master https://server:8080 --api-key "your-secure-api-key" --insecure-skip-verify
+
+# Error: "Invalid API key"
+# Solution: Make sure the agent's API key matches the master's API key exactly
+```
+
+**Connection successful checklist:**
+When the agent successfully registers, you should see:
+```
+✓ Registered successfully!
+  Node ID: <uuid>
+  Status: active
 ```
