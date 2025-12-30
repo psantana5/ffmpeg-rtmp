@@ -22,7 +22,6 @@ var (
 	engine     string
 	queue      string
 	priority   string
-	engine     string
 	
 	// Job status flags
 	followStatus bool
@@ -170,7 +169,7 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	// Send request
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)
@@ -261,7 +260,7 @@ func fetchJobStatus(jobID string) (*jobResponse, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to master API: %w", err)
@@ -369,7 +368,7 @@ func controlJob(jobID, action string) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{}
+	client := GetHTTPClient()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to connect to master API: %w", err)

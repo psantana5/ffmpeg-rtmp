@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,7 @@ var (
 	outputFormat string
 	cfgFile      string
 	apiKey       string
+	httpClient   *http.Client
 )
 
 // rootCmd represents the base command
@@ -36,7 +38,7 @@ func init() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ffrtmp/config)")
-	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or http://localhost:8080)")
+	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or https://localhost:8080)")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", "table", "output format: table or json")
 }
 
@@ -89,6 +91,29 @@ func initConfig() {
 	if masterURL == "" {
 		masterURL = "https://localhost:8080"
 	}
+	
+	// Initialize HTTP client with TLS configuration that works for both HTTP and HTTPS
+	initHTTPClient()
+}
+
+// initHTTPClient initializes the HTTP client with appropriate TLS settings
+func initHTTPClient() {
+	// Create a TLS config that skips verification for localhost/127.0.0.1
+	// but uses proper verification for remote hosts
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false,
+	}
+	
+	// For localhost and 127.0.0.1, skip TLS verification to support self-signed certs
+	if strings.Contains(masterURL, "localhost") || strings.Contains(masterURL, "127.0.0.1") {
+		tlsConfig.InsecureSkipVerify = true
+	}
+	
+	httpClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
 }
 
 // GetMasterURL returns the configured master URL with trailing slashes removed
@@ -104,6 +129,14 @@ func IsJSONOutput() bool {
 // GetAPIKey returns the configured API key
 func GetAPIKey() string {
 	return apiKey
+}
+
+// GetHTTPClient returns the configured HTTP client
+func GetHTTPClient() *http.Client {
+	if httpClient == nil {
+		initHTTPClient()
+	}
+	return httpClient
 }
 
 // CreateAuthenticatedRequest creates an HTTP request with authentication header if API key is configured
