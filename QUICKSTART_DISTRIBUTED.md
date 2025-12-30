@@ -135,9 +135,68 @@ Workers (poll every 10s)
 ## Next Steps
 
 - See [docs/distributed_architecture_v1.md](docs/distributed_architecture_v1.md) for full documentation
-- Add mTLS for production security
+- Add mTLS for production security (see below)
 - Implement advanced scheduling
 - Connect to existing FFmpeg workflows
+
+## TLS/HTTPS Setup (Production)
+
+For secure production deployments, use HTTPS with TLS certificates:
+
+### Generate Self-Signed Certificate
+
+On the master node, generate a certificate with your server's IP address and hostname:
+
+```bash
+./bin/master --generate-cert \
+  --cert-ips "192.168.0.51,10.0.0.5" \
+  --cert-hosts "depa,master-node" \
+  --cert certs/master.crt \
+  --key certs/master.key
+```
+
+This creates a certificate valid for:
+- DNS names: `master`, `localhost`, `depa`, `master-node`
+- IP addresses: `127.0.0.1`, `::1`, `192.168.0.51`, `10.0.0.5`
+
+### Start Master with TLS
+
+```bash
+./bin/master --port 8080 --tls \
+  --cert certs/master.crt \
+  --key certs/master.key \
+  --api-key "your-secure-api-key"
+```
+
+### Connect Agent with HTTPS
+
+For development with self-signed certificates:
+
+```bash
+./bin/agent --register \
+  --master https://192.168.0.51:8080 \
+  --api-key "your-secure-api-key" \
+  --insecure-skip-verify
+```
+
+⚠️ **Warning:** `--insecure-skip-verify` disables certificate validation. Only use in development!
+
+For production with proper CA certificates:
+
+```bash
+./bin/agent --register \
+  --master https://192.168.0.51:8080 \
+  --api-key "your-secure-api-key" \
+  --ca certs/ca.crt
+```
+
+### Mutual TLS (mTLS)
+
+For maximum security, require client certificates:
+
+1. Generate client certificates for each agent
+2. Start master with `--mtls --ca certs/ca.crt`
+3. Connect agents with `--cert agent.crt --key agent.key`
 
 ## Troubleshooting
 
@@ -154,4 +213,15 @@ ping master-ip
 ```bash
 # Use the allow flag in development
 ./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
+```
+
+**TLS certificate errors:**
+```bash
+# Error: "certificate is valid for X, not Y"
+# Solution: Regenerate certificate with correct hostname/IP
+./bin/master --generate-cert --cert-hosts "your-hostname" --cert-ips "your-ip"
+
+# Error: "certificate signed by unknown authority"
+# Solution: Use --insecure-skip-verify for development, or provide --ca for production
+./bin/agent --register --master https://server:8080 --insecure-skip-verify
 ```
