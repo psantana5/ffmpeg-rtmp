@@ -1,12 +1,93 @@
 # Grafana Dashboards
 
-This directory contains Grafana dashboards for monitoring FFmpeg transcoding performance, power consumption, and energy efficiency.
+This directory contains streamlined Grafana dashboards for monitoring FFmpeg transcoding performance, power consumption, and energy efficiency with all exporters integrated.
 
-## Available Dashboards
+## Dashboard Organization (Updated December 2024)
 
-### 1. Energy Efficiency Analysis
-**File:** `energy-efficiency-dashboard.json`
-**UID:** `energy-efficiency-dashboard`
+The dashboard collection has been reorganized for clarity and efficiency. **Obsolete dashboards have been moved to the `archive/` directory.**
+
+---
+
+## Core Dashboards
+
+### 1. System Overview ⭐ **START HERE**
+**File:** `system-overview.json`  
+**UID:** `system-overview`  
+**Purpose:** Primary dashboard showing overall system health and resource utilization
+
+**Use Cases:**
+- Quick system health check
+- Monitor all exporters at a glance
+- Identify resource bottlenecks
+- Track power consumption across CPU and GPU
+
+**Key Panels:**
+- CPU Power Consumption (RAPL) - from `cpu-exporter-go`
+- GPU Power Consumption - from `gpu-exporter-go`
+- CPU, Memory, GPU Usage Gauges
+- Exporter Health Status
+- Network Traffic
+- Docker Container CPU Usage
+- Exporter Status Table (all 12 exporters)
+
+**Exporters Used:** cpu-exporter-go, gpu-exporter-go, node-exporter, cadvisor, exporter-health-checker
+
+---
+
+### 2. Transcoding Performance
+**File:** `transcoding-performance.json`  
+**UID:** `transcoding-performance`  
+**Purpose:** Real-time FFmpeg encoding metrics and RTMP server stats
+
+**Use Cases:**
+- Monitor encoding quality and throughput
+- Track dropped frames and latency
+- Analyze encoding speed vs realtime
+- Monitor RTMP stream health
+
+**Key Panels:**
+- FFmpeg Encoding FPS
+- FFmpeg Output Bitrate (current + average)
+- Encoding Speed (realtime multiplier)
+- Dropped Frames Counter
+- Total Frames Processed
+- Encoder Load Percentage
+- Encode Latency
+- RTMP Server Stats (streams, viewers)
+- Frame Processing Rate
+
+**Exporters Used:** ffmpeg-exporter, nginx-exporter
+
+---
+
+### 3. Hardware Details
+**File:** `hardware-details.json`  
+**UID:** `hardware-details`  
+**Purpose:** Deep dive into hardware metrics and container resource usage
+
+**Use Cases:**
+- Analyze detailed RAPL power zones
+- Monitor GPU temperature and clock speeds
+- Track GPU encoder/decoder utilization
+- Monitor container-level resource usage
+
+**Key Panels:**
+- CPU RAPL Power Zones (detailed breakdown)
+- GPU Temperature
+- GPU Utilization Breakdown (core, memory, encoder, decoder)
+- GPU Memory Usage
+- GPU Clock Speeds (graphics, SM, memory)
+- GPU Power Draw vs Limit
+- Container Memory Usage (cAdvisor)
+- Container Network Traffic (cAdvisor)
+
+**Exporters Used:** cpu-exporter-go, gpu-exporter-go, cadvisor
+
+---
+
+### 4. Energy Efficiency Analysis
+**File:** `energy-efficiency-dashboard.json`  
+**UID:** `energy-efficiency-dashboard`  
 **Purpose:** Advanced energy efficiency analysis and optimization
 
 **Use Cases:**
@@ -14,10 +95,8 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 - Compare energy efficiency across scenarios
 - Identify CPU vs GPU tipping points
 - Analyze stability and reliability
-- Support decision-making for production deployments
 
 **Documentation:** See [ENERGY_EFFICIENCY_DASHBOARD.md](./ENERGY_EFFICIENCY_DASHBOARD.md)
-**Visual Guide:** See [VISUAL_SUMMARY.md](./VISUAL_SUMMARY.md)
 
 **Key Panels:**
 - Energy Efficiency Leaderboard
@@ -25,42 +104,92 @@ This directory contains Grafana dashboards for monitoring FFmpeg transcoding per
 - Energy Wasted vs Optimal
 - CPU vs GPU Scaling
 - Efficiency Stability
-- Energy per Mbps Throughput
-- Energy per Frame
-- Power Overhead vs Baseline
+
+**Exporters Used:** results-exporter, cpu-exporter-go, gpu-exporter-go
 
 ---
 
-### 2. Power Monitoring
-**File:** `power-monitoring.json`
-**Purpose:** Real-time power consumption monitoring
+### 5. Power Monitoring
+**File:** `power-monitoring.json`  
+**Purpose:** Real-time power consumption monitoring with historical trends
 
 **Use Cases:**
 - Monitor CPU package power (RAPL)
 - Track Docker container overhead
 - Real-time power consumption during tests
 
-**Key Panels:**
-- CPU Package Power (RAPL)
-- Docker Container Overhead
+**Exporters Used:** cpu-exporter-go, docker-stats-exporter
 
 ---
 
-### 3. Baseline vs Test
-**File:** `baseline-vs-test.json`
-**Purpose:** Compare baseline and test scenario metrics
+### 6. QoE (Quality of Experience) Dashboard
+**File:** `qoe-dashboard.json`  
+**UID:** `qoe-dashboard`  
+**Purpose:** Video quality metrics and quality-per-watt analysis
 
 **Use Cases:**
-- Validate baseline measurements
-- Compare test scenarios to idle state
-- Identify power deltas
+- Monitor VMAF and PSNR quality scores
+- Analyze quality-weighted efficiency
+- Track QoE-aware performance metrics
+
+**Exporters Used:** qoe-exporter, results-exporter
 
 ---
 
-## Dashboard Access
+### 7. Cost & ROI Analysis
+**File:** `cost-roi-dashboard.json`  
+**Purpose:** Load-aware cost analysis and ROI metrics
 
-Once Grafana is running, access dashboards at:
+**Use Cases:**
+- Track compute and energy costs
+- Analyze cost per pixel delivered
+- Monitor cost per viewer watch hour
+- Calculate ROI for different configurations
 
+**Exporters Used:** cost-exporter, results-exporter
+
+---
+
+## Exporter Reference
+
+All dashboards pull data from these exporters configured in VictoriaMetrics:
+
+| Exporter | Port | Metrics | Used In Dashboards |
+|----------|------|---------|-------------------|
+| **cpu-exporter-go** | 9500 | `rapl_power_watts`, `rapl_zones_discovered` | System Overview, Hardware Details, Power Monitoring |
+| **gpu-exporter-go** | 9505 | `gpu_power_draw_watts`, `gpu_utilization_percent`, `gpu_memory_*`, `gpu_temperature_celsius`, `gpu_clocks_*` | System Overview, Hardware Details |
+| **ffmpeg-exporter** | 9506 | `ffmpeg_fps`, `ffmpeg_bitrate_*`, `ffmpeg_dropped_frames_total`, `ffmpeg_frames_total`, `ffmpeg_encoder_load_percent`, `ffmpeg_encode_latency_ms`, `ffmpeg_speed` | Transcoding Performance |
+| **docker-stats-exporter** | 9501 | `docker_*` | Power Monitoring |
+| **node-exporter** | 9100 | `node_cpu_*`, `node_memory_*`, `node_network_*` | System Overview |
+| **cadvisor** | 8080 | `container_cpu_*`, `container_memory_*`, `container_network_*` | System Overview, Hardware Details |
+| **nginx-exporter** | 9728 | `nginx_rtmp_streams`, `nginx_rtmp_viewers_total` | Transcoding Performance |
+| **results-exporter** | 9502 | `test_results_*` | Energy Efficiency, QoE |
+| **qoe-exporter** | 9503 | `qoe_vmaf_score`, `qoe_psnr_score`, `qoe_quality_per_watt` | QoE Dashboard |
+| **cost-exporter** | 9504 | `cost_total_*`, `cost_per_pixel`, `cost_per_watch_hour` | Cost & ROI |
+| **exporter-health-checker** | 9600 | `exporter_health_*` | System Overview |
+| **dcgm-exporter** (GPU) | 9400 | `DCGM_*` | Hardware Details (nvidia profile) |
+
+---
+
+## Quick Start Guide
+
+### Step 1: Start the Stack
+
+**For Docker Compose (Development):**
+```bash
+cd /path/to/ffmpeg-rtmp
+make up-build
+```
+
+**For Production (Distributed Mode):**
+```bash
+# On master node
+make vm-up-build
+```
+
+### Step 2: Access Grafana
+
+Open your browser and navigate to:
 ```
 http://localhost:3000
 ```
@@ -69,9 +198,67 @@ http://localhost:3000
 - Username: `admin`
 - Password: `admin` (change on first login)
 
+### Step 3: Navigate Dashboards
+
+1. Click on **Dashboards** (四 icon) in the left sidebar
+2. You'll see all 7 dashboards:
+   - **System Overview** - Start here for overall health ⭐
+   - **Transcoding Performance** - FFmpeg and encoding metrics
+   - **Hardware Details** - Deep hardware monitoring
+   - **Energy Efficiency Analysis** - Optimization insights
+   - **Power Monitoring** - Real-time power tracking
+   - **QoE Dashboard** - Video quality metrics
+   - **Cost & ROI Analysis** - Business metrics
+
+### Step 4: Verify Data Collection
+
+1. Open **System Overview** dashboard
+2. Check the **Exporter Status** table at the bottom
+3. All exporters should show **Status: UP** (green)
+4. If any exporter shows **DOWN** (red), check:
+   ```bash
+   docker compose logs <exporter-name>
+   make logs SERVICE=<exporter-name>
+   ```
+
+### Step 5: Run a Test to See Data
+
+To populate dashboards with real data:
+
+```bash
+# Run a simple test
+python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
+
+# Watch data appear in dashboards (auto-refresh every 5s)
+```
+
+---
+
+## Data Source Configuration
+
+All dashboards use the **VictoriaMetrics** data source (Prometheus-compatible).
+
+**Configuration:** `../datasources/prometheus.yml`
+```yaml
+apiVersion: 1
+datasources:
+  - name: VictoriaMetrics
+    type: prometheus
+    url: http://victoriametrics:8428
+    isDefault: true
+    jsonData:
+      timeInterval: 1s
+```
+
+VictoriaMetrics scrapes all exporters every **1 second** for high-resolution metrics.
+
+**Scrape Configuration:** `../victoriametrics.yml`
+
+---
+
 ## Dashboard Provisioning
 
-Dashboards are automatically provisioned when Grafana starts.
+Dashboards are automatically loaded when Grafana starts (no manual import needed).
 
 **Configuration:** `default.yml`
 ```yaml
@@ -81,23 +268,10 @@ providers:
     orgId: 1
     folder: ''
     type: file
-    disableDeletion: false
     updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
       path: /etc/grafana/provisioning/dashboards
-```
-
-## Data Sources
-
-All dashboards use the provisioned Prometheus data source.
-
-**Configuration:** `../datasources/prometheus.yml`
-```yaml
-apiVersion: 1
-datasources:
-  - name: VictoriaMetrics
-    type: prometheus
     access: proxy
     url: http://victoriametrics:8428
     isDefault: true
@@ -442,3 +616,145 @@ For issues or questions:
 **Last Updated:** 2024-12-27
 **Grafana Version:** 9.5.0+
 **Prometheus Version:** 2.40+
+
+---
+
+## Troubleshooting
+
+### No Data in Dashboards
+
+**Problem:** Dashboard panels show "No data"
+
+**Solutions:**
+1. Check VictoriaMetrics is running and healthy:
+   ```bash
+   curl http://localhost:8428/health
+   ```
+
+2. Verify exporters are up:
+   ```bash
+   docker compose ps
+   # All exporters should show "healthy" or "running"
+   ```
+
+3. Check if VictoriaMetrics is scraping:
+   ```bash
+   curl http://localhost:8428/api/v1/targets
+   ```
+
+4. View exporter metrics directly:
+   ```bash
+   curl http://localhost:9500/metrics  # CPU exporter
+   curl http://localhost:9506/metrics  # FFmpeg exporter
+   curl http://localhost:9505/metrics  # GPU exporter
+   ```
+
+### Exporter Shows DOWN
+
+**Problem:** Exporter status shows red/DOWN in System Overview
+
+**Solutions:**
+1. Check exporter logs:
+   ```bash
+   docker compose logs <exporter-name>
+   ```
+
+2. Restart the exporter:
+   ```bash
+   docker compose restart <exporter-name>
+   ```
+
+3. For GPU exporters (requires NVIDIA GPU):
+   ```bash
+   # Start with nvidia profile
+   docker compose --profile nvidia up -d
+   ```
+
+### Dashboard Not Loading
+
+**Problem:** Dashboard doesn't appear in Grafana
+
+**Solutions:**
+1. Check Grafana logs:
+   ```bash
+   docker compose logs grafana
+   ```
+
+2. Verify dashboard file exists:
+   ```bash
+   ls -l master/monitoring/grafana/provisioning/dashboards/*.json
+   ```
+
+3. Restart Grafana to reload provisioning:
+   ```bash
+   docker compose restart grafana
+   ```
+
+### Slow Dashboard Performance
+
+**Problem:** Dashboard takes long to load or is slow
+
+**Solutions:**
+1. Reduce time range (use last 15m instead of 1h)
+2. Increase refresh interval (10s instead of 5s)
+3. Check VictoriaMetrics resource usage:
+   ```bash
+   docker stats victoriametrics
+   ```
+
+---
+
+## Archive
+
+Obsolete dashboards have been moved to `archive/` directory:
+- `baseline-vs-test.json` - Replaced by System Overview
+- `benchmark-history.json` - History available in VictoriaMetrics directly
+- `cost-dashboard-load-aware.json` - Duplicate, consolidated into cost-roi-dashboard
+- `cost-dashboard.json` - Duplicate, consolidated into cost-roi-dashboard
+- `efficiency-forecasting.json` - Advanced forecasting, limited practical use
+- `future-load-predictions.json` - Advanced forecasting, limited practical use
+
+These are kept for reference but not loaded by default.
+
+---
+
+## Dashboard Customization
+
+All dashboards support:
+- **Time Range Selection** - Top-right corner
+- **Auto-refresh** - Set to 5s by default (configurable)
+- **Panel Editing** - Click panel title → Edit
+- **Variable Queries** - Can add template variables for filtering
+- **Export** - Share → Export → Save JSON
+
+**Note:** Changes made in UI are temporary unless you export and save the JSON.
+
+---
+
+## Metrics Retention
+
+- **VictoriaMetrics Default:** 30 days
+- **Resolution:** 1-second scrape interval
+- **Downsampling:** None (full resolution retained)
+
+To change retention period, edit `docker-compose.yml`:
+```yaml
+victoriametrics:
+  command:
+    - "--retentionPeriod=30d"  # Change to 60d, 90d, etc.
+```
+
+---
+
+## Next Steps
+
+1. ✅ **Verify Setup:** Open System Overview and confirm all exporters are UP
+2. 📊 **Run Tests:** Execute transcoding tests to populate metrics
+3. 🔍 **Explore:** Navigate through all 7 dashboards
+4. ⚡ **Optimize:** Use Energy Efficiency dashboard to find optimal settings
+5. 💰 **Analyze:** Check Cost & ROI dashboard for business insights
+
+For more information, see:
+- [VictoriaMetrics Configuration](../victoriametrics.yml)
+- [Docker Compose Stack](../../../../../docker-compose.yml)
+- [Main Documentation](../../../../../README.md)
