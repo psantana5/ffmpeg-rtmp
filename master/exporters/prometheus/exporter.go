@@ -81,10 +81,14 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				jobCount++
 			}
 			
-			// Track completed jobs by actual engine used (from job results)
-			// Note: This is the engine that was actually selected, not the preference
-			if job.Status == models.JobStatusCompleted && job.Engine != "" && job.Engine != "auto" {
-				completedByEngine[job.Engine]++
+			// Track completed jobs by actual engine used
+			// If engine is "auto", treat it as ffmpeg (the default implementation)
+			if job.Status == models.JobStatusCompleted && job.Engine != "" {
+				engine := job.Engine
+				if engine == "auto" {
+					engine = "ffmpeg" // Auto defaults to ffmpeg
+				}
+				completedByEngine[engine]++
 			}
 		}
 	}

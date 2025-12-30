@@ -13,10 +13,16 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 )
 
+// MetricsRecorder is an interface for recording metrics
+type MetricsRecorder interface {
+	RecordScheduleAttempt(result string)
+}
+
 // MasterHandler handles master node API requests
 type MasterHandler struct {
-	store      store.Store
-	maxRetries int
+	store           store.Store
+	maxRetries      int
+	metricsRecorder MetricsRecorder
 }
 
 // NewMasterHandler creates a new master handler
@@ -33,6 +39,11 @@ func NewMasterHandlerWithRetry(s store.Store, maxRetries int) *MasterHandler {
 		store:      s,
 		maxRetries: maxRetries,
 	}
+}
+
+// SetMetricsRecorder sets the metrics recorder for the handler
+func (h *MasterHandler) SetMetricsRecorder(recorder MetricsRecorder) {
+	h.metricsRecorder = recorder
 }
 
 // RegisterRoutes registers all API routes
@@ -218,16 +229,28 @@ func (h *MasterHandler) GetNextJob(w http.ResponseWriter, r *http.Request) {
 	job, err := h.store.GetNextJob(nodeID)
 	if err != nil {
 		if err == store.ErrJobNotFound {
-			// No jobs available
+			// No jobs available - record failed scheduling attempt
+			if h.metricsRecorder != nil {
+				h.metricsRecorder.RecordScheduleAttempt("no_jobs")
+			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"job": nil,
 			})
 			return
 		}
+		// Record failed scheduling attempt due to error
+		if h.metricsRecorder != nil {
+			h.metricsRecorder.RecordScheduleAttempt("error")
+		}
 		log.Printf("Error getting next job: %v", err)
 		http.Error(w, "Failed to get next job", http.StatusInternalServerError)
 		return
+	}
+
+	// Record successful scheduling attempt
+	if h.metricsRecorder != nil {
+		h.metricsRecorder.RecordScheduleAttempt("success")
 	}
 
 	log.Printf("Job %s assigned to node %s", job.ID, nodeID)
@@ -252,29 +275,29 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("Error getting job for retry check: %v", err)
 		} else if job.RetryCount < h.maxRetries {
-			// Re-queue job for retry
-			job.RetryCount++
-			job.Status = models.JobStatusPending
-			job.NodeID = ""
-			job.StartedAt = nil
-			job.Error = result.Error // Store error from previous attempt
-			
-			if err := h.store.CreateJob(job); err != nil {
+			// Re-queue job for retry using the RetryJob method
+			// RetryJob will: increment retry_count, set status to pending, clear node_id and started_at
+			if err := h.store.RetryJob(result.JobID, result.Error); err != nil {
 				log.Printf("Error re-queuing job for retry: %v", err)
 			} else {
-				log.Printf("Job %s failed on node %s (attempt %d/%d) - re-queued for retry",
-					result.JobID, result.NodeID, job.RetryCount, h.maxRetries)
-				
-				// Still update the original job status to track the failure
-				if err := h.store.UpdateJobStatus(result.JobID, models.JobStatusFailed, result.Error); err != nil {
-					log.Printf("Error updating original job status: %v", err)
+				// Get updated job to report correct retry count
+				updatedJob, err := h.store.GetJob(result.JobID)
+				if err != nil {
+					log.Printf("Error getting updated job: %v", err)
 				}
+				retryCount := job.RetryCount + 1
+				if err == nil {
+					retryCount = updatedJob.RetryCount
+				}
+				
+				log.Printf("Job %s failed on node %s (attempt %d/%d) - re-queued for retry",
+					result.JobID, result.NodeID, retryCount, h.maxRetries)
 				
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]interface{}{
-					"status":  "retrying",
-					"retry":   job.RetryCount,
+					"status":      "retrying",
+					"retry":       retryCount,
 					"max_retries": h.maxRetries,
 				})
 				return

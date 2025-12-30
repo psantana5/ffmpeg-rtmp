@@ -10,7 +10,7 @@ import (
 
 // Example demonstrating complete FFmpeg command generation workflow
 func main() {
-	fmt.Println("=== FFmpeg Command Generation Example ===\n")
+	fmt.Println("=== FFmpeg Command Generation Example ===")
 
 	// Example 1: GPU-accelerated 1080p streaming
 	example1()
