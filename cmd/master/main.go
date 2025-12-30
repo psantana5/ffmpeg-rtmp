@@ -31,8 +31,7 @@ func main() {
 	generateCert := flag.Bool("generate-cert", false, "Generate self-signed certificate")
 	certIPs := flag.String("cert-ips", "", "Comma-separated list of IP addresses to include in certificate SANs (e.g., '192.168.0.51,10.0.0.5')")
 	certHosts := flag.String("cert-hosts", "", "Comma-separated list of hostnames to include in certificate SANs (e.g., 'depa,server1')")
-	apiKeyFlag := flag.String("api-key", "", "API key for authentication (leave empty to disable, or use FFMPEG_RTMP_API_KEY env var)")
-	apiKey := flag.String("api-key", os.Getenv("MASTER_API_KEY"), "API key for authentication (default: from MASTER_API_KEY env var)")
+	apiKeyFlag := flag.String("api-key", "", "API key for authentication (leave empty to disable, or use MASTER_API_KEY env var)")
 	maxRetries := flag.Int("max-retries", 3, "Maximum job retry attempts on failure")
 	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
 	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
@@ -42,9 +41,9 @@ func main() {
 	apiKey := *apiKeyFlag
 	apiKeySource := ""
 	if apiKey == "" {
-		apiKey = os.Getenv("FFMPEG_RTMP_API_KEY")
+		apiKey = os.Getenv("MASTER_API_KEY")
 		if apiKey != "" {
-			apiKeySource = "environment variable"
+			apiKeySource = "environment variable MASTER_API_KEY"
 		}
 	} else {
 		apiKeySource = "command-line flag"
@@ -118,9 +117,7 @@ func main() {
 
 	// Setup authentication if API key provided
 	if apiKey != "" {
-		log.Printf("API authentication enabled (source: %s)", apiKeySource)
-	if *apiKey != "" {
-		log.Println("✓ API authentication enabled")
+		log.Printf("✓ API authentication enabled (source: %s)", apiKeySource)
 	} else {
 		log.Println("ERROR: No API key provided")
 		log.Println("For production, you must provide an API key:")

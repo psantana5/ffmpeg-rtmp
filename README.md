@@ -10,6 +10,8 @@ A comprehensive streaming test and power monitoring stack for analyzing energy c
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
+> **📚 Architecture Guide**: See [docs/DISTRIBUTED_ARCHITECTURE.md](docs/DISTRIBUTED_ARCHITECTURE.md) for complete details on which components run on master vs worker nodes.
+
 ## Quick Start (Production - Distributed Mode)
 
 The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
@@ -22,6 +24,8 @@ The **recommended way** to deploy for production workloads is **Distributed Comp
 - Linux with kernel 4.15+ (for RAPL power monitoring)
 
 ### Deploy Master Node
+
+**Master runs**: Job orchestrator + VictoriaMetrics + Grafana + Nginx-RTMP (optional)
 
 ```bash
 # Clone and build
@@ -44,6 +48,8 @@ make vm-up-build
 ```
 
 ### Deploy Compute Agent(s)
+
+**Workers run**: Agent + FFmpeg + Exporters (CPU/GPU/FFmpeg stats)
 
 ```bash
 # On compute node(s)
@@ -121,6 +127,8 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 ```
 
 **See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+
+**Architecture:** For detailed information on how components are distributed between master and worker nodes, see [docs/DISTRIBUTED_ARCHITECTURE.md](docs/DISTRIBUTED_ARCHITECTURE.md).
 
 ## What's New: Production-Ready v2.2
 
@@ -238,8 +246,8 @@ sudo systemctl start ffmpeg-agent     # Start agent service
 sudo systemctl status ffmpeg-master   # Check status
 
 # Monitor
-curl http://localhost:8080/nodes      # List registered agents
-curl http://localhost:8080/jobs       # List jobs
+curl -k https://localhost:8080/nodes      # List registered agents
+curl -k https://localhost:8080/jobs       # List jobs
 journalctl -u ffmpeg-master -f        # View master logs
 journalctl -u ffmpeg-agent -f         # View agent logs
 ```

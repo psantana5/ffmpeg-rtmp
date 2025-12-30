@@ -10,7 +10,7 @@ echo ""
 
 # Check if master is running
 echo "1. Checking master health..."
-HEALTH=$(curl -s http://localhost:8080/health)
+HEALTH=$(curl -k -s https://localhost:8080/health)
 if echo "$HEALTH" | grep -q "healthy"; then
     echo "   ✓ Master is healthy"
 else
@@ -21,7 +21,7 @@ echo ""
 
 # Test node registration via curl (simulating agent)
 echo "2. Registering test node..."
-NODE_RESPONSE=$(curl -s -X POST http://localhost:8080/nodes/register \
+NODE_RESPONSE=$(curl -k -s -X POST https://localhost:8080/nodes/register \
     -H "Content-Type: application/json" \
     -d '{
         "address": "test-node-1",
@@ -46,7 +46,7 @@ echo ""
 
 # List nodes
 echo "3. Listing registered nodes..."
-NODES=$(curl -s http://localhost:8080/nodes | jq -r '.count')
+NODES=$(curl -k -s https://localhost:8080/nodes | jq -r '.count')
 if [ "$NODES" -eq 1 ]; then
     echo "   ✓ Found $NODES registered node"
 else
@@ -57,7 +57,7 @@ echo ""
 
 # Create a test job
 echo "4. Creating test job..."
-JOB_RESPONSE=$(curl -s -X POST http://localhost:8080/jobs \
+JOB_RESPONSE=$(curl -k -s -X POST https://localhost:8080/jobs \
     -H "Content-Type: application/json" \
     -d '{
         "scenario": "test-1080p",
@@ -79,7 +79,7 @@ echo ""
 
 # Get next job (simulating agent polling)
 echo "5. Getting next job for node..."
-NEXT_JOB=$(curl -s "http://localhost:8080/jobs/next?node_id=$NODE_ID")
+NEXT_JOB=$(curl -k -s "https://localhost:8080/jobs/next?node_id=$NODE_ID")
 ASSIGNED_JOB_ID=$(echo "$NEXT_JOB" | jq -r '.id')
 if [ "$ASSIGNED_JOB_ID" != "$JOB_ID" ]; then
     echo "   ✗ Job assignment failed"
@@ -91,7 +91,7 @@ echo ""
 
 # Send job results
 echo "6. Sending job results..."
-RESULT_RESPONSE=$(curl -s -X POST http://localhost:8080/results \
+RESULT_RESPONSE=$(curl -k -s -X POST https://localhost:8080/results \
     -H "Content-Type: application/json" \
     -d "{
         \"job_id\": \"$JOB_ID\",
@@ -120,7 +120,7 @@ echo ""
 
 # Try to get another job (should be none)
 echo "7. Checking for additional jobs..."
-NEXT_JOB=$(curl -s "http://localhost:8080/jobs/next?node_id=$NODE_ID")
+NEXT_JOB=$(curl -k -s "https://localhost:8080/jobs/next?node_id=$NODE_ID")
 if echo "$NEXT_JOB" | grep -q '"job":null'; then
     echo "   ✓ No more jobs available (as expected)"
 else

@@ -262,8 +262,8 @@ tail -f /tmp/master.log
 tail -f /tmp/agent.log
 
 # Check state
-curl http://localhost:8080/nodes | jq
-curl http://localhost:8080/jobs | jq
+curl -k https://localhost:8080/nodes | jq
+curl -k https://localhost:8080/jobs | jq
 ```
 
 ### Adding Features

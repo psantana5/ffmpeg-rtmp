@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
+	masterURL := flag.String("master", "https://localhost:8080", "Master node URL")
 	register := flag.Bool("register", false, "Register with master node")
 	pollInterval := flag.Duration("poll-interval", 10*time.Second, "Job polling interval")
 	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "Heartbeat interval")

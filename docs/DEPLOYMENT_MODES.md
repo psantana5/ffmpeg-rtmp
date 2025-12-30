@@ -288,12 +288,12 @@ make vm-up-build
 **4. Verify Master is Running**
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 
 # Should return: {"status":"healthy"}
 
 # Check registered nodes (initially empty)
-curl http://localhost:8080/nodes
+curl -k https://localhost:8080/nodes
 ```
 
 #### Compute Node Setup
@@ -569,7 +569,7 @@ sudo systemctl restart ffmpeg-agent
 **Master Issues**:
 ```bash
 # Check if master is running
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 
 # Check logs
 sudo journalctl -u ffmpeg-master -n 100
