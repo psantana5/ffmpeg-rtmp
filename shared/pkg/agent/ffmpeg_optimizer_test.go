@@ -12,7 +12,7 @@ func TestOptimizeFFmpegParameters_WithGPU(t *testing.T) {
 		CPUModel:   "Intel Core i7",
 		HasGPU:     true,
 		GPUType:    "NVIDIA GeForce RTX 3080",
-		RAMBytes:   16 * 1024 * 1024 * 1024, // 16GB
+		RAMTotalBytes:   16 * 1024 * 1024 * 1024, // 16GB
 		Labels:     make(map[string]string),
 	}
 
@@ -40,7 +40,7 @@ func TestOptimizeFFmpegParameters_HighEndCPU(t *testing.T) {
 		CPUThreads: 24,
 		CPUModel:   "AMD Ryzen 9 5950X",
 		HasGPU:     false,
-		RAMBytes:   64 * 1024 * 1024 * 1024, // 64GB
+		RAMTotalBytes:   64 * 1024 * 1024 * 1024, // 64GB
 		Labels:     make(map[string]string),
 	}
 
@@ -64,7 +64,7 @@ func TestOptimizeFFmpegParameters_MidRangeCPU(t *testing.T) {
 		CPUThreads: 10,
 		CPUModel:   "Intel Core i5",
 		HasGPU:     false,
-		RAMBytes:   16 * 1024 * 1024 * 1024, // 16GB
+		RAMTotalBytes:   16 * 1024 * 1024 * 1024, // 16GB
 		Labels:     make(map[string]string),
 	}
 
@@ -84,7 +84,7 @@ func TestOptimizeFFmpegParameters_LowEndCPU(t *testing.T) {
 		CPUThreads: 4,
 		CPUModel:   "Intel Core i3",
 		HasGPU:     false,
-		RAMBytes:   8 * 1024 * 1024 * 1024, // 8GB
+		RAMTotalBytes:   8 * 1024 * 1024 * 1024, // 8GB
 		Labels:     make(map[string]string),
 	}
 
@@ -104,7 +104,7 @@ func TestOptimizeFFmpegParameters_VeryLowEndCPU(t *testing.T) {
 		CPUThreads: 2,
 		CPUModel:   "Intel Celeron",
 		HasGPU:     false,
-		RAMBytes:   4 * 1024 * 1024 * 1024, // 4GB
+		RAMTotalBytes:   4 * 1024 * 1024 * 1024, // 4GB
 		Labels:     make(map[string]string),
 	}
 
@@ -124,7 +124,7 @@ func TestOptimizeFFmpegParameters_Laptop(t *testing.T) {
 		CPUThreads: 8,
 		CPUModel:   "Intel Core i7 Mobile",
 		HasGPU:     false,
-		RAMBytes:   16 * 1024 * 1024 * 1024, // 16GB
+		RAMTotalBytes:   16 * 1024 * 1024 * 1024, // 16GB
 		Labels:     make(map[string]string),
 	}
 
