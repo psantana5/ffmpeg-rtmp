@@ -29,7 +29,14 @@ git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
 make build-master
 
-# Start master service
+# Set API key (required for production)
+export MASTER_API_KEY=$(openssl rand -base64 32)
+
+# Start master service with production defaults
+# ✅ TLS enabled (auto-generates cert)
+# ✅ SQLite persistence (master.db)
+# ✅ Job retry (3 attempts)
+# ✅ Prometheus metrics (:9090)
 ./bin/master --port 8080 &
 
 # Start monitoring stack (VictoriaMetrics + Grafana)
@@ -44,15 +51,19 @@ git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
 make build-agent
 
-# Register and start agent (replace MASTER_IP)
-./bin/agent --register --master http://MASTER_IP:8080
+# Set same API key as master
+export MASTER_API_KEY="<same-key-as-master>"
+
+# Register and start agent (uses HTTPS with TLS)
+./bin/agent --register --master https://MASTER_IP:8080 --api-key "$MASTER_API_KEY"
 ```
 
 ### Submit and Run Job
 
 ```bash
-# Submit job to master
-curl -X POST http://MASTER_IP:8080/jobs \
+# Submit job to master (requires API key)
+curl -X POST https://MASTER_IP:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "1080p-test",
@@ -61,13 +72,15 @@ curl -X POST http://MASTER_IP:8080/jobs \
   }'
 
 # Agent automatically picks up and executes job
+# Failed jobs auto-retry up to 3 times
 ```
 
 ### Access Dashboards
 
 - **Grafana**: http://MASTER_IP:3000 (admin/admin)
 - **VictoriaMetrics**: http://MASTER_IP:8428
-- **Master API**: http://MASTER_IP:8080/nodes (view registered nodes)
+- **Master API**: https://MASTER_IP:8080/nodes (view registered nodes)
+- **Prometheus Metrics**: http://MASTER_IP:9090/metrics
 
 ### Production Deployment with Systemd
 
@@ -108,6 +121,19 @@ python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
 ```
 
 **See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+
+## 🔒 What's New: Production-Ready v2.2
+
+**Distributed mode now production-ready with enterprise features:**
+
+- **✅ TLS/HTTPS** - Enabled by default with auto-generated certificates
+- **✅ API Authentication** - Required via `MASTER_API_KEY` environment variable
+- **✅ SQLite Persistence** - Default storage, survives restarts
+- **✅ Automatic Job Retry** - Failed jobs retry up to 3 times
+- **✅ Prometheus Metrics** - Built-in metrics endpoint on port 9090
+- **✅ Structured Logging** - Production-grade logging support
+
+See [docs/PRODUCTION_FEATURES.md](docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
 ## 🚀 What's New: Go Exporters + VictoriaMetrics (v2.0)
 
@@ -174,6 +200,7 @@ See [docs/DEPLOYMENT_MODES.md](docs/DEPLOYMENT_MODES.md) for detailed comparison
 Documentation organized by topic:
 
 ### Deployment & Operations
+- **[Production Features](docs/PRODUCTION_FEATURES.md)** - 🆕 ✅ Production-ready features guide (TLS, auth, retry, metrics)
 - **[Deployment Modes](docs/DEPLOYMENT_MODES.md)** - 🆕 Production vs development deployment guide
 - **[Internal Architecture](docs/INTERNAL_ARCHITECTURE.md)** - 🆕 Complete runtime model and operations reference
 - **[Distributed Architecture](docs/distributed_architecture_v1.md)** - Distributed compute details
