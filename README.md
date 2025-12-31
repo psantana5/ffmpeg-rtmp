@@ -7,6 +7,7 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, and **distributed compute capabilities** for scaling workloads across multiple nodes.
+<img width="1658" height="1020" alt="image" src="https://github.com/user-attachments/assets/12e560b2-1d60-407d-b856-f7a80dcfd02c" />
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
