@@ -69,7 +69,7 @@ func main() {
 		if err := os.MkdirAll("certs", 0755); err != nil {
 			log.Fatalf("Failed to create certs directory: %v", err)
 		}
-		
+
 		// Parse IP addresses and hostnames from comma-separated strings
 		var sans []string
 		if *certIPs != "" {
@@ -90,7 +90,7 @@ func main() {
 				}
 			}
 		}
-		
+
 		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master", sans...); err != nil {
 			log.Fatalf("Failed to generate certificate: %v", err)
 		}
@@ -105,7 +105,7 @@ func main() {
 
 	// Create store
 	var dataStore store.Store
-	
+
 	if *dbPath != "" {
 		log.Printf("Using SQLite database: %s", *dbPath)
 		sqliteStore, sErr := store.NewSQLiteStore(*dbPath)
@@ -138,7 +138,7 @@ func main() {
 
 	// Create router
 	router := mux.NewRouter()
-	
+
 	// Add authentication middleware if API key is set
 	if apiKey != "" {
 		router.Use(func(next http.Handler) http.Handler {
@@ -175,10 +175,10 @@ func main() {
 	if *enableMetrics {
 		log.Println("✓ Prometheus metrics endpoint enabled")
 		metricsExporter = prometheus.NewMasterExporter(dataStore)
-		
+
 		// Set metrics recorder in handler
 		handler.SetMetricsRecorder(metricsExporter)
-		
+
 		// Create separate server for metrics
 		metricsRouter := mux.NewRouter()
 		metricsRouter.Handle("/metrics", metricsExporter).Methods("GET")
@@ -187,14 +187,14 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status":"healthy"}`))
 		}).Methods("GET")
-		
+
 		metricsSrv := &http.Server{
 			Addr:         ":" + *metricsPort,
 			Handler:      metricsRouter,
 			ReadTimeout:  10 * time.Second,
 			WriteTimeout: 10 * time.Second,
 		}
-		
+
 		// Start metrics server in background
 		go func() {
 			log.Printf("Metrics server listening on :%s", *metricsPort)
@@ -209,7 +209,7 @@ func main() {
 	// Start background scheduler
 	sched := scheduler.New(dataStore, *schedulerInterval)
 	sched.Start()
-	log.Printf("✓ Background scheduler started (interval: %v)", *schedulerInterval)
+	log.Printf("Background scheduler started (interval: %v)", *schedulerInterval)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -222,9 +222,9 @@ func main() {
 
 	// Setup TLS if enabled
 	if *useTLS {
-		log.Println("✓ TLS enabled")
+		log.Println("TLS enabled")
 		if *requireClientCert {
-			log.Println("✓ mTLS enabled - requiring client certificates")
+			log.Println("mTLS enabled - requiring client certificates")
 		}
 
 		// Check if certificates exist

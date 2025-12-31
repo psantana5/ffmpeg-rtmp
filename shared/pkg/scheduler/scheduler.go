@@ -29,13 +29,13 @@ func New(st store.Store, checkInterval time.Duration) *Scheduler {
 
 // Start begins the background scheduling loop
 func (s *Scheduler) Start() {
-	log.Printf("📅 Scheduler started (check interval: %v)", s.checkInterval)
+	log.Printf("Scheduler started (check interval: %v)", s.checkInterval)
 	go s.run()
 }
 
 // Stop gracefully stops the scheduler
 func (s *Scheduler) Stop() {
-	log.Println("📅 Stopping scheduler...")
+	log.Println("Stopping scheduler...")
 	close(s.stopCh)
 }
 
@@ -50,7 +50,7 @@ func (s *Scheduler) run() {
 			s.processPendingJobs()
 			s.checkStaleJobs()
 		case <-s.stopCh:
-			log.Println("📅 Scheduler stopped")
+			log.Println("Scheduler stopped")
 			return
 		}
 	}
@@ -72,24 +72,24 @@ func (s *Scheduler) processPendingJobs() {
 		return
 	}
 
-	log.Printf("📅 Scheduler: Found %d pending jobs", len(pendingJobs))
+	log.Printf("Scheduler: Found %d pending jobs", len(pendingJobs))
 
 	// Use atomic TryQueuePendingJob to avoid race conditions
 	queuedCount := 0
 	for _, job := range pendingJobs {
 		queued, err := s.store.TryQueuePendingJob(job.ID)
 		if err != nil {
-			log.Printf("❌ Scheduler: failed to queue job %s: %v", job.ID, err)
+			log.Printf("Scheduler: failed to queue job %s: %v", job.ID, err)
 			continue
 		}
 		if queued {
 			queuedCount++
-			log.Printf("📋 Scheduler: Job %s queued (no workers available)", job.ID)
+			log.Printf("Scheduler: Job %s queued (no workers available)", job.ID)
 		}
 	}
 
 	if queuedCount > 0 {
-		log.Printf("📋 Scheduler: Queued %d jobs (no workers available)", queuedCount)
+		log.Printf("Scheduler: Queued %d jobs (no workers available)", queuedCount)
 	}
 }
 
@@ -108,12 +108,12 @@ func (s *Scheduler) checkStaleJobs() {
 
 		// Check if job has been processing for too long
 		if job.StartedAt != nil && job.StartedAt.Add(staleThreshold).Before(now) {
-			log.Printf("⚠️  Scheduler: Job %s is stale (processing for %v), marking as failed", 
+			log.Printf("Scheduler: Job %s is stale (processing for %v), marking as failed", 
 				job.ID, now.Sub(*job.StartedAt))
 			
 			// Mark as failed
 			if err := s.store.UpdateJobStatus(job.ID, models.JobStatusFailed, "Job stale - exceeded 30 minute timeout"); err != nil {
-				log.Printf("❌ Scheduler: failed to fail stale job %s: %v", job.ID, err)
+				log.Printf("Scheduler: failed to fail stale job %s: %v", job.ID, err)
 			}
 		}
 	}
