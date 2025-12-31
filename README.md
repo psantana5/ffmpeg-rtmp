@@ -3,14 +3,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
-[![Docker](https://img.shields.io/badge/docker-optional-blue.svg)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, and **distributed compute capabilities** for scaling workloads across multiple nodes.
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
-## 📁 Project Organization
+## Project Organization
 
 This project is organized into three main directories for clarity:
 
@@ -45,9 +45,10 @@ The **recommended way** to deploy for production workloads is **Distributed Comp
 ### Deploy Master Node
 
 ```bash
-# Clone and build
+# Clone, build and run the required parts of the stack
 git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
+docker compose up -d nginx-rtmp
 make build-master
 
 # Set API key (required for production)
