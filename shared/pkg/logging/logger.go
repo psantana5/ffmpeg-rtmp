@@ -42,6 +42,7 @@ type Logger struct {
 	level      Level
 	jsonFormat bool
 	output     io.Writer
+	fields     map[string]interface{}
 }
 
 // NewLogger creates a new logger
@@ -50,6 +51,7 @@ func NewLogger(level Level, jsonFormat bool) *Logger {
 		level:      level,
 		jsonFormat: jsonFormat,
 		output:     os.Stdout,
+		fields:     make(map[string]interface{}),
 	}
 }
 
@@ -72,12 +74,21 @@ func (l *Logger) log(level Level, message string, fields map[string]interface{})
 		return
 	}
 
+	// Merge logger fields and call fields
+	mergedFields := make(map[string]interface{})
+	for k, v := range l.fields {
+		mergedFields[k] = v
+	}
+	for k, v := range fields {
+		mergedFields[k] = v
+	}
+
 	if l.jsonFormat {
 		entry := LogEntry{
 			Timestamp: time.Now().Format(time.RFC3339),
 			Level:     level.String(),
 			Message:   message,
-			Fields:    fields,
+			Fields:    mergedFields,
 		}
 		data, err := json.Marshal(entry)
 		if err != nil {
@@ -88,8 +99,8 @@ func (l *Logger) log(level Level, message string, fields map[string]interface{})
 	} else {
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
 		fmt.Fprintf(l.output, "[%s] %s: %s", timestamp, level.String(), message)
-		if len(fields) > 0 {
-			fmt.Fprintf(l.output, " %v", fields)
+		if len(mergedFields) > 0 {
+			fmt.Fprintf(l.output, " %v", mergedFields)
 		}
 		fmt.Fprintln(l.output)
 	}
@@ -146,10 +157,18 @@ func (l *Logger) Fatal(message string, fields ...map[string]interface{}) {
 
 // WithField adds a field to the logger context
 func (l *Logger) WithField(key string, value interface{}) *Logger {
-	// Return a new logger instance with context
-	// For simplicity, we'll just return the same logger
-	// In a production implementation, you'd want to maintain context
-	return l
+	// Copy fields to avoid mutation
+	newFields := make(map[string]interface{}, len(l.fields)+1)
+	for k, v := range l.fields {
+		newFields[k] = v
+	}
+	newFields[key] = value
+	return &Logger{
+		level:      l.level,
+		jsonFormat: l.jsonFormat,
+		output:     l.output,
+		fields:     newFields,
+	}
 }
 
 // ParseLevel parses a log level string
