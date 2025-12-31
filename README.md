@@ -75,6 +75,9 @@ make build-agent
 # Set same API key as master
 export MASTER_API_KEY="<same-key-as-master>"
 
+# Generate a test video file
+ffmpeg -y -f lavfi -i testsrc2=size=3840x2160:rate=60 -t 30 -c:v libx264 -preset veryfast -crf 18 /tmp/test_input.mp4
+
 # Register and start agent (uses HTTPS with TLS)
 ./bin/agent --register --master https://MASTER_IP:8080 --api-key "$MASTER_API_KEY"
 ```
