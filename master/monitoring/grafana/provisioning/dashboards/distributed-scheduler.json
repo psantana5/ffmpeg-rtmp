@@ -41,7 +41,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -115,7 +116,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -176,7 +178,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -250,7 +253,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -324,7 +328,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -398,7 +403,8 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "dtdurations",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -473,7 +479,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -536,7 +543,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -612,7 +620,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -749,7 +758,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2
         },
         "overrides": [
           {
