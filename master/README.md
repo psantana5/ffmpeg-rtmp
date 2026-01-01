@@ -78,6 +78,17 @@ master/
 - Monitors health of all exporters
 - Exposes exporter status metrics
 
+**For running exporters without Docker**, see the comprehensive deployment guide:
+
+**[📖 exporters/README.md](exporters/README.md)** - Complete manual deployment guide
+
+This guide covers:
+- Running exporters directly with Python
+- Systemd service configuration
+- Environment variables and configuration options
+- Production deployment best practices
+- Troubleshooting and performance tuning
+
 ## Building the Master
 
 ```bash

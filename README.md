@@ -268,7 +268,9 @@ Documentation organized by topic:
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
 - **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
+- **[Master Exporters Manual Deployment](master/exporters/README.md)** - Running master exporters without Docker
 - **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
+- **[Worker Exporters Manual Deployment](worker/exporters/DEPLOYMENT.md)** - Running worker exporters without Docker
 - **[Energy Advisor](shared/advisor/README.md)** - ML models and efficiency scoring
 - **[Documentation Index](shared/docs/)** - All technical documentation
 
