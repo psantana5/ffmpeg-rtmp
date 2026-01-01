@@ -44,10 +44,10 @@ var jobsSubmitCmd = &cobra.Command{
 
 // jobsStatusCmd represents the jobs status command
 var jobsStatusCmd = &cobra.Command{
-	Use:   "status <job-id>",
+	Use:   "status [job-id]",
 	Short: "Get job status",
-	Long:  `Retrieve the status of a specific job by its ID.`,
-	Args:  cobra.ExactArgs(1),
+	Long:  `Retrieve the status of a specific job by its ID or sequence number. If no ID is provided, lists all jobs.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE:  runJobsStatus,
 }
 
@@ -110,21 +110,28 @@ type jobRequest struct {
 }
 
 type jobResponse struct {
-	ID          string                 `json:"id"`
-	Scenario    string                 `json:"scenario"`
-	Confidence  string                 `json:"confidence"`
-	Engine      string                 `json:"engine,omitempty"`
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`
-	Status      string                 `json:"status"`
-	Queue       string                 `json:"queue,omitempty"`
-	Priority    string                 `json:"priority,omitempty"`
-	Progress    int                    `json:"progress,omitempty"`
-	NodeID      string                 `json:"node_id,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	StartedAt   *time.Time             `json:"started_at,omitempty"`
-	CompletedAt *time.Time             `json:"completed_at,omitempty"`
-	RetryCount  int                    `json:"retry_count"`
-	Error       string                 `json:"error,omitempty"`
+	ID             string                 `json:"id"`
+	SequenceNumber int                    `json:"sequence_number,omitempty"`
+	Scenario       string                 `json:"scenario"`
+	Confidence     string                 `json:"confidence"`
+	Engine         string                 `json:"engine,omitempty"`
+	Parameters     map[string]interface{} `json:"parameters,omitempty"`
+	Status         string                 `json:"status"`
+	Queue          string                 `json:"queue,omitempty"`
+	Priority       string                 `json:"priority,omitempty"`
+	Progress       int                    `json:"progress,omitempty"`
+	NodeID         string                 `json:"node_id,omitempty"`
+	NodeName       string                 `json:"node_name,omitempty"`
+	CreatedAt      time.Time              `json:"created_at"`
+	StartedAt      *time.Time             `json:"started_at,omitempty"`
+	CompletedAt    *time.Time             `json:"completed_at,omitempty"`
+	RetryCount     int                    `json:"retry_count"`
+	Error          string                 `json:"error,omitempty"`
+}
+
+type jobsListResponse struct {
+	Jobs  []jobResponse `json:"jobs"`
+	Count int           `json:"count"`
 }
 
 func runJobsSubmit(cmd *cobra.Command, args []string) error {
@@ -201,20 +208,25 @@ func runJobsSubmit(cmd *cobra.Command, args []string) error {
 		table := tablewriter.NewWriter(os.Stdout)
 		table.Header("Field", "Value")
 
-		table.Append("Job ID", result.ID)
+		table.Append("Job #", fmt.Sprintf("%d", result.SequenceNumber))
 		table.Append("Scenario", result.Scenario)
 		table.Append("Confidence", result.Confidence)
 		table.Append("Status", result.Status)
 		table.Append("Created At", result.CreatedAt.Format(time.RFC3339))
 
 		table.Render()
-		fmt.Printf("\nJob submitted successfully! Job ID: %s\n", result.ID)
+		fmt.Printf("\nJob submitted successfully! Job #%d\n", result.SequenceNumber)
 	}
 
 	return nil
 }
 
 func runJobsStatus(cmd *cobra.Command, args []string) error {
+	// If no job ID provided, list all jobs
+	if len(args) == 0 {
+		return listAllJobs()
+	}
+	
 	jobID := args[0]
 	
 	if followStatus {
@@ -247,6 +259,77 @@ func runJobsStatus(cmd *cobra.Command, args []string) error {
 		displayJobStatus(result, true)
 	}
 	
+	return nil
+}
+
+func listAllJobs() error {
+	url := fmt.Sprintf("%s/jobs", GetMasterURL())
+
+	// Create authenticated GET request
+	httpReq, err := CreateAuthenticatedRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to connect to master API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var result jobsListResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if IsJSONOutput() {
+		// Output as JSON
+		output, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal JSON: %w", err)
+		}
+		fmt.Println(string(output))
+	} else {
+		// Output as table
+		table := tablewriter.NewWriter(os.Stdout)
+		table.Header("Job #", "Scenario", "Status", "Progress", "Node", "Created")
+
+		for _, job := range result.Jobs {
+			progress := fmt.Sprintf("%d%%", job.Progress)
+			nodeName := job.NodeName
+			if nodeName == "" && job.NodeID != "" {
+				nodeName = job.NodeID[:8] // Fallback to short ID
+			} else if nodeName == "" {
+				nodeName = "-"
+			}
+			
+			createdAt := job.CreatedAt.Format("2006-01-02 15:04")
+			
+			table.Append(
+				fmt.Sprintf("%d", job.SequenceNumber),
+				job.Scenario,
+				job.Status,
+				progress,
+				nodeName,
+				createdAt,
+			)
+		}
+
+		table.Render()
+		fmt.Printf("\nTotal jobs: %d\n", result.Count)
+	}
+
 	return nil
 }
 
@@ -295,45 +378,48 @@ func displayJobStatus(result *jobResponse, renderTable bool) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.Header("Field", "Value")
 
-	table.Append([]string{"Job ID", result.ID})
-	table.Append([]string{"Scenario", result.Scenario})
-	table.Append([]string{"Confidence", result.Confidence})
-	table.Append([]string{"Status", result.Status})
+	table.Append("Job #", fmt.Sprintf("%d", result.SequenceNumber))
+	table.Append("Scenario", result.Scenario)
+	table.Append("Confidence", result.Confidence)
+	table.Append("Status", result.Status)
 	
 	if result.Queue != "" {
-		table.Append([]string{"Queue", result.Queue})
+		table.Append("Queue", result.Queue)
 	}
 	if result.Priority != "" {
-		table.Append([]string{"Priority", result.Priority})
+		table.Append("Priority", result.Priority)
 	}
 	if result.Progress > 0 {
-		table.Append([]string{"Progress", fmt.Sprintf("%d%%", result.Progress)})
+		table.Append("Progress", fmt.Sprintf("%d%%", result.Progress))
 	}
 	
-	table.Append([]string{"Retry Count", fmt.Sprintf("%d", result.RetryCount)})
+	table.Append("Retry Count", fmt.Sprintf("%d", result.RetryCount))
 	
-	if result.NodeID != "" {
-		table.Append([]string{"Node ID", result.NodeID})
+	// Display node name if available, fallback to node ID
+	if result.NodeName != "" {
+		table.Append("Node", result.NodeName)
+	} else if result.NodeID != "" {
+		table.Append("Node ID", result.NodeID)
 	}
 
-	table.Append([]string{"Created At", result.CreatedAt.Format(time.RFC3339)})
+	table.Append("Created At", result.CreatedAt.Format(time.RFC3339))
 	
 	if result.StartedAt != nil {
-		table.Append([]string{"Started At", result.StartedAt.Format(time.RFC3339)})
+		table.Append("Started At", result.StartedAt.Format(time.RFC3339))
 	}
 	
 	if result.CompletedAt != nil {
-		table.Append([]string{"Completed At", result.CompletedAt.Format(time.RFC3339)})
+		table.Append("Completed At", result.CompletedAt.Format(time.RFC3339))
 	}
 
 	if result.Error != "" {
-		table.Append([]string{"Error", result.Error})
+		table.Append("Error", result.Error)
 	}
 
 	// Display parameters if any
 	if len(result.Parameters) > 0 {
 		paramsJSON, _ := json.MarshalIndent(result.Parameters, "", "  ")
-		table.Append([]string{"Parameters", string(paramsJSON)})
+		table.Append("Parameters", string(paramsJSON))
 	}
 
 	if renderTable {

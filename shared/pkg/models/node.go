@@ -16,6 +16,7 @@ const (
 // Node represents a compute node in the distributed system
 type Node struct {
 	ID               string            `json:"id"`
+	Name             string            `json:"name"`             // Human-friendly node name (hostname)
 	Address          string            `json:"address"`
 	Type             NodeType          `json:"type"`
 	CPUThreads       int               `json:"cpu_threads"`

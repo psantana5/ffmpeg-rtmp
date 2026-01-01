@@ -22,6 +22,7 @@ const (
 // Job represents a workload to be executed on a compute node
 type Job struct {
 	ID               string                 `json:"id"`
+	SequenceNumber   int                    `json:"sequence_number,omitempty"`   // Human-friendly job number
 	Scenario         string                 `json:"scenario"`   // e.g., "4K60-h264"
 	Confidence       string                 `json:"confidence"` // "auto", "high", "medium", "low"
 	Engine           string                 `json:"engine,omitempty"`      // "auto", "ffmpeg", "gstreamer"
@@ -31,6 +32,7 @@ type Job struct {
 	Priority         string                 `json:"priority,omitempty"` // "high", "medium", "low"
 	Progress         int                    `json:"progress,omitempty"` // 0-100%
 	NodeID           string                 `json:"node_id,omitempty"`
+	NodeName         string                 `json:"node_name,omitempty"`        // Human-friendly node name (not stored, populated on read)
 	CreatedAt        time.Time              `json:"created_at"`
 	StartedAt        *time.Time             `json:"started_at,omitempty"`
 	LastActivityAt   *time.Time             `json:"last_activity_at,omitempty"` // Tracks last heartbeat/progress update

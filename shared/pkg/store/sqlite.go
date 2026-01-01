@@ -52,7 +52,8 @@ func (s *SQLiteStore) initSchema() error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS nodes (
 		id TEXT PRIMARY KEY,
-		address TEXT NOT NULL,
+		name TEXT NOT NULL,
+		address TEXT NOT NULL UNIQUE,
 		type TEXT NOT NULL,
 		cpu_threads INTEGER NOT NULL,
 		cpu_model TEXT NOT NULL,
@@ -71,6 +72,7 @@ func (s *SQLiteStore) initSchema() error {
 
 	CREATE TABLE IF NOT EXISTS jobs (
 		id TEXT PRIMARY KEY,
+		sequence_number INTEGER NOT NULL,
 		scenario TEXT NOT NULL,
 		confidence TEXT,
 		engine TEXT NOT NULL DEFAULT 'auto',
@@ -89,9 +91,11 @@ func (s *SQLiteStore) initSchema() error {
 		state_transitions TEXT
 	);
 
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_sequence ON jobs(sequence_number);
 	CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 	CREATE INDEX IF NOT EXISTS idx_jobs_queue_priority ON jobs(queue, priority, created_at);
 	CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_address ON nodes(address);
 	`
 
 	_, err := s.db.Exec(schema)
@@ -99,19 +103,76 @@ func (s *SQLiteStore) initSchema() error {
 		return err
 	}
 
-	// Migrate existing databases: add last_activity_at column if it doesn't exist
-	// Check if the column exists
-	var columnExists int
+	// Migrate existing databases: add new columns if they don't exist
+	
+	// Migration 1: Add last_activity_at column (if missing)
+	var lastActivityExists int
 	row := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='last_activity_at'")
-	if err := row.Scan(&columnExists); err != nil {
-		return fmt.Errorf("failed to check column existence: %w", err)
+	if err := row.Scan(&lastActivityExists); err != nil {
+		return fmt.Errorf("failed to check last_activity_at column: %w", err)
 	}
-
-	// Add column if it doesn't exist
-	if columnExists == 0 {
+	if lastActivityExists == 0 {
 		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN last_activity_at DATETIME")
 		if err != nil {
 			return fmt.Errorf("failed to add last_activity_at column: %w", err)
+		}
+	}
+	
+	// Migration 2: Add sequence_number column to jobs (if missing)
+	var seqExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='sequence_number'")
+	if err := row.Scan(&seqExists); err != nil {
+		return fmt.Errorf("failed to check sequence_number column: %w", err)
+	}
+	if seqExists == 0 {
+		// Add column with default value
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN sequence_number INTEGER DEFAULT 0")
+		if err != nil {
+			return fmt.Errorf("failed to add sequence_number column: %w", err)
+		}
+		
+		// Assign sequential numbers to existing jobs ordered by created_at
+		_, err = s.db.Exec(`
+			WITH numbered AS (
+				SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) as seq
+				FROM jobs
+			)
+			UPDATE jobs 
+			SET sequence_number = (SELECT seq FROM numbered WHERE numbered.id = jobs.id)
+			WHERE sequence_number = 0
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to migrate sequence numbers: %w", err)
+		}
+	}
+	
+	// Migration 3: Add name column to nodes (if missing)
+	var nameExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('nodes') WHERE name='name'")
+	if err := row.Scan(&nameExists); err != nil {
+		return fmt.Errorf("failed to check name column: %w", err)
+	}
+	if nameExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE nodes ADD COLUMN name TEXT DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("failed to add name column: %w", err)
+		}
+		
+		// For existing nodes, extract hostname from address
+		_, err = s.db.Exec(`
+			UPDATE nodes 
+			SET name = CASE 
+				WHEN address LIKE '%://%' THEN 
+					SUBSTR(address, INSTR(address, '://') + 3, 
+						   CASE WHEN INSTR(SUBSTR(address, INSTR(address, '://') + 3), ':') > 0
+						   THEN INSTR(SUBSTR(address, INSTR(address, '://') + 3), ':') - 1
+						   ELSE LENGTH(address) END)
+				ELSE address
+			END
+			WHERE name = ''
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to migrate node names: %w", err)
 		}
 	}
 
@@ -132,11 +193,11 @@ func (s *SQLiteStore) RegisterNode(node *models.Node) error {
 
 	_, err = s.db.Exec(`
 		INSERT OR REPLACE INTO nodes 
-		(id, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type, 
+		(id, name, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type, 
 		 gpu_capabilities, ram_total_bytes, ram_free_bytes, labels, status, last_heartbeat, 
 		 registered_at, current_job_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, node.ID, node.Address, node.Type, node.CPUThreads, node.CPUModel, node.CPULoadPercent,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, node.ID, node.Name, node.Address, node.Type, node.CPUThreads, node.CPUModel, node.CPULoadPercent,
 		node.HasGPU, node.GPUType, string(gpuCaps), node.RAMTotalBytes, node.RAMFreeBytes,
 		string(labels), node.Status, node.LastHeartbeat, node.RegisteredAt, node.CurrentJobID)
 
@@ -149,11 +210,46 @@ func (s *SQLiteStore) GetNode(id string) (*models.Node, error) {
 	var labelsJSON, gpuCapsJSON string
 
 	err := s.db.QueryRow(`
-		SELECT id, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type,
+		SELECT id, name, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type,
 		       gpu_capabilities, ram_total_bytes, ram_free_bytes, labels, status, last_heartbeat,
 		       registered_at, current_job_id
 		FROM nodes WHERE id = ?
-	`, id).Scan(&node.ID, &node.Address, &node.Type, &node.CPUThreads, &node.CPUModel,
+	`, id).Scan(&node.ID, &node.Name, &node.Address, &node.Type, &node.CPUThreads, &node.CPUModel,
+		&node.CPULoadPercent, &node.HasGPU, &node.GPUType, &gpuCapsJSON, &node.RAMTotalBytes,
+		&node.RAMFreeBytes, &labelsJSON, &node.Status, &node.LastHeartbeat,
+		&node.RegisteredAt, &node.CurrentJobID)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNodeNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal([]byte(labelsJSON), &node.Labels); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal labels: %w", err)
+	}
+
+	if gpuCapsJSON != "" && gpuCapsJSON != "null" {
+		if err := json.Unmarshal([]byte(gpuCapsJSON), &node.GPUCapabilities); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal gpu_capabilities: %w", err)
+		}
+	}
+
+	return &node, nil
+}
+
+// GetNodeByAddress retrieves a node by address
+func (s *SQLiteStore) GetNodeByAddress(address string) (*models.Node, error) {
+	var node models.Node
+	var labelsJSON, gpuCapsJSON string
+
+	err := s.db.QueryRow(`
+		SELECT id, name, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type,
+		       gpu_capabilities, ram_total_bytes, ram_free_bytes, labels, status, last_heartbeat,
+		       registered_at, current_job_id
+		FROM nodes WHERE address = ?
+	`, address).Scan(&node.ID, &node.Name, &node.Address, &node.Type, &node.CPUThreads, &node.CPUModel,
 		&node.CPULoadPercent, &node.HasGPU, &node.GPUType, &gpuCapsJSON, &node.RAMTotalBytes,
 		&node.RAMFreeBytes, &labelsJSON, &node.Status, &node.LastHeartbeat,
 		&node.RegisteredAt, &node.CurrentJobID)
@@ -181,7 +277,7 @@ func (s *SQLiteStore) GetNode(id string) (*models.Node, error) {
 // GetAllNodes returns all registered nodes
 func (s *SQLiteStore) GetAllNodes() []*models.Node {
 	rows, err := s.db.Query(`
-		SELECT id, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type,
+		SELECT id, name, address, type, cpu_threads, cpu_model, cpu_load_percent, has_gpu, gpu_type,
 		       gpu_capabilities, ram_total_bytes, ram_free_bytes, labels, status, last_heartbeat,
 		       registered_at, current_job_id
 		FROM nodes
@@ -196,7 +292,7 @@ func (s *SQLiteStore) GetAllNodes() []*models.Node {
 		var node models.Node
 		var labelsJSON, gpuCapsJSON string
 
-		if err := rows.Scan(&node.ID, &node.Address, &node.Type, &node.CPUThreads,
+		if err := rows.Scan(&node.ID, &node.Name, &node.Address, &node.Type, &node.CPUThreads,
 			&node.CPUModel, &node.CPULoadPercent, &node.HasGPU, &node.GPUType, &gpuCapsJSON,
 			&node.RAMTotalBytes, &node.RAMFreeBytes, &labelsJSON, &node.Status,
 			&node.LastHeartbeat, &node.RegisteredAt, &node.CurrentJobID); err != nil {
@@ -284,12 +380,26 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 		job.Engine = "auto"
 	}
 
+	// Generate sequence number if not set
+	if job.SequenceNumber == 0 {
+		var maxSeq sql.NullInt64
+		err := s.db.QueryRow("SELECT MAX(sequence_number) FROM jobs").Scan(&maxSeq)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("failed to get max sequence number: %w", err)
+		}
+		if maxSeq.Valid {
+			job.SequenceNumber = int(maxSeq.Int64) + 1
+		} else {
+			job.SequenceNumber = 1
+		}
+	}
+
 	_, err = s.db.Exec(`
 		INSERT INTO jobs 
-		(id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
+		(id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
 		 created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, job.ID, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, job.ID, job.SequenceNumber, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
 		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt, job.LastActivityAt,
 		job.CompletedAt, job.RetryCount, job.Error, string(transitions))
 
@@ -303,10 +413,61 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
-		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
+		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
 		FROM jobs WHERE id = ?
-	`, id).Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
+	`, id).Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
+		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
+		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrJobNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable node_id
+	if nodeIDNull.Valid {
+		job.NodeID = nodeIDNull.String
+	}
+
+	if paramsJSON.Valid {
+		if err := json.Unmarshal([]byte(paramsJSON.String), &job.Parameters); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
+		}
+	}
+
+	if transitionsJSON.Valid && transitionsJSON.String != "" && transitionsJSON.String != "null" {
+		if err := json.Unmarshal([]byte(transitionsJSON.String), &job.StateTransitions); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal state_transitions: %w", err)
+		}
+	}
+
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if lastActivityAt.Valid {
+		job.LastActivityAt = &lastActivityAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	return &job, nil
+}
+
+// GetJobBySequenceNumber retrieves a job by sequence number
+func (s *SQLiteStore) GetJobBySequenceNumber(seqNum int) (*models.Job, error) {
+	var job models.Job
+	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+	var startedAt, lastActivityAt, completedAt sql.NullTime
+
+	err := s.db.QueryRow(`
+		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		FROM jobs WHERE sequence_number = ?
+	`, seqNum).Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
 		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
 
@@ -350,9 +511,9 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 // GetAllJobs returns all jobs
 func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	rows, err := s.db.Query(`
-		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
+		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
 		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
-		FROM jobs ORDER BY created_at DESC
+		FROM jobs ORDER BY sequence_number DESC
 	`)
 	if err != nil {
 		return []*models.Job{}
@@ -365,7 +526,7 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
 		var startedAt, lastActivityAt, completedAt sql.NullTime
 
-		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
+		if err := rows.Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt,
 			&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
 			continue
@@ -853,11 +1014,13 @@ func (s *SQLiteStore) Close() error {
 type Store interface {
 	RegisterNode(node *models.Node) error
 	GetNode(id string) (*models.Node, error)
+	GetNodeByAddress(address string) (*models.Node, error)
 	GetAllNodes() []*models.Node
 	UpdateNodeStatus(id, status string) error
 	UpdateNodeHeartbeat(id string) error
 	CreateJob(job *models.Job) error
 	GetJob(id string) (*models.Job, error)
+	GetJobBySequenceNumber(seqNum int) (*models.Job, error)
 	GetAllJobs() []*models.Job
 	GetNextJob(nodeID string) (*models.Job, error)
 	UpdateJobStatus(id string, status models.JobStatus, errorMsg string) error

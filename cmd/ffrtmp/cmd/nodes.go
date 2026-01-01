@@ -48,6 +48,7 @@ type nodesListResponse struct {
 
 type nodeInfo struct {
 	ID              string   `json:"id"`
+	Name            string   `json:"name"`
 	Address         string   `json:"address"`
 	Type            string   `json:"type"`
 	CPUThreads      int      `json:"cpu_threads"`
@@ -108,7 +109,7 @@ func runNodesList(cmd *cobra.Command, args []string) error {
 		}
 
 		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("ID", "Host", "Status", "Type", "CPU", "GPU")
+		table.Header("Name", "Status", "Type", "CPU", "GPU")
 
 		for _, node := range result.Nodes {
 			gpuInfo := "No"
@@ -124,9 +125,13 @@ func runNodesList(cmd *cobra.Command, args []string) error {
 				cpuInfo = fmt.Sprintf("%s (%d)", node.CPUModel, node.CPUThreads)
 			}
 
+			nodeName := node.Name
+			if nodeName == "" {
+				nodeName = node.Address
+			}
+
 			table.Append(
-				node.ID,
-				node.Address,
+				nodeName,
 				node.Status,
 				node.Type,
 				cpuInfo,

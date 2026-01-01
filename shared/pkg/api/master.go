@@ -75,9 +75,38 @@ func (h *MasterHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if a node with this address already exists
+	existingNode, err := h.store.GetNodeByAddress(reg.Address)
+	if err == nil && existingNode != nil {
+		// Node with this address already exists
+		log.Printf("Node registration rejected: address %s already registered as %s", reg.Address, existingNode.ID)
+		http.Error(w, fmt.Sprintf("Node with address %s is already registered", reg.Address), http.StatusConflict)
+		return
+	}
+
+	// Extract hostname from address for the name field
+	name := reg.Address
+	// Simple hostname extraction (e.g., "https://hostname:port" -> "hostname")
+	if len(name) > 0 {
+		// Remove protocol
+		if idx := len("https://"); len(name) > idx && name[:idx] == "https://" {
+			name = name[idx:]
+		} else if idx := len("http://"); len(name) > idx && name[:idx] == "http://" {
+			name = name[idx:]
+		}
+		// Remove port
+		for i, ch := range name {
+			if ch == ':' {
+				name = name[:i]
+				break
+			}
+		}
+	}
+
 	// Create new node
 	node := &models.Node{
 		ID:              uuid.New().String(),
+		Name:            name,
 		Address:         reg.Address,
 		Type:            reg.Type,
 		CPUThreads:      reg.CPUThreads,
@@ -98,7 +127,7 @@ func (h *MasterHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Node registered: %s (%s, %d threads, %s)", node.ID, node.Type, node.CPUThreads, node.CPUModel)
+	log.Printf("Node registered: %s [%s] (%s, %d threads, %s)", node.Name, node.ID, node.Type, node.CPUThreads, node.CPUModel)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -204,6 +233,15 @@ func (h *MasterHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 func (h *MasterHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	jobs := h.store.GetAllJobs()
 
+	// Populate NodeName for each job
+	for _, job := range jobs {
+		if job.NodeID != "" {
+			if node, err := h.store.GetNode(job.NodeID); err == nil {
+				job.NodeName = node.Name
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"jobs":  jobs,
@@ -211,12 +249,24 @@ func (h *MasterHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetJob retrieves a specific job by ID
+// GetJob retrieves a specific job by ID or sequence number
 func (h *MasterHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
-	job, err := h.store.GetJob(jobID)
+	var job *models.Job
+	var err error
+
+	// Try to parse as sequence number first
+	var seqNum int
+	if _, parseErr := fmt.Sscanf(jobID, "%d", &seqNum); parseErr == nil && seqNum > 0 {
+		// It's a number, try sequence number lookup
+		job, err = h.store.GetJobBySequenceNumber(seqNum)
+	} else {
+		// Try UUID lookup
+		job, err = h.store.GetJob(jobID)
+	}
+
 	if err != nil {
 		if err == store.ErrJobNotFound {
 			http.Error(w, "Job not found", http.StatusNotFound)
@@ -225,6 +275,13 @@ func (h *MasterHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error getting job: %v", err)
 		http.Error(w, "Failed to get job", http.StatusInternalServerError)
 		return
+	}
+
+	// Populate NodeName if NodeID is set
+	if job.NodeID != "" {
+		if node, err := h.store.GetNode(job.NodeID); err == nil {
+			job.NodeName = node.Name
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -17,17 +17,19 @@ var (
 // MemoryStore is an in-memory implementation of the data store
 // Uses a single RWMutex to prevent deadlock issues with nested locks
 type MemoryStore struct {
-	mu       sync.RWMutex // Single mutex for all operations
-	nodes    map[string]*models.Node
-	jobs     map[string]*models.Job
-	jobQueue []string // FIFO queue of job IDs
+	mu          sync.RWMutex // Single mutex for all operations
+	nodes       map[string]*models.Node
+	jobs        map[string]*models.Job
+	jobQueue    []string // FIFO queue of job IDs
+	nextSeqNum  int      // Auto-incrementing sequence number for jobs
 }
 
 // NewMemoryStore creates a new in-memory store
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		nodes:    make(map[string]*models.Node),
-		jobs:     make(map[string]*models.Job),
+		nodes:      make(map[string]*models.Node),
+		jobs:       make(map[string]*models.Job),
+		nextSeqNum: 1,
 		jobQueue: make([]string, 0),
 	}
 }
@@ -53,6 +55,19 @@ func (s *MemoryStore) GetNode(id string) (*models.Node, error) {
 		return nil, ErrNodeNotFound
 	}
 	return node, nil
+}
+
+// GetNodeByAddress retrieves a node by address
+func (s *MemoryStore) GetNodeByAddress(address string) (*models.Node, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, node := range s.nodes {
+		if node.Address == address {
+			return node, nil
+		}
+	}
+	return nil, ErrNodeNotFound
 }
 
 // GetAllNodes returns all registered nodes
@@ -101,13 +116,16 @@ func (s *MemoryStore) UpdateNodeHeartbeat(id string) error {
 // CreateJob adds a new job to the store and queue
 func (s *MemoryStore) CreateJob(job *models.Job) error {
 	s.mu.Lock()
-	s.jobs[job.ID] = job
-	s.mu.Unlock()
+	defer s.mu.Unlock()
 
-	// Add to queue
-	s.mu.Lock()
+	// Generate sequence number if not set
+	if job.SequenceNumber == 0 {
+		job.SequenceNumber = s.nextSeqNum
+		s.nextSeqNum++
+	}
+
+	s.jobs[job.ID] = job
 	s.jobQueue = append(s.jobQueue, job.ID)
-	s.mu.Unlock()
 
 	return nil
 }
@@ -122,6 +140,19 @@ func (s *MemoryStore) GetJob(id string) (*models.Job, error) {
 		return nil, ErrJobNotFound
 	}
 	return job, nil
+}
+
+// GetJobBySequenceNumber retrieves a job by sequence number
+func (s *MemoryStore) GetJobBySequenceNumber(seqNum int) (*models.Job, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, job := range s.jobs {
+		if job.SequenceNumber == seqNum {
+			return job, nil
+		}
+	}
+	return nil, ErrJobNotFound
 }
 
 // GetAllJobs returns all jobs
