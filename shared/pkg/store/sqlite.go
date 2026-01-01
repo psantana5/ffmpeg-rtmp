@@ -82,6 +82,7 @@ func (s *SQLiteStore) initSchema() error {
 		node_id TEXT,
 		created_at DATETIME NOT NULL,
 		started_at DATETIME,
+		last_activity_at DATETIME,
 		completed_at DATETIME,
 		retry_count INTEGER NOT NULL,
 		error TEXT,
@@ -94,7 +95,27 @@ func (s *SQLiteStore) initSchema() error {
 	`
 
 	_, err := s.db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Migrate existing databases: add last_activity_at column if it doesn't exist
+	// Check if the column exists
+	var columnExists int
+	row := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='last_activity_at'")
+	if err := row.Scan(&columnExists); err != nil {
+		return fmt.Errorf("failed to check column existence: %w", err)
+	}
+
+	// Add column if it doesn't exist
+	if columnExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN last_activity_at DATETIME")
+		if err != nil {
+			return fmt.Errorf("failed to add last_activity_at column: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // RegisterNode adds or updates a node in the store
@@ -266,10 +287,10 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	_, err = s.db.Exec(`
 		INSERT INTO jobs 
 		(id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
-		 created_at, started_at, completed_at, retry_count, error, state_transitions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
-		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt,
+		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt, job.LastActivityAt,
 		job.CompletedAt, job.RetryCount, job.Error, string(transitions))
 
 	return err
@@ -279,15 +300,15 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var job models.Job
 	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
-	var startedAt, completedAt sql.NullTime
+	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
 		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
-		&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
+		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrJobNotFound
@@ -316,6 +337,9 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	if startedAt.Valid {
 		job.StartedAt = &startedAt.Time
 	}
+	if lastActivityAt.Valid {
+		job.LastActivityAt = &lastActivityAt.Time
+	}
 	if completedAt.Valid {
 		job.CompletedAt = &completedAt.Time
 	}
@@ -327,7 +351,7 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	rows, err := s.db.Query(`
 		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
 		FROM jobs ORDER BY created_at DESC
 	`)
 	if err != nil {
@@ -339,11 +363,11 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	for rows.Next() {
 		var job models.Job
 		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
-		var startedAt, completedAt sql.NullTime
+		var startedAt, lastActivityAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt,
-			&startedAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
+			&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
 			continue
 		}
 
@@ -366,6 +390,9 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
+		}
+		if lastActivityAt.Valid {
+			job.LastActivityAt = &lastActivityAt.Time
 		}
 		if completedAt.Valid {
 			job.CompletedAt = &completedAt.Time
@@ -406,11 +433,11 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	// Priority: high=3, medium=2, low=1
 	var job models.Job
 	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
-	var startedAt, completedAt sql.NullTime
+	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	query := `
 		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?)
 		ORDER BY 
@@ -432,7 +459,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 
 	err = tx.QueryRow(query, models.JobStatusPending, models.JobStatusQueued).Scan(
 		&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status, &job.Queue,
-		&job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, &startedAt, &completedAt,
+		&job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, &startedAt, &lastActivityAt, &completedAt,
 		&job.RetryCount, &job.Error, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
@@ -491,9 +518,9 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	
 	_, err = tx.Exec(`
 		UPDATE jobs 
-		SET status = ?, node_id = ?, started_at = ?, state_transitions = ?
+		SET status = ?, node_id = ?, started_at = ?, last_activity_at = ?, state_transitions = ?
 		WHERE id = ?
-	`, models.JobStatusProcessing, nodeID, now, string(transitionsJSON2), job.ID)
+	`, models.JobStatusProcessing, nodeID, now, now, string(transitionsJSON2), job.ID)
 
 	if err != nil {
 		return nil, err
@@ -517,6 +544,7 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	job.Status = models.JobStatusProcessing
 	job.NodeID = nodeID
 	job.StartedAt = &now
+	job.LastActivityAt = &now
 
 	return &job, nil
 }
@@ -593,8 +621,29 @@ func (s *SQLiteStore) UpdateJobProgress(id string, progress int) error {
 	}
 
 	result, err := s.db.Exec(`
-		UPDATE jobs SET progress = ? WHERE id = ?
-	`, progress, id)
+		UPDATE jobs SET progress = ?, last_activity_at = ? WHERE id = ?
+	`, progress, time.Now(), id)
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrJobNotFound
+	}
+
+	return nil
+}
+
+// UpdateJobActivity updates the last activity timestamp of a job
+func (s *SQLiteStore) UpdateJobActivity(id string) error {
+	result, err := s.db.Exec(`
+		UPDATE jobs SET last_activity_at = ? WHERE id = ?
+	`, time.Now(), id)
 
 	if err != nil {
 		return err
@@ -734,7 +783,7 @@ func (s *SQLiteStore) CancelJob(id string) error {
 func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job {
 	query := `
 		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?) AND queue = ?
 	`
@@ -757,11 +806,11 @@ func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job
 	for rows.Next() {
 		var job models.Job
 		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
-		var startedAt, completedAt sql.NullTime
+		var startedAt, lastActivityAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull,
-			&job.CreatedAt, &startedAt, &completedAt, &job.RetryCount, &job.Error,
+			&job.CreatedAt, &startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error,
 			&transitionsJSON); err != nil {
 			continue
 		}
@@ -781,6 +830,9 @@ func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job
 
 		if startedAt.Valid {
 			job.StartedAt = &startedAt.Time
+		}
+		if lastActivityAt.Valid {
+			job.LastActivityAt = &lastActivityAt.Time
 		}
 		if completedAt.Valid {
 			job.CompletedAt = &completedAt.Time
@@ -810,6 +862,7 @@ type Store interface {
 	GetNextJob(nodeID string) (*models.Job, error)
 	UpdateJobStatus(id string, status models.JobStatus, errorMsg string) error
 	UpdateJobProgress(id string, progress int) error
+	UpdateJobActivity(id string) error
 	AddStateTransition(id string, from, to models.JobStatus, reason string) error
 	PauseJob(id string) error
 	ResumeJob(id string) error

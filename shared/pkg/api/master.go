@@ -127,6 +127,16 @@ func (h *MasterHandler) NodeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update job activity if the node has a current job
+	node, err := h.store.GetNode(nodeID)
+	if err == nil && node.CurrentJobID != "" {
+		// Update the job's last activity time
+		if err := h.store.UpdateJobActivity(node.CurrentJobID); err != nil {
+			// Log error but don't fail the heartbeat
+			log.Printf("Warning: Failed to update job activity for job %s: %v", node.CurrentJobID, err)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
