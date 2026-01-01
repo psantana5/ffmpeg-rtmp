@@ -114,27 +114,46 @@ pub struct RegionalPricing {
     pub region: String,
     pub electricity_price: f64,
     pub carbon_intensity: f64,
+    pub currency: String,
 }
 
 impl RegionalPricing {
     pub fn new(region: &str) -> Self {
-        let (price, intensity) = match region {
-            "us-east-1" => (0.13, 0.45),
-            "us-west-2" => (0.10, 0.30),
-            "eu-west-1" => (0.20, 0.28),
-            "eu-north-1" => (0.08, 0.12),
-            _ => (0.12, 0.50),
+        let (price, intensity, currency) = match region {
+            "us-east-1" => (0.13, 0.45, "USD"),
+            "us-west-2" => (0.10, 0.30, "USD"),
+            "eu-west-1" => (1.85, 0.28, "SEK"),  // ~0.20 EUR * 9.25 SEK/EUR
+            "eu-north-1" => (0.74, 0.12, "SEK"),  // ~0.08 EUR * 9.25 SEK/EUR
+            "eu-central-1" => (0.18, 0.40, "EUR"),
+            "eu-south-1" => (0.22, 0.35, "EUR"),
+            _ => (0.12, 0.50, "USD"),
         };
 
         Self {
             region: region.to_string(),
             electricity_price: price,
             carbon_intensity: intensity,
+            currency: currency.to_string(),
         }
     }
 
     pub fn compute_co2_emissions(&self, energy_kwh: f64) -> f64 {
         energy_kwh * self.carbon_intensity
+    }
+
+    /// Convert cost to different currency
+    pub fn convert_currency(&self, amount: f64, to_currency: &str) -> f64 {
+        // Exchange rates (approximate)
+        let rate = match (&self.currency[..], to_currency) {
+            ("USD", "EUR") => 0.92,
+            ("USD", "SEK") => 10.50,
+            ("EUR", "USD") => 1.09,
+            ("EUR", "SEK") => 11.40,
+            ("SEK", "USD") => 0.095,
+            ("SEK", "EUR") => 0.088,
+            _ => 1.0,  // Same currency
+        };
+        amount * rate
     }
 }
 
@@ -269,6 +288,40 @@ pub extern "C" fn regional_pricing_compute_co2(ptr: *const CRegionalPricing, ene
         return 0.0;
     }
     unsafe { (*ptr).inner.compute_co2_emissions(energy_kwh) }
+}
+
+#[no_mangle]
+pub extern "C" fn regional_pricing_convert_currency(
+    ptr: *const CRegionalPricing,
+    amount: f64,
+    to_currency: *const c_char,
+) -> f64 {
+    if ptr.is_null() || to_currency.is_null() {
+        return amount;
+    }
+    unsafe {
+        let to_curr = CStr::from_ptr(to_currency).to_str().unwrap_or("USD");
+        (*ptr).inner.convert_currency(amount, to_curr)
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn regional_pricing_get_currency(
+    ptr: *const CRegionalPricing,
+    buf: *mut c_char,
+    buf_len: usize,
+) -> i32 {
+    if ptr.is_null() || buf.is_null() || buf_len == 0 {
+        return -1;
+    }
+    unsafe {
+        let currency = &(*ptr).inner.currency;
+        let bytes = currency.as_bytes();
+        let copy_len = bytes.len().min(buf_len - 1);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, copy_len);
+        *buf.add(copy_len) = 0; // Null terminator
+        0
+    }
 }
 
 #[no_mangle]
