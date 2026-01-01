@@ -98,7 +98,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "exporter_healthy_total",
+          "expr": "sum(exporter_health_status)",
           "refId": "A"
         }
       ],
@@ -140,7 +140,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "exporter_total",
+          "expr": "count(exporter_health_status)",
           "refId": "A"
         }
       ],
@@ -188,12 +188,12 @@
       },
       "targets": [
         {
-          "expr": "exporter_response_time_ms",
+          "expr": "exporter_metric_count",
           "legendFormat": "{{exporter}}",
           "refId": "A"
         }
       ],
-      "title": "Exporter Response Times",
+      "title": "Exporter Metric Counts",
       "type": "timeseries"
     },
     {
@@ -241,7 +241,7 @@
       },
       "targets": [
         {
-          "expr": "exporter_healthy",
+          "expr": "exporter_health_status",
           "legendFormat": "{{exporter}}",
           "refId": "A"
         }
