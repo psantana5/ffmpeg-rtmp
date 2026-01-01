@@ -156,6 +156,7 @@ func (s *MemoryStore) GetNextJob(nodeID string) (*models.Job, error) {
 		job.Status = models.JobStatusRunning
 		job.NodeID = nodeID
 		job.StartedAt = &now
+		job.LastActivityAt = &now
 		s.mu.Unlock()
 
 		// Remove from queue
@@ -226,6 +227,23 @@ func (s *MemoryStore) UpdateJobProgress(id string, progress int) error {
 	}
 
 	job.Progress = progress
+	now := time.Now()
+	job.LastActivityAt = &now
+	return nil
+}
+
+// UpdateJobActivity updates the last activity timestamp of a job
+func (s *MemoryStore) UpdateJobActivity(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	now := time.Now()
+	job.LastActivityAt = &now
 	return nil
 }
 
