@@ -1,319 +1,216 @@
-# Exporter Deployment - Quick Reference
+# Exporters Quick Reference
 
-This is a quick reference guide for deploying exporters without Docker. For detailed instructions, see the full deployment guides.
+Quick guide for all Go-based exporters in the ffmpeg-rtmp project.
 
-## Master Exporters (Python)
+## Master Node Exporters (Go)
 
-**Full Guide**: [master/exporters/README.md](../master/exporters/README.md)
+All master exporters are implemented in Go for high performance.
 
-### Quick Deploy
+### Start All Master Exporters (Docker)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run exporters
-python3 master/exporters/results/results_exporter.py --port 9502 --results-dir ./test_results
-python3 master/exporters/qoe/qoe_exporter.py --port 9503 --results-dir ./test_results
-python3 master/exporters/cost/cost_exporter.py --port 9504 --results-dir ./test_results --energy-cost 0.12
-python3 master/exporters/health_checker/check_exporters_health.py --port 9600
+docker compose up -d results-exporter qoe-exporter cost-exporter exporter-health-checker
 ```
 
-### Systemd Quick Setup
+### Run Master Exporters Manually
 
 ```bash
-# Create service user
-sudo useradd --system --no-create-home --shell /bin/false ffmpeg-exporter
+# Results Exporter - Port 9502
+RESULTS_EXPORTER_PORT=9502 RESULTS_DIR=./test_results ./bin/results_exporter
 
-# Install to /opt
-sudo mkdir -p /opt/ffmpeg-rtmp/exporters
-sudo cp -r master/exporters/* /opt/ffmpeg-rtmp/exporters/
-sudo cp -r shared/advisor /opt/ffmpeg-rtmp/exporters/
-sudo chown -R ffmpeg-exporter:ffmpeg-exporter /opt/ffmpeg-rtmp
+# QoE Exporter - Port 9503
+QOE_EXPORTER_PORT=9503 RESULTS_DIR=./test_results ./bin/qoe_exporter
 
-# Install Python dependencies
-cd /opt/ffmpeg-rtmp
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Cost Exporter - Port 9504
+COST_EXPORTER_PORT=9504 RESULTS_DIR=./test_results \
+ENERGY_COST=0.0 CPU_COST=0.50 CURRENCY=USD REGION=us-east-1 \
+./bin/cost_exporter
 
-# Create and enable systemd services (see full guide for service files)
-sudo systemctl enable --now ffmpeg-results-exporter.service
-sudo systemctl enable --now ffmpeg-qoe-exporter.service
-sudo systemctl enable --now ffmpeg-cost-exporter.service
-sudo systemctl enable --now ffmpeg-health-checker.service
+# Health Checker - Port 9600
+HEALTH_CHECK_PORT=9600 ./bin/health_checker
+```
+
+### Build Master Exporters
+
+```bash
+go build -o bin/results_exporter ./master/exporters/results_go/
+go build -o bin/qoe_exporter ./master/exporters/qoe_go/
+go build -o bin/cost_exporter ./master/exporters/cost_go/
+go build -o bin/health_checker ./master/exporters/health_checker_go/
 ```
 
 ---
 
-## Worker Exporters (Go + Python)
+## Worker Node Exporters (Go)
 
-**Full Guide**: [worker/exporters/DEPLOYMENT.md](../worker/exporters/DEPLOYMENT.md)
+All worker exporters are implemented in Go.
 
-### Quick Build & Deploy
+### Start All Worker Exporters (Docker)
 
 ```bash
-# Build Go exporters
-go build -o bin/cpu-exporter ./worker/exporters/cpu_exporter
-go build -o bin/gpu-exporter ./worker/exporters/gpu_exporter
-go build -o bin/ffmpeg-exporter ./worker/exporters/ffmpeg_exporter
-
-# Run Go exporters
-sudo ./bin/cpu-exporter --port 9510          # Requires sudo for RAPL access
-./bin/gpu-exporter --port 9511               # Requires NVIDIA GPU
-./bin/ffmpeg-exporter --port 9506
-
-# Run Python exporter
-python3 worker/exporters/docker_stats/docker_stats_exporter.py --port 9501
+docker compose up -d cpu-exporter-go docker-stats-exporter ffmpeg-exporter
 ```
 
-### Systemd Quick Setup
+### Run Worker Exporters Manually
 
 ```bash
-# Create service user and groups
-sudo useradd --system --no-create-home --shell /bin/false ffmpeg-worker
-sudo usermod -aG video ffmpeg-worker   # For GPU access
-sudo usermod -aG docker ffmpeg-worker  # For Docker stats
+# CPU Exporter - Port 9510 (requires sudo for RAPL access)
+sudo CPU_EXPORTER_PORT=9500 ./bin/cpu-exporter
 
-# Install to /opt
-sudo mkdir -p /opt/ffmpeg-rtmp/worker/bin
-sudo cp bin/*-exporter /opt/ffmpeg-rtmp/worker/bin/
-sudo cp -r worker/exporters/docker_stats /opt/ffmpeg-rtmp/worker/
-sudo chown -R ffmpeg-worker:ffmpeg-worker /opt/ffmpeg-rtmp/worker
+# Docker Stats Exporter - Port 9501
+DOCKER_STATS_PORT=9501 ./bin/docker-stats-exporter
 
-# Set capabilities for CPU exporter (instead of running as root)
-sudo setcap cap_dac_read_search=+ep /opt/ffmpeg-rtmp/worker/bin/cpu-exporter
+# FFmpeg Exporter - Port 9506
+FFMPEG_EXPORTER_PORT=9506 ./bin/ffmpeg-exporter
 
-# Create and enable systemd services (see full guide for service files)
-sudo systemctl enable --now ffmpeg-cpu-exporter.service
-sudo systemctl enable --now ffmpeg-gpu-exporter.service      # If NVIDIA GPU
-sudo systemctl enable --now ffmpeg-stats-exporter.service
-sudo systemctl enable --now ffmpeg-docker-stats-exporter.service
+# GPU Exporter - Port 9511 (NVIDIA only)
+GPU_EXPORTER_PORT=9505 ./bin/gpu-exporter
+```
+
+### Build Worker Exporters
+
+```bash
+go build -o bin/cpu-exporter ./worker/exporters/cpu_exporter/
+go build -o bin/docker-stats-exporter ./worker/exporters/docker_stats_go/
+go build -o bin/ffmpeg-exporter ./worker/exporters/ffmpeg_exporter/
+go build -o bin/gpu-exporter ./worker/exporters/gpu_exporter/
 ```
 
 ---
 
 ## Port Reference
 
-| Exporter | Port | Type | Purpose |
-|----------|------|------|---------|
-| Results Exporter | 9502 | Master | Test result metrics |
-| QoE Exporter | 9503 | Master | Quality metrics (VMAF, PSNR) |
-| Cost Exporter | 9504 | Master | Cost analysis |
-| Health Checker | 9600 | Master | Exporter health monitoring |
-| Docker Stats | 9501 | Worker | Container resource usage |
-| FFmpeg Stats | 9506 | Worker | FFmpeg encoding stats |
-| CPU/RAPL | 9510 | Worker | CPU power consumption |
-| GPU/NVML | 9511 | Worker | GPU metrics |
+| Exporter | Port | Type | Description |
+|----------|------|------|-------------|
+| **Master Exporters** |
+| results-exporter | 9502 | Go | Test results and scenario metrics |
+| qoe-exporter | 9503 | Go | Quality of Experience (VMAF, PSNR, SSIM) |
+| cost-exporter | 9504 | Go | Cost analysis (energy + compute) |
+| exporter-health-checker | 9600 | Go | Health monitoring for all exporters |
+| **Worker Exporters** |
+| cpu-exporter-go | 9510 | Go | CPU power via Intel RAPL |
+| docker-stats-exporter | 9501 | Go | Docker container metrics |
+| ffmpeg-exporter | 9506 | Go | FFmpeg encoding statistics |
+| gpu-exporter-go | 9511 | Go | NVIDIA GPU metrics |
+| **External Exporters** |
+| nginx-exporter | 9728 | - | NGINX RTMP statistics |
+| node-exporter | 9100 | - | System-level metrics |
+| cadvisor | 8080 | - | Container metrics |
+| dcgm-exporter | 9400 | - | NVIDIA DCGM metrics |
 
 ---
 
-## Common Commands
+## Health Checks
 
-### Check Service Status
+Test all exporters are responding:
+
 ```bash
 # Master exporters
-sudo systemctl status ffmpeg-results-exporter.service
-sudo systemctl status ffmpeg-qoe-exporter.service
-sudo systemctl status ffmpeg-cost-exporter.service
-sudo systemctl status ffmpeg-health-checker.service
+curl http://localhost:9502/health  # results
+curl http://localhost:9503/health  # qoe
+curl http://localhost:9504/health  # cost
+curl http://localhost:9600/health  # health-checker
 
 # Worker exporters
-sudo systemctl status ffmpeg-cpu-exporter.service
-sudo systemctl status ffmpeg-gpu-exporter.service
-sudo systemctl status ffmpeg-stats-exporter.service
-sudo systemctl status ffmpeg-docker-stats-exporter.service
+curl http://localhost:9500/health  # cpu (internal port)
+curl http://localhost:9501/health  # docker-stats
+curl http://localhost:9506/health  # ffmpeg
+curl http://localhost:9505/health  # gpu (internal port)
 ```
 
-### View Logs
-```bash
-# Follow logs
-sudo journalctl -u ffmpeg-results-exporter.service -f
+---
 
-# Last 50 lines
-sudo journalctl -u ffmpeg-cpu-exporter.service -n 50
+## View Metrics
 
-# All exporter logs
-sudo journalctl -u 'ffmpeg-*-exporter.service' -f
-```
+All exporters expose Prometheus-formatted metrics:
 
-### Health Checks
 ```bash
 # Master exporters
-curl http://localhost:9502/health  # Results
-curl http://localhost:9503/health  # QoE
-curl http://localhost:9504/health  # Cost
-curl http://localhost:9600/health  # Health Checker
+curl http://localhost:9502/metrics
+curl http://localhost:9503/metrics
+curl http://localhost:9504/metrics
+curl http://localhost:9600/metrics
 
 # Worker exporters
-curl http://localhost:9510/health  # CPU
-curl http://localhost:9511/health  # GPU
-curl http://localhost:9506/health  # FFmpeg
-curl http://localhost:9501/health  # Docker Stats
-```
-
-### Metrics Endpoints
-```bash
-# View Prometheus metrics
-curl http://localhost:9502/metrics  # Results
-curl http://localhost:9510/metrics  # CPU/RAPL
-curl http://localhost:9511/metrics  # GPU
+curl http://localhost:9500/metrics
+curl http://localhost:9501/metrics
+curl http://localhost:9506/metrics
+curl http://localhost:9505/metrics
 ```
 
 ---
 
-## Firewall Configuration
-
-### Master Node
-```bash
-sudo ufw allow 9502/tcp comment 'Results Exporter'
-sudo ufw allow 9503/tcp comment 'QoE Exporter'
-sudo ufw allow 9504/tcp comment 'Cost Exporter'
-sudo ufw allow 9600/tcp comment 'Health Checker'
-```
-
-### Worker Node
-```bash
-sudo ufw allow 9510/tcp comment 'CPU Exporter'
-sudo ufw allow 9511/tcp comment 'GPU Exporter'
-sudo ufw allow 9506/tcp comment 'FFmpeg Exporter'
-sudo ufw allow 9501/tcp comment 'Docker Stats'
-```
-
----
-
-## VictoriaMetrics Configuration
-
-Add to `master/monitoring/victoriametrics.yml`:
-
-```yaml
-scrape_configs:
-  # Master exporters
-  - job_name: 'results-exporter'
-    static_configs:
-      - targets: ['localhost:9502']
-    scrape_interval: 15s
-
-  - job_name: 'qoe-exporter'
-    static_configs:
-      - targets: ['localhost:9503']
-    scrape_interval: 15s
-
-  - job_name: 'cost-exporter'
-    static_configs:
-      - targets: ['localhost:9504']
-    scrape_interval: 15s
-
-  # Worker exporters (replace with actual worker IPs)
-  - job_name: 'worker-cpu-exporter'
-    static_configs:
-      - targets: ['worker-1:9510', 'worker-2:9510']
-    scrape_interval: 5s
-
-  - job_name: 'worker-gpu-exporter'
-    static_configs:
-      - targets: ['worker-1:9511', 'worker-2:9511']
-    scrape_interval: 5s
-
-  - job_name: 'worker-ffmpeg-exporter'
-    static_configs:
-      - targets: ['worker-1:9506', 'worker-2:9506']
-    scrape_interval: 10s
-
-  - job_name: 'worker-docker-stats'
-    static_configs:
-      - targets: ['worker-1:9501', 'worker-2:9501']
-    scrape_interval: 15s
-```
-
-Reload configuration:
-```bash
-curl -X POST http://localhost:8428/-/reload
-```
-
----
-
-## Troubleshooting Quick Fixes
+## Environment Variables Reference
 
 ### Master Exporters
 
-**Permission denied on results directory**:
-```bash
-sudo chown -R ffmpeg-exporter:ffmpeg-exporter /var/lib/ffmpeg-rtmp/results
-```
+**Results Exporter**
+- `RESULTS_EXPORTER_PORT` (default: 9502)
+- `RESULTS_DIR` (default: /results)
 
-**Missing advisor module**:
-```bash
-sudo cp -r shared/advisor /opt/ffmpeg-rtmp/exporters/
-```
+**QoE Exporter**
+- `QOE_EXPORTER_PORT` (default: 9503)
+- `RESULTS_DIR` (default: /results)
 
-**Missing Python dependencies**:
-```bash
-source /opt/ffmpeg-rtmp/venv/bin/activate
-pip install -r requirements.txt
-```
+**Cost Exporter**
+- `COST_EXPORTER_PORT` (default: 9504)
+- `RESULTS_DIR` (default: /results)
+- `ENERGY_COST` (cost per kWh, e.g., 0.12)
+- `CPU_COST` (cost per hour, e.g., 0.50)
+- `CURRENCY` (default: USD)
+- `REGION` (default: us-east-1)
 
-### Worker Exporters
-
-**CPU exporter can't read RAPL**:
-```bash
-# Option 1: Set capabilities (preferred)
-sudo setcap cap_dac_read_search=+ep /opt/ffmpeg-rtmp/worker/bin/cpu-exporter
-
-# Option 2: Temporary permission (testing only)
-sudo chmod -R a+r /sys/class/powercap
-```
-
-**GPU exporter can't find nvidia-smi**:
-```bash
-# Verify NVIDIA drivers
-nvidia-smi
-
-# Add user to video group
-sudo usermod -aG video ffmpeg-worker
-```
-
-**Docker stats can't connect**:
-```bash
-# Add user to docker group
-sudo usermod -aG docker ffmpeg-worker
-
-# Verify socket permissions
-ls -l /var/run/docker.sock
-```
-
----
-
-## Prerequisites Summary
-
-### Master Exporters
-- Python 3.10+
-- pip packages: `requests`, `scikit-learn`
-- Access to test results directory
-- Shared `advisor` module
+**Health Checker**
+- `HEALTH_CHECK_PORT` (default: 9600)
 
 ### Worker Exporters
-- **All**: Go 1.21+ (for building)
-- **CPU Exporter**: Intel CPU with RAPL, Linux 4.15+, privileged access
-- **GPU Exporter**: NVIDIA GPU, nvidia-smi installed
-- **FFmpeg Exporter**: FFmpeg with progress output
-- **Docker Stats**: Docker daemon, socket access
+
+**CPU Exporter**
+- `CPU_EXPORTER_PORT` (default: 9500)
+
+**Docker Stats Exporter**
+- `DOCKER_STATS_PORT` (default: 9501)
+
+**FFmpeg Exporter**
+- `FFMPEG_EXPORTER_PORT` (default: 9506)
+
+**GPU Exporter**
+- `GPU_EXPORTER_PORT` (default: 9505)
 
 ---
 
-## Full Documentation
+## Troubleshooting
 
-- **[Master Exporters Guide](../master/exporters/README.md)** - Complete Python exporter deployment
-- **[Worker Exporters Guide](../worker/exporters/DEPLOYMENT.md)** - Complete Go exporter deployment
-- **[Master Node Deployment](../deployment/README.md)** - Full production deployment guide
-- **[Architecture Overview](../docs/ARCHITECTURE_DIAGRAM.md)** - System architecture
+### Exporter Won't Start
+
+1. Check port availability: `sudo netstat -tlnp | grep <port>`
+2. Check logs: `docker compose logs <service-name>`
+3. Verify binary built correctly: `ls -lh bin/`
+
+### No Metrics
+
+1. Test health endpoint: `curl http://localhost:<port>/health`
+2. Check metrics endpoint: `curl http://localhost:<port>/metrics`
+3. For master exporters: ensure test result files exist in RESULTS_DIR
+4. For worker exporters: ensure required hardware/permissions available
+
+### Permission Errors
+
+**CPU Exporter**: Requires root or capabilities to read `/sys/class/powercap`
+```bash
+sudo setcap cap_dac_read_search=+ep ./bin/cpu-exporter
+```
+
+**GPU Exporter**: Requires NVIDIA drivers and GPU access
+
+**Docker Stats**: Requires access to `/var/run/docker.sock`
 
 ---
 
-## Support
+## Additional Resources
 
-For issues:
-1. Check logs: `sudo journalctl -u ffmpeg-*-exporter.service -n 100`
-2. Test manually before systemd
-3. Verify prerequisites
-4. Open issue: https://github.com/psantana5/ffmpeg-rtmp/issues
+- [Master Exporters Documentation](../master/exporters/README.md)
+- [Worker Exporters Documentation](../worker/exporters/README.md)
+- [Go Exporters Summary](../GO_EXPORTERS_SUMMARY.md)
+- [Docker Compose Configuration](../docker-compose.yml)
+- [Grafana Dashboards](../master/monitoring/grafana/provisioning/dashboards/)

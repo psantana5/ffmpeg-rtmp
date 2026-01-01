@@ -23,21 +23,24 @@ type MasterHandler struct {
 	store           store.Store
 	maxRetries      int
 	metricsRecorder MetricsRecorder
+	resultsWriter   *ResultsWriter
 }
 
 // NewMasterHandler creates a new master handler
 func NewMasterHandler(s store.Store) *MasterHandler {
 	return &MasterHandler{
-		store:      s,
-		maxRetries: 0, // No retries by default
+		store:         s,
+		maxRetries:    0, // No retries by default
+		resultsWriter: NewResultsWriter("./test_results"),
 	}
 }
 
 // NewMasterHandlerWithRetry creates a new master handler with retry support
 func NewMasterHandlerWithRetry(s store.Store, maxRetries int) *MasterHandler {
 	return &MasterHandler{
-		store:      s,
-		maxRetries: maxRetries,
+		store:         s,
+		maxRetries:    maxRetries,
+		resultsWriter: NewResultsWriter("./test_results"),
 	}
 }
 
@@ -323,6 +326,16 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error updating job status: %v", err)
 		http.Error(w, "Failed to update job status", http.StatusInternalServerError)
 		return
+	}
+
+	// Write results to JSON file for exporters
+	if result.Status == models.JobStatusCompleted {
+		job, err := h.store.GetJob(result.JobID)
+		if err == nil && h.resultsWriter != nil {
+			if err := h.resultsWriter.WriteJobResult(job, &result); err != nil {
+				log.Printf("Warning: Failed to write job results to file: %v", err)
+			}
+		}
 	}
 
 	log.Printf("Results received for job %s (status: %s)", result.JobID, result.Status)
