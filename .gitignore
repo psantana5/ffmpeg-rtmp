@@ -3,7 +3,6 @@
 venv
 env/
 ENV/
-models/
 */__pycache__
 src/exporters/results/__pycache__
 __pycache__/
@@ -60,9 +59,6 @@ streams/*
 test_results/
 results/*
 plots/*
-models/*/checkpoint_*
-models/*/training_history.json
-tests/*
 # Temporary files
 *.tmp
 *.bak
@@ -100,15 +96,26 @@ ffmpeg_exporter
 ml_rust/target/
 ml_rust/Cargo.lock
 
-# ML models (keep directory, ignore generated models except version metadata)
+# ML models (keep directory structure, ignore generated model files)
 ml_models/*.json
 ml_models/*.csv
+ml_models/*.pkl
+ml_models/*.h5
+ml_models/*.onnx
 !ml_models/.gitkeep
 
+# Database files
 master.*db*
-# Distributed compute binaries
+*.db
+*.sqlite
+*.sqlite3
+
+# Distributed compute binaries (root level only)
 bin/*
 .ffmpeg-agent/
 /agent
 /master
+# Exception: Allow master/ and agent/ directories
 !/master/
+!/agent/
+

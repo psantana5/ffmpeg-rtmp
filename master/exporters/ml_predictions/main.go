@@ -48,9 +48,11 @@ const (
 )
 
 var (
-	model      unsafe.Pointer
-	modelMutex sync.RWMutex
-	modelPath  string
+	model            unsafe.Pointer
+	modelMutex       sync.RWMutex
+	modelPath        string
+	modelLoadTime    time.Time
+	modelLoadTimeMux sync.RWMutex
 )
 
 // loadModel loads the ML model from disk
@@ -72,6 +74,12 @@ func loadModel(path string) error {
 	}
 
 	model = newModel
+	
+	// Update model load time
+	modelLoadTimeMux.Lock()
+	modelLoadTime = time.Now()
+	modelLoadTimeMux.Unlock()
+	
 	log.Printf("Loaded ML model from %s", path)
 	return nil
 }
@@ -190,7 +198,10 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintln(w, "# HELP ml_model_last_update_timestamp Last model update time (Unix timestamp)")
 	fmt.Fprintln(w, "# TYPE ml_model_last_update_timestamp gauge")
-	fmt.Fprintf(w, "ml_model_last_update_timestamp %d\n", time.Now().Unix())
+	modelLoadTimeMux.RLock()
+	lastUpdate := modelLoadTime.Unix()
+	modelLoadTimeMux.RUnlock()
+	fmt.Fprintf(w, "ml_model_last_update_timestamp %d\n", lastUpdate)
 
 	// Exporter info
 	fmt.Fprintln(w, "# HELP ml_exporter_info ML exporter information")
@@ -257,8 +268,7 @@ func main() {
 
 	// Load initial model
 	if err := loadModel(modelPath); err != nil {
-		log.Printf("Warning: Failed to load model: %v", err)
-		log.Println("Exporter will start with no model loaded")
+		log.Printf("Warning: Failed to load ML model from %s: %v. Exporter will serve empty metrics until model is loaded.", modelPath, err)
 	}
 
 	// Ensure model is freed on exit
