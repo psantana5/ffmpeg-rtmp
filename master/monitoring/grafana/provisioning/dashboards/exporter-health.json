@@ -67,7 +67,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -132,7 +133,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -196,7 +198,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -280,7 +283,8 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "ms",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -384,7 +388,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },

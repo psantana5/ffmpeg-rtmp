@@ -62,7 +62,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -123,7 +124,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -186,7 +188,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -263,7 +266,8 @@
             ]
           },
           "unit": "dtdurations",
-          "decimals": 2
+          "decimals": 2,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -338,7 +342,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -412,7 +417,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },

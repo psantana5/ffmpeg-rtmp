@@ -63,7 +63,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 6
+          "decimals": 6,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -126,7 +127,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 6
+          "decimals": 6,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -202,7 +204,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 6
+          "decimals": 6,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -282,7 +285,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 10
+          "decimals": 10,
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -358,7 +362,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 6
+          "decimals": 6,
+          "noValue": "0"
         },
         "overrides": []
       },

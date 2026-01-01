@@ -73,7 +73,8 @@
             ]
           },
           "unit": "none",
-          "decimals": 2
+          "decimals": 2,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -149,7 +150,8 @@
             ]
           },
           "unit": "none",
-          "decimals": 2
+          "decimals": 2,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -225,7 +227,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 4
+          "decimals": 4,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -301,7 +304,8 @@
             ]
           },
           "unit": "short",
-          "decimals": 4
+          "decimals": 4,
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -384,7 +388,8 @@
               }
             ]
           },
-          "unit": "percentunit"
+          "unit": "percentunit",
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -469,7 +474,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No data"
         },
         "overrides": []
       },

@@ -160,7 +160,8 @@
             ]
           },
           "unit": "percent",
-          "decimals": 2
+          "decimals": 2,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -378,7 +379,8 @@
             ]
           },
           "unit": "celsius",
-          "decimals": 1
+          "decimals": 1,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -455,7 +457,8 @@
             ]
           },
           "unit": "watt",
-          "decimals": 2
+          "decimals": 2,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -578,10 +581,12 @@
             {
               "options": {
                 "0": {
-                  "text": "No GPU"
+                  "text": "No GPU",
+                  "color": "dark-red"
                 },
                 "1": {
-                  "text": "Has GPU"
+                  "text": "GPU Available",
+                  "color": "dark-green"
                 }
               },
               "type": "value"
@@ -600,7 +605,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No GPU"
         }
       },
       "gridPos": {
