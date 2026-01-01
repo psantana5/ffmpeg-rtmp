@@ -53,6 +53,7 @@ func (h *MasterHandler) SetMetricsRecorder(recorder MetricsRecorder) {
 func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/nodes/register", h.RegisterNode).Methods("POST")
 	r.HandleFunc("/nodes/{id}", h.GetNodeDetails).Methods("GET")
+	r.HandleFunc("/nodes/{id}", h.RemoveNode).Methods("DELETE")
 	r.HandleFunc("/nodes", h.ListNodes).Methods("GET")
 	r.HandleFunc("/nodes/{id}/heartbeat", h.NodeHeartbeat).Methods("POST")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
@@ -63,6 +64,8 @@ func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/jobs/{id}/pause", h.PauseJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/resume", h.ResumeJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/cancel", h.CancelJob).Methods("POST")
+	r.HandleFunc("/jobs/{id}/retry", h.RetryJob).Methods("POST")
+	r.HandleFunc("/jobs/{id}/logs", h.GetJobLogs).Methods("GET")
 	r.HandleFunc("/results", h.ReceiveResults).Methods("POST")
 	r.HandleFunc("/health", h.Health).Methods("GET")
 }
@@ -499,6 +502,125 @@ func (h *MasterHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "canceled",
 		"job_id": jobID,
+	})
+}
+
+// RetryJob retries a failed job
+func (h *MasterHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	// Get the job to verify it exists and can be retried
+	job, err := h.store.GetJob(jobID)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Only allow retry for failed or canceled jobs
+	if job.Status != "failed" && job.Status != "canceled" {
+		http.Error(w, "Only failed or canceled jobs can be retried", http.StatusBadRequest)
+		return
+	}
+
+	// Reset job to pending state
+	job.Status = "pending"
+	job.RetryCount++
+	job.NodeID = ""
+	job.StartedAt = nil
+	job.CompletedAt = nil
+	job.Error = ""
+
+	if err := h.store.UpdateJob(job); err != nil {
+		log.Printf("Error retrying job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retry job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Job %s queued for retry (attempt %d)", jobID, job.RetryCount)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "queued",
+		"job_id":      jobID,
+		"retry_count": job.RetryCount,
+	})
+}
+
+// GetJobLogs retrieves logs for a specific job
+func (h *MasterHandler) GetJobLogs(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["id"]
+
+	// Get the job to verify it exists
+	job, err := h.store.GetJob(jobID)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve job: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// For now, return the error field as logs (can be extended to read from log files)
+	logs := job.Error
+	if logs == "" {
+		logs = "No logs available for this job"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"job_id": jobID,
+		"logs":   logs,
+	})
+}
+
+// RemoveNode removes a node from the cluster
+func (h *MasterHandler) RemoveNode(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	nodeID := vars["id"]
+
+	// Get the node to check if it exists
+	node, err := h.store.GetNode(nodeID)
+	if err != nil {
+		if err == store.ErrNodeNotFound {
+			http.Error(w, "Node not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving node: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve node: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if node is currently processing a job
+	if node.Status == "busy" {
+		http.Error(w, "Cannot remove node while it is processing a job", http.StatusBadRequest)
+		return
+	}
+
+	// Remove the node
+	if err := h.store.DeleteNode(nodeID); err != nil {
+		log.Printf("Error removing node: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to remove node: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Node %s (%s) removed from cluster", nodeID, node.Name)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "removed",
+		"node_id": nodeID,
 	})
 }
 

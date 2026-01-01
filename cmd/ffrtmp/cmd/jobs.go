@@ -78,6 +78,24 @@ var jobsResumeCmd = &cobra.Command{
 	RunE:  runJobsResume,
 }
 
+// jobsLogsCmd represents the jobs logs command
+var jobsLogsCmd = &cobra.Command{
+	Use:   "logs <job-id>",
+	Short: "Get logs for a job",
+	Long:  `Retrieve execution logs for a specific job.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runJobsLogs,
+}
+
+// jobsRetryCmd represents the jobs retry command
+var jobsRetryCmd = &cobra.Command{
+	Use:   "retry <job-id>",
+	Short: "Retry a failed job",
+	Long:  `Retry a previously failed job with the same parameters.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runJobsRetry,
+}
+
 func init() {
 	rootCmd.AddCommand(jobsCmd)
 	jobsCmd.AddCommand(jobsSubmitCmd)
@@ -85,6 +103,8 @@ func init() {
 	jobsCmd.AddCommand(jobsCancelCmd)
 	jobsCmd.AddCommand(jobsPauseCmd)
 	jobsCmd.AddCommand(jobsResumeCmd)
+	jobsCmd.AddCommand(jobsLogsCmd)
+	jobsCmd.AddCommand(jobsRetryCmd)
 
 	// Flags for job submit
 	jobsSubmitCmd.Flags().StringVar(&scenario, "scenario", "", "scenario name (required, e.g., 4K60-h264)")
@@ -471,4 +491,56 @@ func controlJob(jobID, action string) error {
 
 	fmt.Printf("✓ Job %s %sed successfully\n", jobID, action)
 	return nil
+}
+
+func runJobsLogs(cmd *cobra.Command, args []string) error {
+	jobID := args[0]
+	url := fmt.Sprintf("%s/jobs/%s/logs", GetMasterURL(), jobID)
+
+	// Create authenticated GET request
+	httpReq, err := CreateAuthenticatedRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to connect to master API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	type logsResponse struct {
+		JobID string `json:"job_id"`
+		Logs  string `json:"logs"`
+	}
+
+	var result logsResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if IsJSONOutput() {
+		output, _ := json.MarshalIndent(result, "", "  ")
+		fmt.Println(string(output))
+	} else {
+		fmt.Printf("=== Logs for Job %s ===\n\n", jobID)
+		fmt.Println(result.Logs)
+	}
+
+	return nil
+}
+
+func runJobsRetry(cmd *cobra.Command, args []string) error {
+	jobID := args[0]
+	return controlJob(jobID, "retry")
 }

@@ -35,10 +35,20 @@ var nodesDescribeCmd = &cobra.Command{
 	RunE:  runNodesDescribe,
 }
 
+// nodesRemoveCmd represents the nodes remove command
+var nodesRemoveCmd = &cobra.Command{
+	Use:   "remove <node-id>",
+	Short: "Remove a node from the cluster",
+	Long:  `Remove a registered node from the cluster. The node must not be running any jobs.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runNodesRemove,
+}
+
 func init() {
 	rootCmd.AddCommand(nodesCmd)
 	nodesCmd.AddCommand(nodesListCmd)
 	nodesCmd.AddCommand(nodesDescribeCmd)
+	nodesCmd.AddCommand(nodesRemoveCmd)
 }
 
 type nodesListResponse struct {
@@ -246,5 +256,35 @@ func runNodesDescribe(cmd *cobra.Command, args []string) error {
 		table.Render()
 	}
 
+	return nil
+}
+
+func runNodesRemove(cmd *cobra.Command, args []string) error {
+	nodeID := args[0]
+	url := fmt.Sprintf("%s/nodes/%s", GetMasterURL(), nodeID)
+
+	// Create authenticated DELETE request
+	httpReq, err := CreateAuthenticatedRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := GetHTTPClient()
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to connect to master API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("✓ Node %s removed successfully\n", nodeID)
 	return nil
 }

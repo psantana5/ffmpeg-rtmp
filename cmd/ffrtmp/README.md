@@ -115,19 +115,44 @@ Job submitted successfully! Job ID: c5fe10ab-7629-4118-a851-b315228925f5
 
 #### Get Job Status
 
-Retrieve the status of a specific job:
+Retrieve the status of a specific job or list all jobs:
 
 ```bash
-# Table output
+# List all jobs in the cluster
+ffrtmp jobs status
+
+# Get status of a specific job (by ID or sequence number)
 ffrtmp jobs status <job-id>
+ffrtmp jobs status 42
+
+# Follow job status in real-time (polls every 2 seconds)
+ffrtmp jobs status <job-id> --follow
 
 # JSON output for scripting
 ffrtmp jobs status <job-id> --output json
 ```
 
-**Example:**
+**Example - List all jobs:**
 ```bash
-ffrtmp jobs status c5fe10ab-7629-4118-a851-b315228925f5
+ffrtmp jobs status
+```
+
+**Example output:**
+```
+┌───────┬─────────────┬───────────┬──────────┬────────────┬──────────────────┐
+│ Job # │   Scenario  │   Status  │ Progress │    Node    │     Created      │
+├───────┼─────────────┼───────────┼──────────┼────────────┼──────────────────┤
+│     1 │ 4K60-h264   │ completed │    100%  │ worker1    │ 2025-01-01 14:20 │
+│     2 │ 1080p60     │ running   │     45%  │ worker2    │ 2025-01-01 15:30 │
+│     3 │ test-stream │ pending   │      0%  │ -          │ 2025-01-01 16:00 │
+└───────┴─────────────┴───────────┴──────────┴────────────┴──────────────────┘
+
+Total jobs: 3
+```
+
+**Example - Single job:**
+```bash
+ffrtmp jobs status 42
 ```
 
 **Example output:**
@@ -135,17 +160,122 @@ ffrtmp jobs status c5fe10ab-7629-4118-a851-b315228925f5
 ┌─────────────┬──────────────────────────────────────┐
 │    FIELD    │                VALUE                 │
 ├─────────────┼──────────────────────────────────────┤
-│ Job ID      │ c5fe10ab-7629-4118-a851-b315228925f5 │
+│ Job #       │ 42                                   │
 │ Scenario    │ 4K60-h264                            │
 │ Confidence  │ auto                                 │
-│ Status      │ pending                              │
+│ Status      │ running                              │
+│ Progress    │ 45%                                  │
 │ Retry Count │ 0                                    │
-│ Created At  │ 2025-12-30T13:34:41Z                 │
+│ Node        │ worker2                              │
+│ Created At  │ 2025-01-01T15:30:41Z                 │
+│ Started At  │ 2025-01-01T15:31:02Z                 │
 │ Parameters  │ {                                    │
 │             │   "bitrate": "10M",                  │
 │             │   "duration": 120                    │
 │             │ }                                    │
 └─────────────┴──────────────────────────────────────┘
+```
+
+#### Get Job Logs
+
+Retrieve execution logs for a specific job:
+
+```bash
+# Get logs for a job
+ffrtmp jobs logs <job-id>
+
+# JSON output
+ffrtmp jobs logs <job-id> --output json
+```
+
+**Example:**
+```bash
+ffrtmp jobs logs 42
+```
+
+#### Cancel Job
+
+Cancel a pending or running job:
+
+```bash
+ffrtmp jobs cancel <job-id>
+```
+
+**Example:**
+```bash
+ffrtmp jobs cancel 42
+✓ Job 42 canceled successfully
+```
+
+#### Pause/Resume Job
+
+Pause and resume running jobs:
+
+```bash
+# Pause a running job
+ffrtmp jobs pause <job-id>
+
+# Resume a paused job
+ffrtmp jobs resume <job-id>
+```
+
+#### Retry Failed Job
+
+Retry a failed or canceled job with the same parameters:
+
+```bash
+ffrtmp jobs retry <job-id>
+```
+
+**Example:**
+```bash
+ffrtmp jobs retry 42
+✓ Job 42 retried successfully
+```
+
+#### Node Management
+
+List and manage compute nodes:
+
+```bash
+# List all nodes
+ffrtmp nodes list
+
+# Get detailed node information
+ffrtmp nodes describe <node-id>
+
+# Remove a node from the cluster (must not be busy)
+ffrtmp nodes remove <node-id>
+```
+
+**Example - Describe node:**
+```bash
+ffrtmp nodes describe worker1
+```
+
+**Example output:**
+```
+┌──────────────────┬─────────────────────────────────────┐
+│     Property     │                Value                │
+├──────────────────┼─────────────────────────────────────┤
+│ Node ID          │ d8455638-456f-4bf4-9131-b56cc1b7... │
+│ Address          │ worker1.example.com:8081            │
+│ Type             │ server                              │
+│ Status           │ available                           │
+│ CPU              │ Intel Xeon E5-2680 (16 threads)    │
+│ CPU Load         │ 45.2%                               │
+│ GPU              │ NVIDIA RTX 4090                     │
+│ GPU Capabilities │ NVENC                               │
+│ Total RAM        │ 64.00 GB                            │
+│ Free RAM         │ 32.50 GB                            │
+│ Active Job       │ None                                │
+└──────────────────┴─────────────────────────────────────┘
+```
+
+**Example - Remove node:**
+```bash
+ffrtmp nodes remove worker1
+✓ Node worker1 removed successfully
 ```
 
 ## Examples

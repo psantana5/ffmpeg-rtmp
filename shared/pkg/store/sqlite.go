@@ -357,6 +357,27 @@ func (s *SQLiteStore) UpdateNodeHeartbeat(id string) error {
 	return nil
 }
 
+// DeleteNode removes a node from the store
+func (s *SQLiteStore) DeleteNode(id string) error {
+	result, err := s.db.Exec(`
+		DELETE FROM nodes WHERE id = ?
+	`, id)
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNodeNotFound
+	}
+
+	return nil
+}
+
 // CreateJob adds a new job to the store
 func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	params, err := json.Marshal(job.Parameters)
@@ -821,6 +842,28 @@ func (s *SQLiteStore) UpdateJobActivity(id string) error {
 	return nil
 }
 
+// UpdateJob updates a job's complete state
+func (s *SQLiteStore) UpdateJob(job *models.Job) error {
+	params, err := json.Marshal(job.Parameters)
+	if err != nil {
+		return fmt.Errorf("failed to marshal parameters: %w", err)
+	}
+
+	_, err = s.db.Exec(`
+		UPDATE jobs 
+		SET status = ?, retry_count = ?, node_id = ?, started_at = ?, 
+		    completed_at = ?, error = ?, parameters = ?
+		WHERE id = ?
+	`, job.Status, job.RetryCount, job.NodeID, job.StartedAt,
+		job.CompletedAt, job.Error, string(params), job.ID)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AddStateTransition adds a state transition to a job's history
 func (s *SQLiteStore) AddStateTransition(id string, from, to models.JobStatus, reason string) error {
 	// Get current job
@@ -1018,6 +1061,7 @@ type Store interface {
 	GetAllNodes() []*models.Node
 	UpdateNodeStatus(id, status string) error
 	UpdateNodeHeartbeat(id string) error
+	DeleteNode(id string) error
 	CreateJob(job *models.Job) error
 	GetJob(id string) (*models.Job, error)
 	GetJobBySequenceNumber(seqNum int) (*models.Job, error)
@@ -1026,6 +1070,7 @@ type Store interface {
 	UpdateJobStatus(id string, status models.JobStatus, errorMsg string) error
 	UpdateJobProgress(id string, progress int) error
 	UpdateJobActivity(id string) error
+	UpdateJob(job *models.Job) error
 	AddStateTransition(id string, from, to models.JobStatus, reason string) error
 	PauseJob(id string) error
 	ResumeJob(id string) error

@@ -111,6 +111,19 @@ func (s *MemoryStore) UpdateNodeHeartbeat(id string) error {
 	return nil
 }
 
+// DeleteNode removes a node from the store
+func (s *MemoryStore) DeleteNode(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.nodes[id]; !ok {
+		return ErrNodeNotFound
+	}
+
+	delete(s.nodes, id)
+	return nil
+}
+
 // Job operations
 
 // CreateJob adds a new job to the store and queue
@@ -275,6 +288,19 @@ func (s *MemoryStore) UpdateJobActivity(id string) error {
 
 	now := time.Now()
 	job.LastActivityAt = &now
+	return nil
+}
+
+// UpdateJob updates a job's complete state
+func (s *MemoryStore) UpdateJob(job *models.Job) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.jobs[job.ID]; !ok {
+		return ErrJobNotFound
+	}
+
+	s.jobs[job.ID] = job
 	return nil
 }
 
