@@ -101,14 +101,14 @@ func (s *SQLiteStore) initSchema() error {
 
 	// Migrate existing databases: add last_activity_at column if it doesn't exist
 	// Check if the column exists
-	var columnExists bool
+	var columnExists int
 	row := s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='last_activity_at'")
 	if err := row.Scan(&columnExists); err != nil {
 		return fmt.Errorf("failed to check column existence: %w", err)
 	}
 
 	// Add column if it doesn't exist
-	if !columnExists {
+	if columnExists == 0 {
 		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN last_activity_at DATETIME")
 		if err != nil {
 			return fmt.Errorf("failed to add last_activity_at column: %w", err)
