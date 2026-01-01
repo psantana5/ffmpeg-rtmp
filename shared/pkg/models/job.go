@@ -33,6 +33,7 @@ type Job struct {
 	NodeID           string                 `json:"node_id,omitempty"`
 	CreatedAt        time.Time              `json:"created_at"`
 	StartedAt        *time.Time             `json:"started_at,omitempty"`
+	LastActivityAt   *time.Time             `json:"last_activity_at,omitempty"` // Tracks last heartbeat/progress update
 	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
 	RetryCount       int                    `json:"retry_count"`
 	Error            string                 `json:"error,omitempty"`
