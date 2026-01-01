@@ -96,6 +96,14 @@ cpu_exporter
 gpu_exporter
 ffmpeg_exporter
 
+# Rust build artifacts
+ml_rust/target/
+ml_rust/Cargo.lock
+
+# ML models (keep directory, ignore generated models except version metadata)
+ml_models/*.json
+!ml_models/.gitkeep
+
 master.*db*
 # Distributed compute binaries
 bin/*
