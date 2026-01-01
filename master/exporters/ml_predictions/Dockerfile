@@ -1,5 +1,5 @@
 # Build stage for Rust ML library
-FROM rust:1.75-alpine AS rust-builder
+FROM rust:1.83-alpine AS rust-builder
 
 RUN apk --no-cache add musl-dev
 
@@ -8,9 +8,10 @@ WORKDIR /build
 # Copy Rust library source
 COPY ml_rust/ ./ml_rust/
 
-# Build Rust library
+# Build Rust library with musl target
 RUN cd ml_rust && \
-    cargo build --release
+    rustup target add x86_64-unknown-linux-musl && \
+    cargo build --release --target x86_64-unknown-linux-musl
 
 # Build stage for Go exporter
 FROM golang:1.24-alpine AS go-builder
@@ -26,9 +27,8 @@ COPY shared/pkg/go.mod shared/pkg/go.sum* ./shared/pkg/
 # Download dependencies
 RUN go mod download
 
-# Copy Rust library from previous stage
-COPY --from=rust-builder /build/ml_rust/target/release/libffmpeg_ml.a /usr/local/lib/
-COPY --from=rust-builder /build/ml_rust/target/release/libffmpeg_ml.so /usr/local/lib/
+# Copy Rust library from previous stage (use static library for musl)
+COPY --from=rust-builder /build/ml_rust/target/x86_64-unknown-linux-musl/release/libffmpeg_ml.a /usr/local/lib/
 
 # Copy source code
 COPY master/exporters/ml_predictions/ ./master/exporters/ml_predictions/
@@ -50,12 +50,6 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=go-builder /build/master/exporters/ml_predictions/ml_exporter .
-
-# Copy Rust shared library
-COPY --from=rust-builder /build/ml_rust/target/release/libffmpeg_ml.so /usr/local/lib/
-
-# Set library path
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 EXPOSE 9505
 
