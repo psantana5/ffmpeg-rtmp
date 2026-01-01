@@ -102,6 +102,7 @@ ml_rust/Cargo.lock
 
 # ML models (keep directory, ignore generated models except version metadata)
 ml_models/*.json
+ml_models/*.csv
 !ml_models/.gitkeep
 
 master.*db*
