@@ -1,0 +1,25 @@
+# ffrtmp CLI Configuration File Example
+#
+# This file should be placed at: ~/.ffrtmp/config.yaml
+#
+# The CLI will automatically load this configuration file on startup.
+# You can override these settings using command-line flags or environment variables.
+
+# Master server URL (HTTPS recommended for production)
+# Environment variable: MASTER_URL
+master_url: https://localhost:8080
+
+# API Key for authentication
+# Environment variable: MASTER_API_KEY
+# Obtain this from your master server administrator
+api_key: your-api-key-here
+
+# Alternative key names (for backward compatibility):
+# - master: (alias for master_url)
+# - token: (alias for api_key)
+
+# Notes:
+# - Use HTTPS for production deployments
+# - For local development with self-signed certificates, HTTPS to localhost is supported
+# - The CLI automatically skips TLS verification for localhost/127.0.0.1
+# - For remote hosts, proper TLS certificates are required

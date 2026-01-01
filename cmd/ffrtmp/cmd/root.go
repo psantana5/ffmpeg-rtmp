@@ -74,11 +74,21 @@ func initConfig() {
 	// If a config file is found, read it in
 	if err := viper.ReadInConfig(); err == nil {
 		// Config file found and successfully parsed
-		if viper.GetString("master_url") != "" && masterURL == "" {
-			masterURL = viper.GetString("master_url")
+		// Support both master_url and master keys
+		if masterURL == "" {
+			if viper.GetString("master_url") != "" {
+				masterURL = viper.GetString("master_url")
+			} else if viper.GetString("master") != "" {
+				masterURL = viper.GetString("master")
+			}
 		}
-		if viper.GetString("api_key") != "" && apiKey == "" {
-			apiKey = viper.GetString("api_key")
+		// Support both api_key and token keys
+		if apiKey == "" {
+			if viper.GetString("api_key") != "" {
+				apiKey = viper.GetString("api_key")
+			} else if viper.GetString("token") != "" {
+				apiKey = viper.GetString("token")
+			}
 		}
 	}
 	
