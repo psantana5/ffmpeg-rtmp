@@ -21,23 +21,33 @@ go install ./cmd/ffrtmp
 The CLI reads configuration from `~/.ffrtmp/config.yaml`:
 
 ```yaml
-master_url: http://localhost:8080
+master_url: https://localhost:8080
 api_key: your-api-key-here
 ```
 
-Configuration options:
-- `master_url` - The URL of the master server (default: http://localhost:8080)
-- `api_key` - API key for authentication (required if master has authentication enabled)
+### Configuration Options
 
-You can also specify the master URL using the `--master` flag, which takes precedence over the config file.
+- `master_url` (or `master`) - The URL of the master server (default: https://localhost:8080)
+- `api_key` (or `token`) - API key for authentication (required if master has authentication enabled)
+
+**Note:** The CLI supports both `master_url`/`master` and `api_key`/`token` keys for backward compatibility.
+
+### Configuration Precedence
+
+1. Command-line flags (`--master`, `--config`)
+2. Config file (`~/.ffrtmp/config.yaml` or `~/.ffrtmp/config`)
+3. Environment variables (`MASTER_URL`, `MASTER_API_KEY`)
+4. Default values (https://localhost:8080)
+
+**Security Note:** Use HTTPS for production deployments. For local development with self-signed certificates, the CLI automatically skips TLS verification for localhost/127.0.0.1.
 
 ## Usage
 
 ### Global Flags
 
-- `--master <url>` - Master API URL (default: http://localhost:8080 or from config)
+- `--master <url>` - Master API URL (default: https://localhost:8080 or from config)
 - `--output <format>` - Output format: `table` (default) or `json`
-- `--config <file>` - Config file path (default: ~/.ffrtmp/config.yaml)
+- `--config <file>` - Config file path (default: `~/.ffrtmp/config.yaml` or `~/.ffrtmp/config`)
 
 ### Commands
 
@@ -143,19 +153,26 @@ ffrtmp jobs status c5fe10ab-7629-4118-a851-b315228925f5
 ### Using with different master servers
 
 ```bash
-# Connect to local development server
+# Connect to local development server (with default HTTPS)
+ffrtmp nodes list --master https://localhost:8080
+
+# Or use HTTP if your local setup requires it
 ffrtmp nodes list --master http://localhost:8080
 
 # Connect to production server
 ffrtmp nodes list --master https://master.example.com
 
-# Use config file
+# Use config file (recommended for regular use)
 cat > ~/.ffrtmp/config.yaml << EOF
-master_url: https://master.example.com
+master_url: https://localhost:8080
 api_key: your-secure-api-key
 EOF
-ffrtmp nodes list
+ffrtmp nodes list  # No --master flag needed!
 ```
+
+### Configuration File Example
+
+See [`examples/config.example.yaml`](../../examples/config.example.yaml) for a complete configuration example with comments.
 
 ### Scripting with JSON output
 

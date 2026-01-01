@@ -1,86 +1,382 @@
 {
-  "test_metadata": {
-    "timestamp": "2024-01-15T10:30:00Z",
-    "duration": 300,
-    "platform": "linux",
-    "gpu": "none"
-  },
   "scenarios": [
     {
-      "name": "2 streams @ 2500k",
-      "duration": 120.5,
+      "avg_fps": 29.97,
       "bitrate": "2500k",
-      "encoder_type": "libx264",
-      "resolution": "1920x1080",
-      "vmaf_score": 92.5,
-      "psnr_score": 42.3,
-      "ssim_score": 0.985,
-      "avg_fps": 29.97,
+      "cpu_usage_cores": [
+        2.1,
+        2.3,
+        2.2,
+        2.4,
+        2.3,
+        2.2,
+        2.3,
+        2.4,
+        2.1,
+        2.2
+      ],
       "dropped_frames": 5,
-      "total_frames": 3612,
-      "pixels_processed": 8957952000,
-      "start_time": 1705315800,
+      "duration": 120.5,
+      "encoder_type": "libx264",
       "end_time": 1705315920.5,
-      "power_watts": [45.2, 46.1, 45.8, 47.0, 46.5, 45.9, 46.3, 46.7, 45.5, 46.2],
-      "cpu_usage_cores": [2.1, 2.3, 2.2, 2.4, 2.3, 2.2, 2.3, 2.4, 2.1, 2.2],
-      "step_seconds": 5.0
-    },
-    {
-      "name": "4 streams @ 5000k",
-      "duration": 180.3,
-      "bitrate": "5000k",
-      "encoder_type": "libx264",
+      "name": "2 streams @ 2500k",
+      "pixels_processed": 8957952000,
+      "power_watts": [
+        45.2,
+        46.1,
+        45.8,
+        47,
+        46.5,
+        45.9,
+        46.3,
+        46.7,
+        45.5,
+        46.2
+      ],
+      "psnr_score": 42.3,
       "resolution": "1920x1080",
-      "vmaf_score": 95.2,
-      "psnr_score": 44.1,
-      "ssim_score": 0.992,
+      "ssim_score": 0.985,
+      "start_time": 1705315800,
+      "step_seconds": 5,
+      "total_frames": 3612,
+      "vmaf_score": 92.5
+    },
+    {
       "avg_fps": 29.97,
+      "bitrate": "5000k",
+      "cpu_usage_cores": [
+        4.5,
+        4.8,
+        4.7,
+        5,
+        4.8,
+        4.6,
+        4.9,
+        5.1,
+        4.6,
+        4.7,
+        4.8,
+        4.9
+      ],
       "dropped_frames": 12,
-      "total_frames": 5412,
-      "pixels_processed": 13436928000,
-      "start_time": 1705316100,
-      "end_time": 1705316280.3,
-      "power_watts": [68.5, 70.2, 69.8, 71.3, 70.0, 69.5, 70.8, 71.2, 68.9, 70.1, 69.7, 70.5],
-      "cpu_usage_cores": [4.5, 4.8, 4.7, 5.0, 4.8, 4.6, 4.9, 5.1, 4.6, 4.7, 4.8, 4.9],
-      "step_seconds": 5.0
-    },
-    {
-      "name": "single stream @ 1500k",
-      "duration": 90.2,
-      "bitrate": "1500k",
+      "duration": 180.3,
       "encoder_type": "libx264",
-      "resolution": "1280x720",
-      "vmaf_score": 88.3,
-      "psnr_score": 39.8,
-      "ssim_score": 0.975,
-      "avg_fps": 29.97,
-      "dropped_frames": 2,
-      "total_frames": 2704,
-      "pixels_processed": 2508185600,
-      "start_time": 1705316500,
-      "end_time": 1705316590.2,
-      "power_watts": [32.1, 33.5, 32.8, 33.2, 32.9, 33.0, 32.7, 33.3],
-      "cpu_usage_cores": [1.2, 1.4, 1.3, 1.4, 1.3, 1.3, 1.2, 1.4],
-      "step_seconds": 5.0
+      "end_time": 1705316280.3,
+      "name": "4 streams @ 5000k",
+      "pixels_processed": 13436928000,
+      "power_watts": [
+        68.5,
+        70.2,
+        69.8,
+        71.3,
+        70,
+        69.5,
+        70.8,
+        71.2,
+        68.9,
+        70.1,
+        69.7,
+        70.5
+      ],
+      "psnr_score": 44.1,
+      "resolution": "1920x1080",
+      "ssim_score": 0.992,
+      "start_time": 1705316100,
+      "step_seconds": 5,
+      "total_frames": 5412,
+      "vmaf_score": 95.2
     },
     {
-      "name": "baseline idle",
-      "duration": 60.0,
-      "bitrate": "0k",
-      "encoder_type": "none",
-      "resolution": "0x0",
-      "vmaf_score": 0,
-      "psnr_score": 0,
-      "ssim_score": 0,
+      "avg_fps": 29.97,
+      "bitrate": "1500k",
+      "cpu_usage_cores": [
+        1.2,
+        1.4,
+        1.3,
+        1.4,
+        1.3,
+        1.3,
+        1.2,
+        1.4
+      ],
+      "dropped_frames": 2,
+      "duration": 90.2,
+      "encoder_type": "libx264",
+      "end_time": 1705316590.2,
+      "name": "single stream @ 1500k",
+      "pixels_processed": 2508185600,
+      "power_watts": [
+        32.1,
+        33.5,
+        32.8,
+        33.2,
+        32.9,
+        33,
+        32.7,
+        33.3
+      ],
+      "psnr_score": 39.8,
+      "resolution": "1280x720",
+      "ssim_score": 0.975,
+      "start_time": 1705316500,
+      "step_seconds": 5,
+      "total_frames": 2704,
+      "vmaf_score": 88.3
+    },
+    {
       "avg_fps": 0,
+      "bitrate": "0k",
+      "cpu_usage_cores": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ],
       "dropped_frames": 0,
-      "total_frames": 0,
-      "pixels_processed": 0,
-      "start_time": 1705316800,
+      "duration": 60,
+      "encoder_type": "none",
       "end_time": 1705316860,
-      "power_watts": [25.3, 25.1, 25.4, 25.2, 25.3, 25.0, 25.2, 25.4, 25.1, 25.3],
-      "cpu_usage_cores": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-      "step_seconds": 5.0
+      "name": "baseline idle",
+      "pixels_processed": 0,
+      "power_watts": [
+        25.3,
+        25.1,
+        25.4,
+        25.2,
+        25.3,
+        25,
+        25.2,
+        25.4,
+        25.1,
+        25.3
+      ],
+      "psnr_score": 0,
+      "resolution": "0x0",
+      "ssim_score": 0,
+      "start_time": 1705316800,
+      "step_seconds": 5,
+      "total_frames": 0,
+      "vmaf_score": 0
+    },
+    {
+      "bitrate": "0k",
+      "duration": 23.432807328,
+      "encoder_type": "auto",
+      "end_time": 1767287069,
+      "name": "test-720p",
+      "start_time": 1767287044
+    },
+    {
+      "bitrate": "0k",
+      "duration": 21.202154906,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767288837,
+      "name": "test1",
+      "start_time": 1767288809
+    },
+    {
+      "bitrate": "0k",
+      "duration": 21.447076931,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767288887,
+      "name": "live-stream",
+      "start_time": 1767288862
+    },
+    {
+      "bitrate": "0k",
+      "duration": 21.997941909,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767288909,
+      "name": "live-stream",
+      "start_time": 1767288863
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.089948007,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292055,
+      "name": "gstreamer-test",
+      "start_time": 1767292036
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.117039335,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292065,
+      "name": "gstreamer-test",
+      "start_time": 1767292038
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.95089381,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292075,
+      "name": "gstreamer-test",
+      "start_time": 1767292038
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.230900571,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767292124,
+      "name": "test-ffmpeg-10s",
+      "start_time": 1767292121
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.007078825,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292135,
+      "name": "test-gstreamer-10s",
+      "start_time": 1767292123
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.784708925,
+      "encoder_type": "auto",
+      "end_time": 1767292143,
+      "name": "test-short-2s",
+      "start_time": 1767292125
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.259699538,
+      "encoder_type": "auto",
+      "end_time": 1767292154,
+      "name": "test-medium-30s",
+      "start_time": 1767292127
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.5136595430000002,
+      "encoder_type": "auto",
+      "end_time": 1767292164,
+      "name": "test-long-60s",
+      "start_time": 1767292129
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.5269178920000002,
+      "encoder_type": "auto",
+      "end_time": 1767292174,
+      "name": "test-lowbitrate",
+      "start_time": 1767292136
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.454511841,
+      "encoder_type": "auto",
+      "end_time": 1767292184,
+      "name": "test-highbitrate",
+      "start_time": 1767292138
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.247008548,
+      "encoder_type": "auto",
+      "end_time": 1767292194,
+      "name": "test-no-duration",
+      "start_time": 1767292138
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.29780386,
+      "encoder_type": "auto",
+      "end_time": 1767292244,
+      "name": "test-zero-duration",
+      "start_time": 1767292142
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.288980717,
+      "encoder_type": "auto",
+      "end_time": 1767292254,
+      "name": "concurrent-3",
+      "start_time": 1767292142
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.216026206,
+      "encoder_type": "auto",
+      "end_time": 1767292264,
+      "name": "concurrent-1",
+      "start_time": 1767292142
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.231954319,
+      "encoder_type": "auto",
+      "end_time": 1767292274,
+      "name": "concurrent-2",
+      "start_time": 1767292142
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.8493607399999998,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292285,
+      "name": "gst-medium-30s",
+      "start_time": 1767292143
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.068917739,
+      "encoder_type": "gstreamer",
+      "end_time": 1767292295,
+      "name": "gst-highbitrate",
+      "start_time": 1767292145
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.357234204,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767292304,
+      "name": "real-test-60s",
+      "start_time": 1767292225
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.232826081,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767292374,
+      "name": "test-fix-30s",
+      "start_time": 1767292370
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.2268990770000001,
+      "encoder_type": "auto",
+      "end_time": 1767292864,
+      "name": "test-fixed",
+      "start_time": 1767292854
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.2142001869999999,
+      "encoder_type": "auto",
+      "end_time": 1767292884,
+      "name": "final-test",
+      "start_time": 1767292874
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.98605263,
+      "encoder_type": "auto",
+      "end_time": 1767293074,
+      "name": "doc-test",
+      "start_time": 1767293067
     }
-  ]
+  ],
+  "test_date": "2026-01-01T19:44:34+01:00",
+  "test_metadata": {
+    "platform": "distributed",
+    "source": "scheduler",
+    "timestamp": "2026-01-01T19:44:34+01:00"
+  }
 }

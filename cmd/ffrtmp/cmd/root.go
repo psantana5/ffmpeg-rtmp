@@ -40,7 +40,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ffrtmp/config)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ffrtmp/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&masterURL, "master", "", "master API URL (default from config or https://localhost:8080)")
 	rootCmd.PersistentFlags().StringVar(&outputFormat, "output", "table", "output format: table or json")
 }
@@ -58,7 +58,8 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".ffrtmp/config" (without extension)
+		// Search config in home directory with name ".ffrtmp/config.yaml" or ".ffrtmp/config"
+		// Viper will try both config.yaml and config (without extension)
 		configDir := filepath.Join(home, ".ffrtmp")
 		viper.AddConfigPath(configDir)
 		viper.SetConfigName("config")

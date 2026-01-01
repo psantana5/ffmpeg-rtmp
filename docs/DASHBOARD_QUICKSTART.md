@@ -294,12 +294,17 @@ ffrtmp jobs cancel <job-id>
 **Master URL configuration:**
 ```bash
 # Option 1: Command-line flag
-ffrtmp jobs submit --scenario test --master http://localhost:8080
+ffrtmp jobs submit --scenario test --master https://localhost:8080
 
-# Option 2: Config file ~/.ffrtmp/config.yaml
-master_url: http://localhost:8080
+# Option 2: Config file ~/.ffrtmp/config.yaml (recommended)
+cat > ~/.ffrtmp/config.yaml << EOF
+master_url: https://localhost:8080
 api_key: your-api-key-here
+EOF
+ffrtmp jobs submit --scenario test  # No --master flag needed!
 ```
+
+**Note:** Use HTTPS for production. The CLI supports self-signed certificates for localhost.
 
 ## Documentation
 
