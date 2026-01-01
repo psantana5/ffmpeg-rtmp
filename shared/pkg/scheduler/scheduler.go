@@ -129,7 +129,8 @@ func (s *Scheduler) checkStaleJobs() {
 					}
 				}
 			} else if job.StartedAt != nil {
-				// Fallback: if LastActivityAt is not set, use StartedAt
+				// Defensive fallback: if LastActivityAt is not set (shouldn't happen for new jobs),
+				// use StartedAt as the activity reference point
 				timeSinceStart := now.Sub(*job.StartedAt)
 				if timeSinceStart > liveStaleThreshold {
 					log.Printf("Scheduler: Live job %s is stale (no activity since start for %v), marking as failed", 
