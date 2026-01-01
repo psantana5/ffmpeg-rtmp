@@ -49,6 +49,18 @@ func (h *MasterHandler) SetMetricsRecorder(recorder MetricsRecorder) {
 	h.metricsRecorder = recorder
 }
 
+// getJobByIDOrSequence retrieves a job by ID (UUID) or sequence number
+func (h *MasterHandler) getJobByIDOrSequence(idOrSeq string) (*models.Job, error) {
+	// Try to parse as sequence number first
+	var seqNum int
+	if _, parseErr := fmt.Sscanf(idOrSeq, "%d", &seqNum); parseErr == nil && seqNum > 0 {
+		// It's a number, try sequence number lookup
+		return h.store.GetJobBySequenceNumber(seqNum)
+	}
+	// Try UUID lookup
+	return h.store.GetJob(idOrSeq)
+}
+
 // RegisterRoutes registers all API routes
 func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/nodes/register", h.RegisterNode).Methods("POST")
@@ -257,18 +269,7 @@ func (h *MasterHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
-	var job *models.Job
-	var err error
-
-	// Try to parse as sequence number first
-	var seqNum int
-	if _, parseErr := fmt.Sscanf(jobID, "%d", &seqNum); parseErr == nil && seqNum > 0 {
-		// It's a number, try sequence number lookup
-		job, err = h.store.GetJobBySequenceNumber(seqNum)
-	} else {
-		// Try UUID lookup
-		job, err = h.store.GetJob(jobID)
-	}
+	job, err := h.getJobByIDOrSequence(jobID)
 
 	if err != nil {
 		if err == store.ErrJobNotFound {
@@ -444,7 +445,20 @@ func (h *MasterHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 // PauseJob pauses a running job
 func (h *MasterHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	jobID := vars["id"]
+	jobIDOrSeq := vars["id"]
+
+	// Resolve to actual job ID
+	job, err := h.getJobByIDOrSequence(jobIDOrSeq)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve job: %v", err), http.StatusInternalServerError)
+		return
+	}
+	jobID := job.ID
 
 	if err := h.store.PauseJob(jobID); err != nil {
 		if err == store.ErrJobNotFound {
@@ -469,7 +483,20 @@ func (h *MasterHandler) PauseJob(w http.ResponseWriter, r *http.Request) {
 // ResumeJob resumes a paused job
 func (h *MasterHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	jobID := vars["id"]
+	jobIDOrSeq := vars["id"]
+
+	// Resolve to actual job ID
+	job, err := h.getJobByIDOrSequence(jobIDOrSeq)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve job: %v", err), http.StatusInternalServerError)
+		return
+	}
+	jobID := job.ID
 
 	if err := h.store.ResumeJob(jobID); err != nil {
 		if err == store.ErrJobNotFound {
@@ -494,7 +521,20 @@ func (h *MasterHandler) ResumeJob(w http.ResponseWriter, r *http.Request) {
 // CancelJob cancels a job
 func (h *MasterHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	jobID := vars["id"]
+	jobIDOrSeq := vars["id"]
+
+	// Resolve to actual job ID
+	job, err := h.getJobByIDOrSequence(jobIDOrSeq)
+	if err != nil {
+		if err == store.ErrJobNotFound {
+			http.Error(w, "Job not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving job: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to retrieve job: %v", err), http.StatusInternalServerError)
+		return
+	}
+	jobID := job.ID
 
 	if err := h.store.CancelJob(jobID); err != nil {
 		if err == store.ErrJobNotFound {
@@ -519,10 +559,10 @@ func (h *MasterHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 // RetryJob retries a failed job
 func (h *MasterHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	jobID := vars["id"]
+	jobIDOrSeq := vars["id"]
 
 	// Get the job to verify it exists and can be retried
-	job, err := h.store.GetJob(jobID)
+	job, err := h.getJobByIDOrSequence(jobIDOrSeq)
 	if err != nil {
 		if err == store.ErrJobNotFound {
 			http.Error(w, "Job not found", http.StatusNotFound)
@@ -553,13 +593,13 @@ func (h *MasterHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Job %s queued for retry (attempt %d)", jobID, job.RetryCount)
+	log.Printf("Job %s queued for retry (attempt %d)", job.ID, job.RetryCount)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":      "queued",
-		"job_id":      jobID,
+		"job_id":      job.ID,
 		"retry_count": job.RetryCount,
 	})
 }
@@ -567,10 +607,10 @@ func (h *MasterHandler) RetryJob(w http.ResponseWriter, r *http.Request) {
 // GetJobLogs retrieves logs for a specific job
 func (h *MasterHandler) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	jobID := vars["id"]
+	jobIDOrSeq := vars["id"]
 
 	// Get the job to verify it exists
-	job, err := h.store.GetJob(jobID)
+	job, err := h.getJobByIDOrSequence(jobIDOrSeq)
 	if err != nil {
 		if err == store.ErrJobNotFound {
 			http.Error(w, "Job not found", http.StatusNotFound)
@@ -593,7 +633,7 @@ func (h *MasterHandler) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"job_id": jobID,
+		"job_id": job.ID,
 		"logs":   logs,
 	})
 }
