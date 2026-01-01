@@ -1,63 +1,84 @@
-# Master Exporters - Manual Deployment Guide
+# Master Exporters - Deployment Guide
 
-This guide explains how to deploy and run master node exporters **without Docker**, for production environments where you want direct control over the services.
+This guide explains how to deploy and run master node exporters. All exporters are implemented in **Go** for high performance and reliability.
 
 ## Overview
 
-Master exporters collect and expose metrics about test results, quality of experience (QoE), and cost analysis. These exporters are:
+Master exporters collect and expose metrics about test results, quality of experience (QoE), and cost analysis:
 
 1. **Results Exporter** (Port 9502) - Exposes test result metrics
-2. **QoE Exporter** (Port 9503) - Exposes quality metrics (VMAF, PSNR)
+2. **QoE Exporter** (Port 9503) - Exposes quality metrics (VMAF, PSNR, SSIM)
 3. **Cost Exporter** (Port 9504) - Exposes cost analysis metrics
 4. **Health Checker** (Port 9600) - Monitors health of all exporters
 
-## Quick Start
+## Quick Start with Docker
 
-### Prerequisites
-
-- Python 3.10 or later
-- pip (Python package manager)
-- Linux system with systemd (for service management)
-
-### Install Python Dependencies
+The easiest way to run all exporters is using Docker Compose:
 
 ```bash
 cd /path/to/ffmpeg-rtmp
-pip install -r requirements.txt
+mkdir -p test_results
+docker compose up -d
 ```
 
-Required packages:
-- `requests>=2.31.0`
-- `scikit-learn>=1.3.0`
+This will start all exporters with their default configurations.
+
+## Verify Exporters
+
+Check that all exporters are running and healthy:
+
+```bash
+# Check container status
+docker compose ps
+
+# Test individual exporters
+curl http://localhost:9502/health  # results-exporter
+curl http://localhost:9503/health  # qoe-exporter
+curl http://localhost:9504/health  # cost-exporter
+curl http://localhost:9600/health  # exporter-health-checker
+
+# View metrics
+curl http://localhost:9502/metrics
+curl http://localhost:9503/metrics
+curl http://localhost:9504/metrics
+curl http://localhost:9600/metrics
+```
+
+## Manual Deployment (Without Docker)
+
+### Prerequisites
+
+- Go 1.21 or later
+- Linux system (for systemd service management)
+
+### Build Exporters
+
+```bash
+cd /path/to/ffmpeg-rtmp
+
+# Build all exporters
+go build -o bin/results_exporter ./master/exporters/results_go/
+go build -o bin/qoe_exporter ./master/exporters/qoe_go/
+go build -o bin/cost_exporter ./master/exporters/cost_go/
+go build -o bin/health_checker ./master/exporters/health_checker_go/
+```
 
 ### Run Exporters Manually
 
 ```bash
 # Results Exporter
-python3 master/exporters/results/results_exporter.py \
-    --port 9502 \
-    --results-dir ./test_results \
-    --prometheus-url http://localhost:8428
+RESULTS_EXPORTER_PORT=9502 RESULTS_DIR=./test_results ./bin/results_exporter &
 
 # QoE Exporter
-python3 master/exporters/qoe/qoe_exporter.py \
-    --port 9503 \
-    --results-dir ./test_results
+QOE_EXPORTER_PORT=9503 RESULTS_DIR=./test_results ./bin/qoe_exporter &
 
 # Cost Exporter
-python3 master/exporters/cost/cost_exporter.py \
-    --port 9504 \
-    --results-dir ./test_results \
-    --energy-cost 0.12 \
-    --cpu-cost 0.50 \
-    --currency USD \
-    --region us-east-1 \
-    --pricing-config ./pricing_config.json \
-    --prometheus-url http://localhost:8428
+COST_EXPORTER_PORT=9504 RESULTS_DIR=./test_results \
+ENERGY_COST=0.0 CPU_COST=0.50 CURRENCY=USD REGION=us-east-1 \
+./bin/cost_exporter &
 
 # Health Checker
-python3 master/exporters/health_checker/check_exporters_health.py \
-    --port 9600
+HEALTH_CHECK_PORT=9600 ./bin/health_checker &
 ```
 
 ---
@@ -70,75 +91,63 @@ python3 master/exporters/health_checker/check_exporters_health.py \
 
 **Port**: 9502 (default)
 
-**Command-line Options**:
-- `--port`: HTTP server port (default: 9502)
-- `--results-dir`: Directory containing test result JSON files (default: ./test_results)
-- `--prometheus-url`: VictoriaMetrics/Prometheus URL for querying metrics (optional)
-
 **Environment Variables**:
-- `RESULTS_EXPORTER_PORT`: Alternative way to set port
-- `RESULTS_DIR`: Alternative way to set results directory
-- `PROMETHEUS_URL`: Alternative way to set Prometheus URL
+- `RESULTS_EXPORTER_PORT`: HTTP server port (default: 9502)
+- `RESULTS_DIR`: Directory containing test result JSON files (default: /results)
 
-**Example**:
-```bash
-export RESULTS_EXPORTER_PORT=9502
-export RESULTS_DIR=/var/lib/ffmpeg-rtmp/results
-export PROMETHEUS_URL=http://victoriametrics:8428
-
-python3 master/exporters/results/results_exporter.py
-```
-
-**Dependencies**: 
-- Shared `advisor` module (located in `shared/advisor/`)
-- `scikit-learn` for ML predictions (optional)
+**Metrics Exposed**:
+- `results_scenarios_total`: Number of scenarios loaded
+- `results_scenario_duration_seconds`: Scenario duration
+- `results_scenario_avg_fps`: Average FPS
+- `results_scenario_dropped_frames`: Dropped frames count
+- `results_scenario_total_frames`: Total frames processed
+- `results_scenario_vmaf_score`: VMAF quality score
+- `results_scenario_psnr_score`: PSNR quality score
 
 **Health Check**:
 ```bash
 curl http://localhost:9502/health
-# Expected: {"status": "healthy"}
+# Expected: {"status": "ok"}
 ```
 
-**Metrics Endpoint**:
+**Example Usage**:
 ```bash
-curl http://localhost:9502/metrics
+export RESULTS_EXPORTER_PORT=9502
+export RESULTS_DIR=/var/lib/ffmpeg-rtmp/results
+./bin/results_exporter
 ```
 
 ---
 
 ### 2. QoE Exporter
 
-**Purpose**: Exposes Quality of Experience metrics including VMAF, PSNR, and efficiency scores.
+**Purpose**: Exposes Quality of Experience metrics including VMAF, PSNR, SSIM and efficiency scores.
 
 **Port**: 9503 (default)
 
-**Command-line Options**:
-- `--port`: HTTP server port (default: 9503)
-- `--results-dir`: Directory containing test result JSON files (default: ./test_results)
-
 **Environment Variables**:
-- `QOE_EXPORTER_PORT`: Alternative way to set port
-- `RESULTS_DIR`: Alternative way to set results directory
-
-**Example**:
-```bash
-python3 master/exporters/qoe/qoe_exporter.py \
-    --port 9503 \
-    --results-dir /var/lib/ffmpeg-rtmp/results
-```
-
-**Dependencies**:
-- Shared `advisor` module for efficiency scoring
+- `QOE_EXPORTER_PORT`: HTTP server port (default: 9503)
+- `RESULTS_DIR`: Directory containing test result JSON files (default: /results)
 
 **Metrics Exposed**:
 - `qoe_vmaf_score`: VMAF quality score (0-100)
 - `qoe_psnr_score`: PSNR quality score (dB)
-- `qoe_quality_per_watt`: Quality efficiency metric
-- `qoe_efficiency_score`: QoE efficiency score
+- `qoe_ssim_score`: SSIM quality score (0-1)
+- `qoe_quality_per_watt`: Quality efficiency metric (quality/watt)
+- `qoe_efficiency_score`: QoE efficiency score (quality-weighted pixels per joule)
+- `qoe_drop_rate`: Frame drop rate
 
 **Health Check**:
 ```bash
 curl http://localhost:9503/health
+# Expected: {"status": "ok"}
+```
+
+**Example Usage**:
+```bash
+export QOE_EXPORTER_PORT=9503
+export RESULTS_DIR=/var/lib/ffmpeg-rtmp/results
+./bin/qoe_exporter
 ```
 
 ---
@@ -149,54 +158,36 @@ curl http://localhost:9503/health
 
 **Port**: 9504 (default)
 
-**Command-line Options**:
-- `--port`: HTTP server port (default: 9504)
-- `--results-dir`: Directory containing test results
-- `--energy-cost`: Cost per kWh (e.g., 0.12 for $0.12/kWh)
-- `--cpu-cost`: CPU cost per hour (e.g., 0.50 for $0.50/hour)
-- `--currency`: Currency code (default: USD)
-- `--region`: Cloud region for pricing (default: us-east-1)
-- `--pricing-config`: Path to pricing configuration JSON
-- `--prometheus-url`: VictoriaMetrics/Prometheus URL for load-aware metrics
-
 **Environment Variables**:
-- `COST_EXPORTER_PORT`: Server port
-- `RESULTS_DIR`: Results directory
-- `ENERGY_COST_PER_KWH`: Energy cost per kWh
-- `CPU_COST_PER_HOUR`: CPU cost per hour
-- `CURRENCY`: Currency code
-- `REGION`: Cloud region
-- `PRICING_CONFIG`: Path to pricing config
-- `ELECTRICITY_MAPS_TOKEN`: Optional token for real-time energy pricing
-- `PROMETHEUS_URL`: Prometheus/VictoriaMetrics URL
-
-**Example**:
-```bash
-python3 master/exporters/cost/cost_exporter.py \
-    --port 9504 \
-    --results-dir /var/lib/ffmpeg-rtmp/results \
-    --energy-cost 0.12 \
-    --cpu-cost 0.50 \
-    --currency USD \
-    --region us-east-1 \
-    --pricing-config /etc/ffmpeg-rtmp/pricing_config.json \
-    --prometheus-url http://localhost:8428
-```
+- `COST_EXPORTER_PORT`: Server port (default: 9504)
+- `RESULTS_DIR`: Results directory (default: /results)
+- `ENERGY_COST`: Energy cost per kWh (e.g., 0.12 for $0.12/kWh, or 0.0 for free energy)
+- `CPU_COST`: CPU cost per hour (e.g., 0.50 for $0.50/hour)
+- `CURRENCY`: Currency code (default: USD)
+- `REGION`: Cloud region (default: us-east-1)
 
 **Metrics Exposed**:
-- `cost_total_load_aware`: Total cost (load-aware)
+- `cost_total_load_aware`: Total cost (load-aware calculation)
 - `cost_energy_load_aware`: Energy cost component
 - `cost_compute_load_aware`: Compute cost component
 - `cost_per_pixel`: Cost efficiency per megapixel
 - `cost_per_watch_hour`: Cost per viewer watch hour
 
-**Dependencies**:
-- Shared `advisor` module for cost calculations
-- Regional pricing configuration
-
 **Health Check**:
 ```bash
 curl http://localhost:9504/health
+# Expected: {"status": "ok"}
+```
+
+**Example Usage**:
+```bash
+export COST_EXPORTER_PORT=9504
+export RESULTS_DIR=/var/lib/ffmpeg-rtmp/results
+export ENERGY_COST=0.12
+export CPU_COST=0.50
+export CURRENCY=USD
+export REGION=us-east-1
+./bin/cost_exporter
 ```
 
 ---
@@ -207,41 +198,48 @@ curl http://localhost:9504/health
 
 **Port**: 9600 (default)
 
-**Command-line Options**:
-- `--port`: HTTP server port (default: 9600)
-- `--interval`: Check interval in seconds (optional, for continuous mode)
-
 **Environment Variables**:
-- `HEALTH_CHECK_PORT`: Server port
+- `HEALTH_CHECK_PORT`: Server port (default: 9600)
 
-**Example**:
-```bash
-# Single check
-python3 master/exporters/health_checker/check_exporters_health.py --port 9600
-
-# Continuous monitoring (every 60 seconds)
-python3 master/exporters/health_checker/check_exporters_health.py --port 9600 --interval 60
-```
+**Monitored Exporters**:
+- nginx-exporter (9728)
+- cpu-exporter-go (9500)
+- docker-stats-exporter (9501)
+- node-exporter (9100)
+- cadvisor (8080)
+- results-exporter (9502)
+- qoe-exporter (9503)
+- cost-exporter (9504)
+- ffmpeg-exporter (9506)
 
 **Metrics Exposed**:
-- `exporter_up{exporter="<name>"}`: Whether exporter is reachable (1=up, 0=down)
-- `exporter_response_time_seconds{exporter="<name>"}`: Response time
+- `exporter_healthy`: Health status (1=healthy, 0=unhealthy)
+- `exporter_response_time_ms`: Response time in milliseconds
+- `exporter_last_check_timestamp`: Last check timestamp
+- `exporter_total`: Total exporters monitored
+- `exporter_healthy_total`: Total healthy exporters
 
 **Health Check**:
 ```bash
 curl http://localhost:9600/health
+# Expected: {"status": "ok"}
+```
+
+**Example Usage**:
+```bash
+export HEALTH_CHECK_PORT=9600
+./bin/health_checker
 ```
 
 ---
 
 ## Production Deployment with Systemd
 
-For production environments, it's recommended to run exporters as systemd services.
+For production environments, run exporters as systemd services.
 
 ### 1. Create Service User
 
 ```bash
-# Create a dedicated user for exporters
 sudo useradd --system --no-create-home --shell /bin/false ffmpeg-exporter
 ```
 
@@ -249,29 +247,18 @@ sudo useradd --system --no-create-home --shell /bin/false ffmpeg-exporter
 
 ```bash
 # Create directories
-sudo mkdir -p /opt/ffmpeg-rtmp/exporters
+sudo mkdir -p /opt/ffmpeg-rtmp/bin
 sudo mkdir -p /var/lib/ffmpeg-rtmp/results
-sudo mkdir -p /etc/ffmpeg-rtmp
+
+# Copy binaries
+sudo cp bin/results_exporter /opt/ffmpeg-rtmp/bin/
+sudo cp bin/qoe_exporter /opt/ffmpeg-rtmp/bin/
+sudo cp bin/cost_exporter /opt/ffmpeg-rtmp/bin/
+sudo cp bin/health_checker /opt/ffmpeg-rtmp/bin/
 
 # Set ownership
-sudo chown -R ffmpeg-exporter:ffmpeg-exporter /opt/ffmpeg-rtmp/exporters
-sudo chown -R ffmpeg-exporter:ffmpeg-exporter /var/lib/ffmpeg-rtmp
-
-# Copy exporter scripts and shared modules
-sudo cp -r master/exporters/* /opt/ffmpeg-rtmp/exporters/
-sudo cp -r shared/advisor /opt/ffmpeg-rtmp/exporters/advisor
-sudo cp requirements.txt /opt/ffmpeg-rtmp/
-sudo cp pricing_config.json /etc/ffmpeg-rtmp/
-
-# Install dependencies as root or in a virtual environment
-cd /opt/ffmpeg-rtmp
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-deactivate
-
-# Adjust ownership
 sudo chown -R ffmpeg-exporter:ffmpeg-exporter /opt/ffmpeg-rtmp
+sudo chown -R ffmpeg-exporter:ffmpeg-exporter /var/lib/ffmpeg-rtmp
 ```
 
 ### 3. Create Systemd Service Files
@@ -290,30 +277,11 @@ After=network.target
 Type=simple
 User=ffmpeg-exporter
 Group=ffmpeg-exporter
-WorkingDirectory=/opt/ffmpeg-rtmp/exporters
-
-# Environment
 Environment="RESULTS_EXPORTER_PORT=9502"
 Environment="RESULTS_DIR=/var/lib/ffmpeg-rtmp/results"
-Environment="PROMETHEUS_URL=http://localhost:8428"
-
-# Command
-ExecStart=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/results/results_exporter.py \
-    --port 9502 \
-    --results-dir /var/lib/ffmpeg-rtmp/results \
-    --prometheus-url http://localhost:8428
-
-# Restart policy
-Restart=on-failure
-RestartSec=10s
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=yes
-
-# Resource limits
-MemoryLimit=512M
-CPUQuota=50%
+ExecStart=/opt/ffmpeg-rtmp/bin/results_exporter
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -333,21 +301,11 @@ After=network.target
 Type=simple
 User=ffmpeg-exporter
 Group=ffmpeg-exporter
-WorkingDirectory=/opt/ffmpeg-rtmp/exporters
-
 Environment="QOE_EXPORTER_PORT=9503"
 Environment="RESULTS_DIR=/var/lib/ffmpeg-rtmp/results"
-
-ExecStart=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/qoe/qoe_exporter.py \
-    --port 9503 \
-    --results-dir /var/lib/ffmpeg-rtmp/results
-
-Restart=on-failure
-RestartSec=10s
-NoNewPrivileges=true
-PrivateTmp=yes
-MemoryLimit=512M
-CPUQuota=50%
+ExecStart=/opt/ffmpeg-rtmp/bin/qoe_exporter
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -367,34 +325,15 @@ After=network.target
 Type=simple
 User=ffmpeg-exporter
 Group=ffmpeg-exporter
-WorkingDirectory=/opt/ffmpeg-rtmp/exporters
-
 Environment="COST_EXPORTER_PORT=9504"
 Environment="RESULTS_DIR=/var/lib/ffmpeg-rtmp/results"
-Environment="ENERGY_COST_PER_KWH=0.12"
-Environment="CPU_COST_PER_HOUR=0.50"
+Environment="ENERGY_COST=0.12"
+Environment="CPU_COST=0.50"
 Environment="CURRENCY=USD"
 Environment="REGION=us-east-1"
-Environment="PRICING_CONFIG=/etc/ffmpeg-rtmp/pricing_config.json"
-Environment="PROMETHEUS_URL=http://localhost:8428"
-# Optional: Environment="ELECTRICITY_MAPS_TOKEN=your-token-here"
-
-ExecStart=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/cost/cost_exporter.py \
-    --port 9504 \
-    --results-dir /var/lib/ffmpeg-rtmp/results \
-    --energy-cost 0.12 \
-    --cpu-cost 0.50 \
-    --currency USD \
-    --region us-east-1 \
-    --pricing-config /etc/ffmpeg-rtmp/pricing_config.json \
-    --prometheus-url http://localhost:8428
-
-Restart=on-failure
-RestartSec=10s
-NoNewPrivileges=true
-PrivateTmp=yes
-MemoryLimit=512M
-CPUQuota=50%
+ExecStart=/opt/ffmpeg-rtmp/bin/cost_exporter
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -406,7 +345,7 @@ Create `/etc/systemd/system/ffmpeg-health-checker.service`:
 
 ```ini
 [Unit]
-Description=FFmpeg RTMP Health Checker
+Description=FFmpeg RTMP Exporter Health Checker
 Documentation=https://github.com/psantana5/ffmpeg-rtmp
 After=network.target
 
@@ -414,19 +353,10 @@ After=network.target
 Type=simple
 User=ffmpeg-exporter
 Group=ffmpeg-exporter
-WorkingDirectory=/opt/ffmpeg-rtmp/exporters
-
 Environment="HEALTH_CHECK_PORT=9600"
-
-ExecStart=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/health_checker/check_exporters_health.py \
-    --port 9600
-
-Restart=on-failure
-RestartSec=10s
-NoNewPrivileges=true
-PrivateTmp=yes
-MemoryLimit=256M
-CPUQuota=25%
+ExecStart=/opt/ffmpeg-rtmp/bin/health_checker
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -435,345 +365,101 @@ WantedBy=multi-user.target
 ### 4. Enable and Start Services
 
 ```bash
-# Reload systemd configuration
+# Reload systemd
 sudo systemctl daemon-reload
 
-# Enable services (start on boot)
-sudo systemctl enable ffmpeg-results-exporter.service
-sudo systemctl enable ffmpeg-qoe-exporter.service
-sudo systemctl enable ffmpeg-cost-exporter.service
-sudo systemctl enable ffmpeg-health-checker.service
+# Enable services
+sudo systemctl enable ffmpeg-results-exporter
+sudo systemctl enable ffmpeg-qoe-exporter
+sudo systemctl enable ffmpeg-cost-exporter
+sudo systemctl enable ffmpeg-health-checker
 
 # Start services
-sudo systemctl start ffmpeg-results-exporter.service
-sudo systemctl start ffmpeg-qoe-exporter.service
-sudo systemctl start ffmpeg-cost-exporter.service
-sudo systemctl start ffmpeg-health-checker.service
+sudo systemctl start ffmpeg-results-exporter
+sudo systemctl start ffmpeg-qoe-exporter
+sudo systemctl start ffmpeg-cost-exporter
+sudo systemctl start ffmpeg-health-checker
 
 # Check status
-sudo systemctl status ffmpeg-results-exporter.service
-sudo systemctl status ffmpeg-qoe-exporter.service
-sudo systemctl status ffmpeg-cost-exporter.service
-sudo systemctl status ffmpeg-health-checker.service
+sudo systemctl status ffmpeg-results-exporter
+sudo systemctl status ffmpeg-qoe-exporter
+sudo systemctl status ffmpeg-cost-exporter
+sudo systemctl status ffmpeg-health-checker
 ```
 
-### 5. Verify Services
+### 5. View Logs
 
 ```bash
-# Check all exporters are running
-curl http://localhost:9502/health  # Results
-curl http://localhost:9503/health  # QoE
-curl http://localhost:9504/health  # Cost
-curl http://localhost:9600/health  # Health Checker
-
-# Check metrics endpoints
-curl http://localhost:9502/metrics
-curl http://localhost:9503/metrics
-curl http://localhost:9504/metrics
-curl http://localhost:9600/metrics
-```
-
-### 6. View Logs
-
-```bash
-# View logs for each service
-sudo journalctl -u ffmpeg-results-exporter.service -f
-sudo journalctl -u ffmpeg-qoe-exporter.service -f
-sudo journalctl -u ffmpeg-cost-exporter.service -f
-sudo journalctl -u ffmpeg-health-checker.service -f
-
-# View last 50 lines
-sudo journalctl -u ffmpeg-results-exporter.service -n 50
-```
-
----
-
-## Firewall Configuration
-
-If you have a firewall enabled, allow the exporter ports:
-
-```bash
-# Using ufw
-sudo ufw allow 9502/tcp comment 'Results Exporter'
-sudo ufw allow 9503/tcp comment 'QoE Exporter'
-sudo ufw allow 9504/tcp comment 'Cost Exporter'
-sudo ufw allow 9600/tcp comment 'Health Checker'
-
-# Using firewalld
-sudo firewall-cmd --permanent --add-port=9502/tcp
-sudo firewall-cmd --permanent --add-port=9503/tcp
-sudo firewall-cmd --permanent --add-port=9504/tcp
-sudo firewall-cmd --permanent --add-port=9600/tcp
-sudo firewall-cmd --reload
-```
-
----
-
-## VictoriaMetrics Scrape Configuration
-
-Add the exporters to your VictoriaMetrics scrape configuration (`master/monitoring/victoriametrics.yml`):
-
-```yaml
-scrape_configs:
-  # ... existing jobs ...
-
-  - job_name: 'results-exporter'
-    static_configs:
-      - targets: ['localhost:9502']
-    scrape_interval: 15s
-
-  - job_name: 'qoe-exporter'
-    static_configs:
-      - targets: ['localhost:9503']
-    scrape_interval: 15s
-
-  - job_name: 'cost-exporter'
-    static_configs:
-      - targets: ['localhost:9504']
-    scrape_interval: 15s
-
-  - job_name: 'health-checker'
-    static_configs:
-      - targets: ['localhost:9600']
-    scrape_interval: 30s
-```
-
-Reload VictoriaMetrics configuration:
-```bash
-curl -X POST http://localhost:8428/-/reload
+# View logs for specific service
+sudo journalctl -u ffmpeg-results-exporter -f
+sudo journalctl -u ffmpeg-qoe-exporter -f
+sudo journalctl -u ffmpeg-cost-exporter -f
+sudo journalctl -u ffmpeg-health-checker -f
 ```
 
 ---
 
 ## Troubleshooting
 
-### Service Fails to Start
+### Exporter Won't Start
 
-**Check logs**:
-```bash
-sudo journalctl -u ffmpeg-results-exporter.service -n 50
-```
+1. Check logs: `sudo journalctl -u ffmpeg-results-exporter -n 50`
+2. Verify binary permissions: `ls -l /opt/ffmpeg-rtmp/bin/`
+3. Check port availability: `sudo netstat -tlnp | grep 9502`
+4. Verify results directory exists and is readable: `ls -la /var/lib/ffmpeg-rtmp/results`
 
-**Common issues**:
+### No Metrics Appearing
 
-1. **Permission denied on results directory**:
-   ```bash
-   sudo chown -R ffmpeg-exporter:ffmpeg-exporter /var/lib/ffmpeg-rtmp/results
-   sudo chmod 755 /var/lib/ffmpeg-rtmp/results
-   ```
+1. Check health endpoint responds: `curl http://localhost:9502/health`
+2. Check metrics endpoint: `curl http://localhost:9502/metrics`
+3. Verify test results files exist: `ls /var/lib/ffmpeg-rtmp/results/`
+4. Check file format (should be JSON with naming pattern: `test_results_YYYYMMDD_HHMMSS.json`)
 
-2. **Missing Python dependencies**:
-   ```bash
-   source /opt/ffmpeg-rtmp/venv/bin/activate
-   pip install -r /opt/ffmpeg-rtmp/requirements.txt
-   ```
+### Health Checker Shows Exporters Down
 
-3. **Missing shared advisor module**:
-   ```bash
-   sudo cp -r shared/advisor /opt/ffmpeg-rtmp/exporters/
-   sudo chown -R ffmpeg-exporter:ffmpeg-exporter /opt/ffmpeg-rtmp/exporters/advisor
-   ```
-
-4. **Port already in use**:
-   ```bash
-   sudo lsof -i :9502
-   # Kill the process or change the port in service file
-   ```
-
-### Exporter Returns No Metrics
-
-1. **Check if test results exist**:
-   ```bash
-   ls -l /var/lib/ffmpeg-rtmp/results/
-   ```
-
-2. **Verify results directory in service file**:
-   ```bash
-   grep RESULTS_DIR /etc/systemd/system/ffmpeg-results-exporter.service
-   ```
-
-3. **Check exporter can read results**:
-   ```bash
-   sudo -u ffmpeg-exporter ls -l /var/lib/ffmpeg-rtmp/results/
-   ```
-
-### VictoriaMetrics Not Scraping
-
-1. **Check VictoriaMetrics logs**:
-   ```bash
-   docker compose logs victoriametrics
-   ```
-
-2. **Verify scrape targets**:
-   ```bash
-   curl http://localhost:8428/targets
-   ```
-
-3. **Test connectivity from VictoriaMetrics container**:
-   ```bash
-   docker exec victoriametrics curl http://host.docker.internal:9502/metrics
-   ```
+1. Check each exporter individually with `curl`
+2. Verify network connectivity between containers/hosts
+3. Check firewall rules if running on separate hosts
+4. Verify correct ports in docker-compose.yml or environment variables
 
 ---
 
-## Upgrading Exporters
+## Integration with VictoriaMetrics
 
-```bash
-# Stop services
-sudo systemctl stop ffmpeg-results-exporter.service
-sudo systemctl stop ffmpeg-qoe-exporter.service
-sudo systemctl stop ffmpeg-cost-exporter.service
-sudo systemctl stop ffmpeg-health-checker.service
+All exporters expose metrics in Prometheus format on `/metrics` endpoint. Configure VictoriaMetrics to scrape:
 
-# Update code
-cd /path/to/ffmpeg-rtmp
-git pull
-
-# Copy updated files
-sudo cp -r master/exporters/* /opt/ffmpeg-rtmp/exporters/
-sudo cp -r shared/advisor /opt/ffmpeg-rtmp/exporters/advisor
-sudo chown -R ffmpeg-exporter:ffmpeg-exporter /opt/ffmpeg-rtmp/exporters
-
-# Update dependencies if needed
-source /opt/ffmpeg-rtmp/venv/bin/activate
-pip install --upgrade -r requirements.txt
-deactivate
-
-# Restart services
-sudo systemctl start ffmpeg-results-exporter.service
-sudo systemctl start ffmpeg-qoe-exporter.service
-sudo systemctl start ffmpeg-cost-exporter.service
-sudo systemctl start ffmpeg-health-checker.service
-
-# Verify
-sudo systemctl status ffmpeg-*-exporter.service
+```yaml
+scrape_configs:
+  - job_name: 'results-exporter'
+    static_configs:
+      - targets: ['localhost:9502']
+  
+  - job_name: 'qoe-exporter'
+    static_configs:
+      - targets: ['localhost:9503']
+  
+  - job_name: 'cost-exporter'
+    static_configs:
+      - targets: ['localhost:9504']
+  
+  - job_name: 'health-checker'
+    static_configs:
+      - targets: ['localhost:9600']
 ```
 
 ---
 
-## Security Considerations
+## Additional Resources
 
-1. **Run as dedicated user**: Never run exporters as root
-2. **Restrict file permissions**: Results directory should be readable only by exporter user
-3. **Use firewall rules**: Limit access to exporter ports to trusted networks
-4. **Rotate logs**: Configure journald log rotation
-5. **Monitor resource usage**: Set memory and CPU limits in systemd
-6. **Keep dependencies updated**: Regularly update Python packages
-
----
-
-## Performance Tuning
-
-### Adjust Cache TTL
-
-Exporters cache metrics to reduce disk I/O. Adjust in the Python code:
-
-```python
-# In results_exporter.py, qoe_exporter.py, cost_exporter.py
-self.cache_ttl = 60  # Increase to reduce disk reads
-```
-
-### Limit Result Files
-
-Only keep recent results to improve performance:
-
-```bash
-# Keep only last 7 days of results
-find /var/lib/ffmpeg-rtmp/results -name "test_results_*.json" -mtime +7 -delete
-```
-
-### Adjust Systemd Resource Limits
-
-```ini
-# In service file
-MemoryLimit=1G      # Increase if needed
-CPUQuota=100%       # Increase for more CPU
-```
-
----
-
-## Alternative: Running Without Systemd
-
-For systems without systemd (e.g., containers, minimal Linux), use a process manager like `supervisord`:
-
-### Install Supervisor
-
-```bash
-pip install supervisor
-```
-
-### Create Supervisor Config
-
-Create `/etc/supervisor/conf.d/ffmpeg-exporters.conf`:
-
-```ini
-[program:results-exporter]
-command=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/results/results_exporter.py --port 9502 --results-dir /var/lib/ffmpeg-rtmp/results
-directory=/opt/ffmpeg-rtmp/exporters
-user=ffmpeg-exporter
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/results-exporter.log
-stderr_logfile=/var/log/results-exporter.err
-
-[program:qoe-exporter]
-command=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/qoe/qoe_exporter.py --port 9503 --results-dir /var/lib/ffmpeg-rtmp/results
-directory=/opt/ffmpeg-rtmp/exporters
-user=ffmpeg-exporter
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/qoe-exporter.log
-stderr_logfile=/var/log/qoe-exporter.err
-
-[program:cost-exporter]
-command=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/cost/cost_exporter.py --port 9504 --results-dir /var/lib/ffmpeg-rtmp/results --energy-cost 0.12 --cpu-cost 0.50
-directory=/opt/ffmpeg-rtmp/exporters
-user=ffmpeg-exporter
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/cost-exporter.log
-stderr_logfile=/var/log/cost-exporter.err
-
-[program:health-checker]
-command=/opt/ffmpeg-rtmp/venv/bin/python3 /opt/ffmpeg-rtmp/exporters/health_checker/check_exporters_health.py --port 9600
-directory=/opt/ffmpeg-rtmp/exporters
-user=ffmpeg-exporter
-autostart=true
-autorestart=true
-stdout_logfile=/var/log/health-checker.log
-stderr_logfile=/var/log/health-checker.err
-```
-
-### Start Supervisor
-
-```bash
-supervisord -c /etc/supervisor/supervisord.conf
-supervisorctl reread
-supervisorctl update
-supervisorctl status
-```
-
----
-
-## Related Documentation
-
-- [Master Node README](../README.md) - Master node overview
-- [Production Deployment](../../deployment/README.md) - Complete production setup
-- [Worker Exporters](../../worker/exporters/README.md) - Worker exporter deployment
+- [Go Exporters Summary](../../GO_EXPORTERS_SUMMARY.md) - Detailed implementation notes
+- [Grafana Dashboards](../monitoring/grafana/provisioning/dashboards/) - Pre-built dashboards for visualization
+- [VictoriaMetrics Configuration](../monitoring/victoriametrics.yml) - Metrics collection setup
+- [Docker Compose](../../docker-compose.yml) - Container orchestration
 
 ---
 
 ## Support
 
-For issues with exporter deployment:
-
-1. Check logs: `sudo journalctl -u ffmpeg-*-exporter.service -n 100`
-2. Verify file permissions and ownership
-3. Test exporter manually before using systemd
-4. Open an issue: https://github.com/psantana5/ffmpeg-rtmp/issues
-
-Include in your issue:
-- Exporter logs
-- Service status output
-- System information (OS, Python version)
-- Configuration files (redact sensitive information)
+For issues or questions:
+- GitHub Issues: https://github.com/psantana5/ffmpeg-rtmp/issues
+- Documentation: https://github.com/psantana5/ffmpeg-rtmp/tree/main/docs
