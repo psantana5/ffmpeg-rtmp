@@ -108,7 +108,9 @@ services:
       - CPU_EXPORTER_PORT=9500
 
   docker-stats-exporter:
-    build: ./worker/exporters/docker_stats
+    build:
+      context: .
+      dockerfile: worker/exporters/docker_stats_go/Dockerfile
     container_name: docker-stats-exporter
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -195,7 +197,9 @@ services:
       - GPU_EXPORTER_PORT=9505
 
   results-exporter:
-    build: ./master/exporters/results
+    build:
+      context: .
+      dockerfile: master/exporters/results_go/Dockerfile
     container_name: results-exporter
     volumes:
       - ./test_results:/results
@@ -207,7 +211,6 @@ services:
     environment:
       - RESULTS_EXPORTER_PORT=9502
       - RESULTS_DIR=/results
-      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9502/health"]
       interval: 30s
@@ -217,11 +220,10 @@ services:
   qoe-exporter:
     build:
       context: .
-      dockerfile: master/exporters/qoe/Dockerfile
+      dockerfile: master/exporters/qoe_go/Dockerfile
     container_name: qoe-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./shared/advisor:/app/advisor:ro
     ports:
       - "9503:9503"
     restart: unless-stopped
@@ -239,35 +241,31 @@ services:
   cost-exporter:
     build:
       context: .
-      dockerfile: master/exporters/cost/Dockerfile
+      dockerfile: master/exporters/cost_go/Dockerfile
     container_name: cost-exporter
     volumes:
       - ./test_results:/results:ro
-      - ./shared/advisor:/app/advisor:ro
-      - ./pricing_config.json:/app/pricing_config.json:ro
     ports:
       - "9504:9504"
     restart: unless-stopped
     networks:
       - streaming-net
     environment:
-      - COST_EXPORTER_PORT=9504
       - RESULTS_DIR=/results
-      - ENERGY_COST_PER_KWH=0.0
-      - CPU_COST_PER_HOUR=0.50
+      - ENERGY_COST=0.0
+      - CPU_COST=0.50
       - CURRENCY=USD
       - REGION=us-east-1
-      - PRICING_CONFIG=/app/pricing_config.json
-      - ELECTRICITY_MAPS_TOKEN=${ELECTRICITY_MAPS_TOKEN:-}
-      - PROMETHEUS_URL=http://victoriametrics:8428
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9504/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9504/health"]
       interval: 30s
       timeout: 5s
       retries: 3
 
   exporter-health-checker:
-    build: ./master/exporters/health_checker
+    build:
+      context: .
+      dockerfile: master/exporters/health_checker_go/Dockerfile
     container_name: exporter-health-checker
     ports:
       - "9600:9600"
@@ -276,7 +274,6 @@ services:
       - streaming-net
     environment:
       - HEALTH_CHECK_PORT=9600
-    command: ["--port", "9600"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9600/health"]
       interval: 30s
@@ -301,28 +298,7 @@ services:
       timeout: 5s
       retries: 3
 
-  cost-exporter-go:
-    build:
-      context: .
-      dockerfile: master/exporters/cost_go/Dockerfile
-    container_name: cost-exporter-go
-    volumes:
-      - ./test_results:/results:ro
-    ports:
-      - "9514:9504"
-    restart: unless-stopped
-    networks:
-      - streaming-net
-    environment:
-      - RESULTS_DIR=/results
-      - REGION=us-east-1
-      - ENERGY_COST=0.0
-      - CPU_COST=0.50
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9504/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+
 
 networks:
   streaming-net:
