@@ -457,13 +457,92 @@ python3 scripts/validate_predictions.py \
 
 ### Dashboard Not Showing Data
 
-**Problem:** Empty panels in Grafana
+**Problem:** Empty panels in Grafana showing "No data"
+
+**Common Causes:**
+1. **Wrong datasource UID** - Dashboard panels referencing incorrect datasource
+2. **Missing scrape configuration** - VictoriaMetrics not configured to scrape ML exporter
+3. **Datasource mismatch** - Dashboard UID doesn't match provisioned datasource
 
 **Solution:**
-1. Verify exporter is running: `curl http://localhost:9505/health`
-2. Check metrics are exposed: `curl http://localhost:9505/metrics`
-3. Verify VictoriaMetrics is scraping: Check VictoriaMetrics targets
-4. Reload dashboard: `make update-dashboards`
+
+**Step 1: Verify Exporter is Running**
+```bash
+# Check exporter health
+curl http://localhost:9505/health
+
+# Verify metrics are being exposed
+curl http://localhost:9505/metrics | grep qoe_predicted
+```
+
+**Step 2: Check VictoriaMetrics Scrape Configuration**
+
+Ensure `master/monitoring/victoriametrics.yml` includes the ML exporter:
+
+```yaml
+- job_name: 'ml-predictions-exporter'
+  static_configs:
+    - targets: ['ml-predictions-exporter:9505']
+      labels:
+        service: 'ml-predictions'
+        exporter: 'go-rust'
+```
+
+After adding, restart VictoriaMetrics:
+```bash
+docker compose restart victoriametrics
+```
+
+**Step 3: Verify Datasource UID in Dashboard**
+
+The dashboard panels must use the correct datasource UID. Check `master/monitoring/grafana/provisioning/datasources/prometheus.yml` for the datasource UID:
+
+```yaml
+datasources:
+  - name: VictoriaMetrics
+    type: prometheus
+    uid: DS_VICTORIAMETRICS  # This is the UID to use
+    isDefault: true
+```
+
+Update all panel datasources in `ml-predictions.json` to match:
+```json
+{
+  "datasource": {
+    "type": "prometheus",
+    "uid": "DS_VICTORIAMETRICS"
+  }
+}
+```
+
+**Step 4: Verify Metrics in VictoriaMetrics**
+```bash
+# Check if metrics are being scraped
+curl -s 'http://localhost:8428/api/v1/query?query=ml_exporter_up' | jq
+
+# Check for prediction metrics
+curl -s 'http://localhost:8428/api/v1/query?query=qoe_predicted_vmaf' | jq
+```
+
+**Step 5: Set Dashboard Refresh Rate**
+
+Configure automatic refresh in the dashboard JSON:
+```json
+{
+  "refresh": "5s"
+}
+```
+
+**Step 6: Restart Grafana**
+```bash
+docker compose restart grafana
+```
+
+**Verification:**
+1. Open Grafana: `http://localhost:3000`
+2. Navigate to "ML Predictions Dashboard"
+3. Dashboard should refresh every 5 seconds
+4. All panels should display prediction data
 
 ## Future Enhancements
 
