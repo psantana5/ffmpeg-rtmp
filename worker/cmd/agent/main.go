@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -540,8 +541,44 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		}
 	}
 
-	// Execute the command
-	cmd := exec.Command(cmdPath, args...)
+	// Get duration for timeout calculation
+	duration := 0
+	if job.Parameters != nil {
+		if d, ok := job.Parameters["duration"].(float64); ok {
+			duration = int(d)
+		} else if d, ok := job.Parameters["duration"].(int); ok {
+			duration = d
+		} else if d, ok := job.Parameters["duration_seconds"].(float64); ok {
+			duration = int(d)
+		} else if d, ok := job.Parameters["duration_seconds"].(int); ok {
+			duration = d
+		}
+	}
+
+	// Create context with timeout for GStreamer jobs
+	// Add buffer time: duration + 30 seconds for startup/cleanup
+	var ctx context.Context
+	var cancel context.CancelFunc
+	
+	if engine.Name() == "gstreamer" && duration > 0 {
+		// GStreamer needs explicit timeout since it runs continuously
+		timeout := time.Duration(duration+30) * time.Second
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		log.Printf("→ GStreamer job will timeout after %d seconds (duration: %d + 30s buffer)", duration+30, duration)
+	} else if duration > 0 {
+		// FFmpeg handles duration internally, but add safety timeout
+		timeout := time.Duration(duration*2 + 60) * time.Second // 2x duration + 1 minute buffer
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	} else {
+		// No duration specified - use default 10 minute timeout
+		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+	}
+
+	// Execute the command with context
+	cmd := exec.CommandContext(ctx, cmdPath, args...)
 	
 	// Capture output for metrics
 	var stdout, stderr bytes.Buffer
@@ -552,8 +589,34 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	
 	startTime := time.Now()
 	if err := cmd.Run(); err != nil {
-		log.Printf("%s stderr: %s", cmdName, stderr.String())
-		return nil, nil, fmt.Errorf("%s execution failed: %w", cmdName, err)
+		// Check if context deadline exceeded
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("⚠️  %s timed out after expected duration", cmdName)
+			// For GStreamer with duration, timeout is expected - not an error
+			if engine.Name() == "gstreamer" && duration > 0 {
+				log.Printf("✓ GStreamer completed via timeout (expected behavior)")
+				// Not an error - continue to metrics
+			} else {
+				log.Printf("%s stderr: %s", cmdName, stderr.String())
+				return nil, nil, fmt.Errorf("%s execution timeout: %w", cmdName, err)
+			}
+		} else {
+			log.Printf("%s stderr: %s", cmdName, stderr.String())
+			// Check for specific GStreamer errors
+			stderrStr := stderr.String()
+			if engine.Name() == "gstreamer" {
+				if strings.Contains(stderrStr, "Resource not found") {
+					return nil, nil, fmt.Errorf("GStreamer pipeline error: RTMP server not reachable or stream rejected")
+				}
+				if strings.Contains(stderrStr, "Could not connect") {
+					return nil, nil, fmt.Errorf("GStreamer pipeline error: Failed to connect to RTMP server")
+				}
+				if strings.Contains(stderrStr, "No such element") {
+					return nil, nil, fmt.Errorf("GStreamer pipeline error: Missing GStreamer plugin (check gst-inspect-1.0)")
+				}
+			}
+			return nil, nil, fmt.Errorf("%s execution failed: %w", cmdName, err)
+		}
 	}
 	execDuration := time.Since(startTime).Seconds()
 

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 
@@ -41,13 +42,25 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		params = make(map[string]interface{})
 	}
 
+	// Get duration parameter (in seconds)
+	duration := 0
+	if d, ok := params["duration"].(float64); ok {
+		duration = int(d)
+	} else if d, ok := params["duration"].(int); ok {
+		duration = d
+	} else if d, ok := params["duration_seconds"].(float64); ok {
+		duration = int(d)
+	} else if d, ok := params["duration_seconds"].(int); ok {
+		duration = d
+	}
+
 	// Get RTMP URL
 	rtmpURL := ""
+	masterHost := "localhost" // Declare here
 	if rtmpURLParam, ok := params["rtmp_url"].(string); ok && rtmpURLParam != "" {
 		rtmpURL = rtmpURLParam
 	} else {
 		// Default: construct RTMP URL pointing to master node
-		masterHost := "localhost"
 		if hostURL != "" {
 			parsedURL, err := url.Parse(hostURL)
 			if err == nil && parsedURL.Host != "" {
@@ -92,22 +105,44 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 	// Build GStreamer pipeline
 	var pipeline []string
 
+	// Add -e flag for EOS (End of Stream) signal handling
+	// This ensures proper cleanup when duration expires or stream ends
+	pipeline = append(pipeline, "-e")
+
 	if inputFile != "" {
 		// File input pipeline
-		pipeline = []string{
-			"-q", // Quiet mode
+		pipeline = append(pipeline,
 			"filesrc", fmt.Sprintf("location=%s", inputFile), "!",
 			"decodebin", "!",
 			"videoconvert", "!",
+		)
+		
+		// Add num-buffers limit if duration specified
+		if duration > 0 {
+			// Note: For file sources, duration control is trickier
+			// We rely on context timeout in the worker instead
+			log.Printf("Note: File input with duration=%d - using context timeout for control", duration)
 		}
 	} else {
 		// Test pattern pipeline
-		pipeline = []string{
-			"-q", // Quiet mode
-			"videotestsrc", fmt.Sprintf("pattern=ball"), "!",
+		pipeline = append(pipeline,
+			"videotestsrc", "pattern=ball",
+		)
+		
+		// Add num-buffers for duration control on test source
+		if duration > 0 {
+			// Calculate number of buffers at 30fps
+			numBuffers := duration * 30
+			pipeline = append(pipeline,
+				fmt.Sprintf("num-buffers=%d", numBuffers),
+			)
+		}
+		
+		pipeline = append(pipeline,
+			"!",
 			"video/x-raw,format=I420,width=1280,height=720,framerate=30/1", "!",
 			"videoconvert", "!",
-		}
+		)
 	}
 
 	// Add video encoding based on hardware
@@ -156,13 +191,14 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 	// Add muxer and RTMP sink with buffer tuning for low latency
 	pipeline = append(pipeline,
 		"video/x-h264,profile=baseline", "!",
+		"h264parse", "!", // Add h264parse for better stream compatibility
 		"flvmux", "name=mux", "streamable=true", "!",
 		"rtmpsink",
 		fmt.Sprintf("location=%s", rtmpURL),
 		"sync=false",
 		"async=false",
-		"max-lateness=0",
-		"qos=true",
+		"max-lateness=-1", // Allow late buffers (changed from 0)
+		"qos=false", // Disable QoS to prevent early termination
 	)
 
 	return pipeline, nil
