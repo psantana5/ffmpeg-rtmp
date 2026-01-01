@@ -175,6 +175,19 @@ func (s *SQLiteStore) initSchema() error {
 			return fmt.Errorf("failed to migrate node names: %w", err)
 		}
 	}
+	
+	// Migration 4: Add logs column to jobs (if missing)
+	var logsExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='logs'")
+	if err := row.Scan(&logsExists); err != nil {
+		return fmt.Errorf("failed to check logs column: %w", err)
+	}
+	if logsExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN logs TEXT DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("failed to add logs column: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -418,11 +431,11 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	_, err = s.db.Exec(`
 		INSERT INTO jobs 
 		(id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
-		 created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.SequenceNumber, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
 		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt, job.LastActivityAt,
-		job.CompletedAt, job.RetryCount, job.Error, string(transitions))
+		job.CompletedAt, job.RetryCount, job.Error, job.Logs, string(transitions))
 
 	return err
 }
@@ -430,16 +443,16 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 // GetJob retrieves a job by ID
 func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var job models.Job
-	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
 	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
 		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
-		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
+		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &logsNull, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrJobNotFound
@@ -451,6 +464,11 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	// Handle nullable node_id
 	if nodeIDNull.Valid {
 		job.NodeID = nodeIDNull.String
+	}
+	
+	// Handle nullable logs
+	if logsNull.Valid {
+		job.Logs = logsNull.String
 	}
 
 	if paramsJSON.Valid {
@@ -481,16 +499,16 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 // GetJobBySequenceNumber retrieves a job by sequence number
 func (s *SQLiteStore) GetJobBySequenceNumber(seqNum int) (*models.Job, error) {
 	var job models.Job
-	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
 	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
 		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
 		FROM jobs WHERE sequence_number = ?
 	`, seqNum).Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
-		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON)
+		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &logsNull, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrJobNotFound
@@ -502,6 +520,11 @@ func (s *SQLiteStore) GetJobBySequenceNumber(seqNum int) (*models.Job, error) {
 	// Handle nullable node_id
 	if nodeIDNull.Valid {
 		job.NodeID = nodeIDNull.String
+	}
+	
+	// Handle nullable logs
+	if logsNull.Valid {
+		job.Logs = logsNull.String
 	}
 
 	if paramsJSON.Valid {
@@ -533,7 +556,7 @@ func (s *SQLiteStore) GetJobBySequenceNumber(seqNum int) (*models.Job, error) {
 func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	rows, err := s.db.Query(`
 		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
 		FROM jobs ORDER BY sequence_number DESC
 	`)
 	if err != nil {
@@ -544,18 +567,23 @@ func (s *SQLiteStore) GetAllJobs() []*models.Job {
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
-		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+		var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
 		var startedAt, lastActivityAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt,
-			&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &transitionsJSON); err != nil {
+			&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &logsNull, &transitionsJSON); err != nil {
 			continue
 		}
 
 		// Handle nullable node_id
 		if nodeIDNull.Valid {
 			job.NodeID = nodeIDNull.String
+		}
+	
+		// Handle nullable logs
+		if logsNull.Valid {
+			job.Logs = logsNull.String
 		}
 
 		if paramsJSON.Valid {
@@ -614,12 +642,12 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	// Queue priority: live=3, default=2, batch=1
 	// Priority: high=3, medium=2, low=1
 	var job models.Job
-	var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
 	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	query := `
-		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?)
 		ORDER BY 
@@ -640,9 +668,9 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	`
 
 	err = tx.QueryRow(query, models.JobStatusPending, models.JobStatusQueued).Scan(
-		&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status, &job.Queue,
+		&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status, &job.Queue,
 		&job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, &startedAt, &lastActivityAt, &completedAt,
-		&job.RetryCount, &job.Error, &transitionsJSON)
+		&job.RetryCount, &job.Error, &logsNull, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrJobNotFound
@@ -654,6 +682,11 @@ func (s *SQLiteStore) GetNextJob(nodeID string) (*models.Job, error) {
 	// Handle nullable node_id
 	if nodeIDNull.Valid {
 		job.NodeID = nodeIDNull.String
+	}
+	
+	// Handle nullable logs
+	if logsNull.Valid {
+		job.Logs = logsNull.String
 	}
 
 	if paramsJSON.Valid {
@@ -987,7 +1020,7 @@ func (s *SQLiteStore) CancelJob(id string) error {
 func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job {
 	query := `
 		SELECT id, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
 		FROM jobs 
 		WHERE status IN (?, ?) AND queue = ?
 	`
@@ -1009,19 +1042,24 @@ func (s *SQLiteStore) GetQueuedJobs(queue string, priority string) []*models.Job
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
-		var paramsJSON, transitionsJSON, nodeIDNull sql.NullString
+		var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
 		var startedAt, lastActivityAt, completedAt sql.NullTime
 
 		if err := rows.Scan(&job.ID, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON,
 			&job.Status, &job.Queue, &job.Priority, &job.Progress, &nodeIDNull,
 			&job.CreatedAt, &startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error,
-			&transitionsJSON); err != nil {
+			&logsNull, &transitionsJSON); err != nil {
 			continue
 		}
 
 		// Handle nullable node_id
 		if nodeIDNull.Valid {
 			job.NodeID = nodeIDNull.String
+		}
+	
+		// Handle nullable logs
+		if logsNull.Valid {
+			job.Logs = logsNull.String
 		}
 
 		if paramsJSON.Valid {

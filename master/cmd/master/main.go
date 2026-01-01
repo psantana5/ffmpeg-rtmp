@@ -18,6 +18,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/tracing"
 )
 
 func main() {
@@ -37,6 +38,8 @@ func main() {
 	enableMetrics := flag.Bool("metrics", true, "Enable Prometheus metrics endpoint")
 	metricsPort := flag.String("metrics-port", "9090", "Prometheus metrics port")
 	schedulerInterval := flag.Duration("scheduler-interval", 5*time.Second, "Background scheduler check interval")
+	enableTracing := flag.Bool("tracing", false, "Enable distributed tracing")
+	tracingEndpoint := flag.String("tracing-endpoint", "localhost:4318", "OpenTelemetry OTLP endpoint")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -136,8 +139,41 @@ func main() {
 	// Create API handler with retry support
 	handler := api.NewMasterHandlerWithRetry(dataStore, *maxRetries)
 
+	// Initialize distributed tracing if enabled
+	var tracerProvider *tracing.Provider
+	if *enableTracing {
+		log.Println("Initializing distributed tracing...")
+		var err error
+		tracerProvider, err = tracing.InitTracer(tracing.Config{
+			ServiceName:    "ffrtmp-master",
+			ServiceVersion: "1.0.0",
+			Environment:    "production",
+			OTLPEndpoint:   *tracingEndpoint,
+			Enabled:        true,
+		})
+		if err != nil {
+			log.Fatalf("Failed to initialize tracing: %v", err)
+		}
+		log.Printf("✓ Distributed tracing enabled (endpoint: %s)", *tracingEndpoint)
+		
+		// Ensure graceful shutdown of tracer
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracerProvider.Shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
 	// Create router
 	router := mux.NewRouter()
+
+	// Add tracing middleware first (before auth) if enabled
+	if *enableTracing && tracerProvider != nil {
+		router.Use(tracing.HTTPMiddleware(tracerProvider, "ffrtmp-master"))
+		log.Println("✓ Tracing middleware enabled")
+	}
 
 	// Add authentication middleware if API key is set
 	if apiKey != "" {

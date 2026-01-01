@@ -387,6 +387,17 @@ func (h *MasterHandler) ReceiveResults(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update job status", http.StatusInternalServerError)
 		return
 	}
+	
+	// Update logs if provided
+	if result.Logs != "" {
+		job, err := h.store.GetJob(result.JobID)
+		if err == nil {
+			job.Logs = result.Logs
+			if err := h.store.UpdateJob(job); err != nil {
+				log.Printf("Warning: Failed to update job logs: %v", err)
+			}
+		}
+	}
 
 	// Write results to JSON file for exporters
 	if result.Status == models.JobStatusCompleted {
@@ -570,8 +581,11 @@ func (h *MasterHandler) GetJobLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For now, return the error field as logs (can be extended to read from log files)
-	logs := job.Error
+	// Return logs from database, fallback to error field if no logs available
+	logs := job.Logs
+	if logs == "" && job.Error != "" {
+		logs = fmt.Sprintf("Error: %s", job.Error)
+	}
 	if logs == "" {
 		logs = "No logs available for this job"
 	}

@@ -39,6 +39,7 @@ type Job struct {
 	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
 	RetryCount       int                    `json:"retry_count"`
 	Error            string                 `json:"error,omitempty"`
+	Logs             string                 `json:"logs,omitempty"`              // Worker execution logs
 	StateTransitions []StateTransition      `json:"state_transitions,omitempty"`
 }
 
@@ -61,6 +62,7 @@ type JobResult struct {
 	Metrics          map[string]interface{} `json:"metrics,omitempty"`
 	AnalyzerOutput   map[string]interface{} `json:"analyzer_output,omitempty"`
 	Error            string                 `json:"error,omitempty"`
+	Logs             string                 `json:"logs,omitempty"` // Worker execution logs
 	CompletedAt      time.Time              `json:"completed_at"`
 	QoEScore         float64                `json:"qoe_score,omitempty"`
 	EfficiencyScore  float64                `json:"efficiency_score,omitempty"`
