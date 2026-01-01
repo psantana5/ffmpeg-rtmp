@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "DS_VICTORIAMETRICS"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -19,7 +22,10 @@
   "links": [],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -66,7 +72,8 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -78,7 +85,11 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["mean", "last", "max"],
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -98,7 +109,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -145,7 +159,9 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "decimals": 2,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -157,7 +173,11 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": ["mean", "last", "max"],
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -177,7 +197,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -214,7 +237,8 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "decbytes",
+          "decimals": 2
         }
       },
       "gridPos": {
@@ -226,7 +250,10 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": ["mean", "last"],
+          "calcs": [
+            "mean",
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -246,7 +273,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -279,7 +309,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -298,14 +330,17 @@
       "type": "gauge"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "axisLabel": "Temperature °C",
+            "axisLabel": "Temperature \u00b0C",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -343,7 +378,9 @@
               }
             ]
           },
-          "unit": "celsius"
+          "unit": "celsius",
+          "decimals": 1,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -355,7 +392,11 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["mean", "last", "max"],
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -375,7 +416,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -412,7 +456,9 @@
               }
             ]
           },
-          "unit": "watt"
+          "unit": "watt",
+          "decimals": 2,
+          "noValue": "N/A (No GPU)"
         }
       },
       "gridPos": {
@@ -424,7 +470,11 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": ["mean", "last", "max"],
+          "calcs": [
+            "mean",
+            "last",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -444,7 +494,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -493,7 +546,9 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["last"],
+          "calcs": [
+            "last"
+          ],
           "displayMode": "table",
           "placement": "bottom"
         },
@@ -513,7 +568,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -523,10 +581,12 @@
             {
               "options": {
                 "0": {
-                  "text": "No GPU"
+                  "text": "No GPU",
+                  "color": "dark-red"
                 },
                 "1": {
-                  "text": "Has GPU"
+                  "text": "GPU Available",
+                  "color": "dark-green"
                 }
               },
               "type": "value"
@@ -545,7 +605,8 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "noValue": "No GPU"
         }
       },
       "gridPos": {
@@ -561,7 +622,9 @@
         "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -582,7 +645,11 @@
   "refresh": "5s",
   "schemaVersion": 36,
   "style": "dark",
-  "tags": ["distributed", "worker-nodes", "hardware"],
+  "tags": [
+    "distributed",
+    "worker-nodes",
+    "hardware"
+  ],
   "templating": {
     "list": []
   },

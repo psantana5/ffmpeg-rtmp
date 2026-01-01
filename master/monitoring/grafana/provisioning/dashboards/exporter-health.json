@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "DS_VICTORIAMETRICS"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -19,26 +22,62 @@
   "links": [],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"options": {"0": {"color": "red", "index": 0, "text": "Down"}}, "type": "value"},
-            {"options": {"1": {"color": "green", "index": 1, "text": "Up"}}, "type": "value"}
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "Down"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "Up"
+                }
+              },
+              "type": "value"
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "green", "value": 1}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "options": {
         "colorMode": "background",
@@ -47,7 +86,9 @@
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "textMode": "value_and_name"
@@ -64,24 +105,45 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "yellow", "value": 1},
-              {"color": "green", "value": 5}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 5
+              }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 2,
       "options": {
         "colorMode": "value",
@@ -90,7 +152,9 @@
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "textMode": "auto"
@@ -106,24 +170,45 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 5},
-              {"color": "red", "value": 10}
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 3,
       "options": {
         "colorMode": "value",
@@ -132,7 +217,9 @@
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": ""
         },
         "textMode": "auto"
@@ -148,10 +235,15 @@
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisLabel": "Response Time (ms)",
             "axisPlacement": "auto",
@@ -159,11 +251,17 @@
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "none",
-            "hideFrom": {"tooltip": false, "viz": false, "legend": false},
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {"type": "linear"},
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": true
           },
@@ -171,20 +269,45 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 100},
-              {"color": "red", "value": 500}
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
             ]
           },
-          "unit": "ms"
+          "unit": "ms",
+          "noValue": "No data"
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
       "id": 4,
       "options": {
-        "legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "bottom"},
-        "tooltip": {"mode": "multi"}
+        "legend": {
+          "calcs": [
+            "last",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "targets": [
         {
@@ -197,10 +320,15 @@
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "DS_VICTORIAMETRICS"},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "palette-classic"},
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "axisLabel": "Health Status",
             "axisPlacement": "auto",
@@ -208,36 +336,81 @@
             "drawStyle": "line",
             "fillOpacity": 50,
             "gradientMode": "none",
-            "hideFrom": {"tooltip": false, "viz": false, "legend": false},
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
             "lineInterpolation": "stepAfter",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {"type": "linear"},
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
             "spanNulls": true
           },
           "mappings": [
-            {"options": {"0": {"color": "red", "index": 0, "text": "Down"}}, "type": "value"},
-            {"options": {"1": {"color": "green", "index": 1, "text": "Up"}}, "type": "value"}
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "Down"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "Up"
+                }
+              },
+              "type": "value"
+            }
           ],
           "max": 1,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "green", "value": 1}
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "No data"
         },
         "overrides": []
       },
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
       "id": 5,
       "options": {
-        "legend": {"calcs": ["last"], "displayMode": "table", "placement": "right"},
-        "tooltip": {"mode": "multi"}
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       },
       "targets": [
         {
@@ -252,12 +425,22 @@
   ],
   "schemaVersion": 36,
   "style": "dark",
-  "tags": ["health", "monitoring", "exporters"],
-  "templating": {"list": []},
-  "time": {"from": "now-1h", "to": "now"},
+  "tags": [
+    "health",
+    "monitoring",
+    "exporters"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "Exporter Health Dashboard",
   "uid": "exporter-health",
-  "version": 1
+  "version": 1,
+  "refresh": "5s"
 }

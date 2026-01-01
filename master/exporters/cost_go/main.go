@@ -18,6 +18,13 @@ const (
 	defaultPort = 9504
 )
 
+// Exchange rates relative to USD (updated periodically)
+var exchangeRates = map[string]float64{
+	"USD": 1.0,
+	"EUR": 0.92,  // 1 USD = 0.92 EUR
+	"SEK": 10.35, // 1 USD = 10.35 SEK
+}
+
 // TestResults holds test result data
 type TestResults struct {
 	Scenarios []Scenario `json:"scenarios"`
@@ -190,23 +197,23 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 	// Export cost metrics for each scenario
 	if len(resultsData.scenarios) > 0 {
 		// Total cost (load-aware)
-		fmt.Fprintf(w, "# HELP cost_total_load_aware Total cost (%s) - load-aware\n", costConfig.Currency)
+		fmt.Fprintln(w, "# HELP cost_total_load_aware Total cost - load-aware")
 		fmt.Fprintln(w, "# TYPE cost_total_load_aware gauge")
 
 		// Energy cost (load-aware)
-		fmt.Fprintf(w, "# HELP cost_energy_load_aware Energy cost (%s) - load-aware\n", costConfig.Currency)
+		fmt.Fprintln(w, "# HELP cost_energy_load_aware Energy cost - load-aware")
 		fmt.Fprintln(w, "# TYPE cost_energy_load_aware gauge")
 
 		// Compute cost (load-aware)
-		fmt.Fprintf(w, "# HELP cost_compute_load_aware Compute cost (%s) - load-aware\n", costConfig.Currency)
+		fmt.Fprintln(w, "# HELP cost_compute_load_aware Compute cost - load-aware")
 		fmt.Fprintln(w, "# TYPE cost_compute_load_aware gauge")
 
 		// Cost per pixel
-		fmt.Fprintf(w, "# HELP cost_per_pixel Cost per pixel (%s/pixel) - load-aware\n", costConfig.Currency)
+		fmt.Fprintln(w, "# HELP cost_per_pixel Cost per pixel - load-aware")
 		fmt.Fprintln(w, "# TYPE cost_per_pixel gauge")
 
 		// Cost per watch hour
-		fmt.Fprintf(w, "# HELP cost_per_watch_hour Cost per viewer watch hour (%s/hour) - load-aware\n", costConfig.Currency)
+		fmt.Fprintln(w, "# HELP cost_per_watch_hour Cost per viewer watch hour - load-aware")
 		fmt.Fprintln(w, "# TYPE cost_per_watch_hour gauge")
 
 		for _, scenario := range resultsData.scenarios {
@@ -221,47 +228,54 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 				stepSeconds = 5.0 // Default
 			}
 
-			labels := fmt.Sprintf("scenario=\"%s\",currency=\"%s\",streams=\"%d\",bitrate=\"%s\",encoder=\"%s\",service=\"cost-analysis\"",
-				scenario.Name, costConfig.Currency, streamCount, scenario.Bitrate, scenario.EncoderType)
-
-			// Calculate costs if data is available
-			energyCost := 0.0
-			computeCost := 0.0
+			// Calculate costs if data is available (in USD first)
+			energyCostUSD := 0.0
+			computeCostUSD := 0.0
 			hasData := len(scenario.PowerWatts) > 0 && len(scenario.CPUUsageCores) > 0
 
 			if hasData {
-				energyCost = calculateEnergyCost(scenario.PowerWatts, stepSeconds, costConfig.EnergyCostPerKWh)
-				computeCost = calculateComputeCost(scenario.CPUUsageCores, stepSeconds, costConfig.CPUCostPerHour)
+				energyCostUSD = calculateEnergyCost(scenario.PowerWatts, stepSeconds, costConfig.EnergyCostPerKWh)
+				computeCostUSD = calculateComputeCost(scenario.CPUUsageCores, stepSeconds, costConfig.CPUCostPerHour)
 			}
 
-			totalCost := energyCost + computeCost
+			totalCostUSD := energyCostUSD + computeCostUSD
 
-			// Export metrics
-			fmt.Fprintf(w, "cost_total_load_aware{%s} %.8f\n", labels, totalCost)
-			fmt.Fprintf(w, "cost_energy_load_aware{%s} %.8f\n", labels, energyCost)
-			fmt.Fprintf(w, "cost_compute_load_aware{%s} %.8f\n", labels, computeCost)
+			// Export metrics for each currency
+			for currency, rate := range exchangeRates {
+				energyCost := energyCostUSD * rate
+				computeCost := computeCostUSD * rate
+				totalCost := totalCostUSD * rate
 
-			// Cost per pixel (if pixel data available)
-			if scenario.PixelsProcessed > 0 && totalCost > 0 {
-				costPerPixel := totalCost / float64(scenario.PixelsProcessed)
-				fmt.Fprintf(w, "cost_per_pixel{%s} %.12f\n", labels, costPerPixel)
-			} else {
-				fmt.Fprintf(w, "cost_per_pixel{%s} 0\n", labels)
-			}
+				labels := fmt.Sprintf("scenario=\"%s\",currency=\"%s\",streams=\"%d\",bitrate=\"%s\",encoder=\"%s\",service=\"cost-analysis\"",
+					scenario.Name, currency, streamCount, scenario.Bitrate, scenario.EncoderType)
 
-			// Cost per watch hour (if duration available)
-			if scenario.Duration > 0 && totalCost > 0 {
-				// Cost per viewer watch hour = total_cost / (duration_hours * stream_count)
-				durationHours := scenario.Duration / 3600.0
-				watchHours := durationHours * float64(streamCount)
-				if watchHours > 0 {
-					costPerWatchHour := totalCost / watchHours
-					fmt.Fprintf(w, "cost_per_watch_hour{%s} %.8f\n", labels, costPerWatchHour)
+				// Export metrics
+				fmt.Fprintf(w, "cost_total_load_aware{%s} %.8f\n", labels, totalCost)
+				fmt.Fprintf(w, "cost_energy_load_aware{%s} %.8f\n", labels, energyCost)
+				fmt.Fprintf(w, "cost_compute_load_aware{%s} %.8f\n", labels, computeCost)
+
+				// Cost per pixel (if pixel data available)
+				if scenario.PixelsProcessed > 0 && totalCost > 0 {
+					costPerPixel := totalCost / float64(scenario.PixelsProcessed)
+					fmt.Fprintf(w, "cost_per_pixel{%s} %.12f\n", labels, costPerPixel)
+				} else {
+					fmt.Fprintf(w, "cost_per_pixel{%s} 0\n", labels)
+				}
+
+				// Cost per watch hour (if duration available)
+				if scenario.Duration > 0 && totalCost > 0 {
+					// Cost per viewer watch hour = total_cost / (duration_hours * stream_count)
+					durationHours := scenario.Duration / 3600.0
+					watchHours := durationHours * float64(streamCount)
+					if watchHours > 0 {
+						costPerWatchHour := totalCost / watchHours
+						fmt.Fprintf(w, "cost_per_watch_hour{%s} %.8f\n", labels, costPerWatchHour)
+					} else {
+						fmt.Fprintf(w, "cost_per_watch_hour{%s} 0\n", labels)
+					}
 				} else {
 					fmt.Fprintf(w, "cost_per_watch_hour{%s} 0\n", labels)
 				}
-			} else {
-				fmt.Fprintf(w, "cost_per_watch_hour{%s} 0\n", labels)
 			}
 		}
 	}
