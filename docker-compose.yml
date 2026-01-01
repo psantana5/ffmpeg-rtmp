@@ -262,6 +262,27 @@ services:
       timeout: 5s
       retries: 3
 
+  ml-predictions-exporter:
+    build:
+      context: .
+      dockerfile: master/exporters/ml_predictions/Dockerfile
+    container_name: ml-predictions-exporter
+    volumes:
+      - ./ml_models:/app/ml_models:ro
+    ports:
+      - "9505:9505"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - ML_EXPORTER_PORT=9505
+      - MODEL_PATH=/app/ml_models/model.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9505/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   exporter-health-checker:
     build:
       context: .
