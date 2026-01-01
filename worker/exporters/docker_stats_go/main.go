@@ -1,21 +1,18 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 )
 
 const (
@@ -24,18 +21,10 @@ const (
 
 // DockerStats holds current docker statistics
 type DockerStats struct {
-	mu                 sync.RWMutex
-	EngineStats        *EngineStats
-	ContainerStats     map[string]*ContainerStat
-	TotalCPUCores      int
-	LastUpdate         time.Time
-}
-
-// EngineStats holds Docker engine (dockerd) statistics
-type EngineStats struct {
-	CPUPercent    float64
-	MemoryPercent float64
-	MemoryKB      float64
+	mu             sync.RWMutex
+	ContainerStats map[string]*ContainerStat
+	TotalCPUCores  int
+	LastUpdate     time.Time
 }
 
 // ContainerStat holds statistics for a single container
@@ -44,25 +33,34 @@ type ContainerStat struct {
 	ID            string
 	CPUPercent    float64
 	MemoryPercent float64
-	MemoryUsageMB float64
-	MemoryLimitMB float64
-	NetworkRxMB   float64
-	NetworkTxMB   float64
-	BlockReadMB   float64
-	BlockWriteMB  float64
+	MemoryUsage   string
+	NetworkIO     string
+	BlockIO       string
+}
+
+// DockerStatsJSON represents the JSON output from docker stats
+type DockerStatsJSON struct {
+	Name       string `json:"Name"`
+	Container  string `json:"Container"`
+	CPUPerc    string `json:"CPUPerc"`
+	MemPerc    string `json:"MemPerc"`
+	MemUsage   string `json:"MemUsage"`
+	NetIO      string `json:"NetIO"`
+	BlockIO    string `json:"BlockIO"`
 }
 
 var (
-	stats        = &DockerStats{ContainerStats: make(map[string]*ContainerStat)}
-	dockerClient *client.Client
+	stats = &DockerStats{ContainerStats: make(map[string]*ContainerStat)}
 )
 
 // getCPUCores gets the number of CPU cores from /proc/cpuinfo
 func getCPUCores() int {
 	data, err := os.ReadFile("/host/proc/cpuinfo")
 	if err != nil {
-		// Fallback to environment-based detection
-		return 4
+		data, err = os.ReadFile("/proc/cpuinfo")
+		if err != nil {
+			return 4 // Default fallback
+		}
 	}
 
 	cores := 0
@@ -79,87 +77,60 @@ func getCPUCores() int {
 	return cores
 }
 
-// updateDockerStats updates statistics from Docker API
-func updateDockerStats(ctx context.Context) error {
+// parsePercentage parses a percentage string like "12.34%" and returns the float value
+func parsePercentage(s string) float64 {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0.0
+	}
+	return val
+}
+
+// updateDockerStats updates statistics from Docker CLI
+func updateDockerStats() error {
 	stats.mu.Lock()
 	defer stats.mu.Unlock()
 
-	// Get container list
-	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{})
+	// Run docker stats command
+	cmd := exec.Command("docker", "stats", "--no-stream", "--format", "{{json .}}")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
+		return fmt.Errorf("failed to run docker stats: %w", err)
 	}
 
-	// Update each container's stats
-	for _, cont := range containers {
-		// Get container stats
-		statsResp, err := dockerClient.ContainerStats(ctx, cont.ID, false)
-		if err != nil {
-			log.Printf("Failed to get stats for container %s: %v", cont.Names[0], err)
+	// Parse output
+	scanner := strings.Split(out.String(), "\n")
+	for _, line := range scanner {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
-		var containerStats types.StatsJSON
-		if err := json.NewDecoder(statsResp.Body).Decode(&containerStats); err != nil {
-			statsResp.Body.Close()
-			log.Printf("Failed to decode stats for container %s: %v", cont.Names[0], err)
+		var dockerStat DockerStatsJSON
+		if err := json.Unmarshal([]byte(line), &dockerStat); err != nil {
+			log.Printf("Failed to parse docker stats line: %v", err)
 			continue
 		}
-		statsResp.Body.Close()
 
-		// Calculate CPU percentage
-		cpuPercent := 0.0
-		cpuDelta := float64(containerStats.CPUStats.CPUUsage.TotalUsage - containerStats.PreCPUStats.CPUUsage.TotalUsage)
-		systemDelta := float64(containerStats.CPUStats.SystemUsage - containerStats.PreCPUStats.SystemUsage)
-		if systemDelta > 0.0 && cpuDelta > 0.0 {
-			cpuPercent = (cpuDelta / systemDelta) * float64(len(containerStats.CPUStats.CPUUsage.PercpuUsage)) * 100.0
-		}
-
-		// Calculate memory usage
-		memUsage := float64(containerStats.MemoryStats.Usage) / (1024 * 1024) // MB
-		memLimit := float64(containerStats.MemoryStats.Limit) / (1024 * 1024)  // MB
-		memPercent := 0.0
-		if memLimit > 0 {
-			memPercent = (memUsage / memLimit) * 100.0
-		}
-
-		// Calculate network I/O
-		networkRx := 0.0
-		networkTx := 0.0
-		for _, network := range containerStats.Networks {
-			networkRx += float64(network.RxBytes) / (1024 * 1024) // MB
-			networkTx += float64(network.TxBytes) / (1024 * 1024) // MB
-		}
-
-		// Calculate block I/O
-		blockRead := 0.0
-		blockWrite := 0.0
-		for _, bioEntry := range containerStats.BlkioStats.IoServiceBytesRecursive {
-			if bioEntry.Op == "Read" || bioEntry.Op == "read" {
-				blockRead += float64(bioEntry.Value) / (1024 * 1024) // MB
-			} else if bioEntry.Op == "Write" || bioEntry.Op == "write" {
-				blockWrite += float64(bioEntry.Value) / (1024 * 1024) // MB
-			}
-		}
-
-		// Get container name (remove leading slash)
-		name := cont.Names[0]
-		if strings.HasPrefix(name, "/") {
-			name = name[1:]
+		// Parse container ID (first 12 chars)
+		containerID := dockerStat.Container
+		if len(containerID) > 12 {
+			containerID = containerID[:12]
 		}
 
 		// Store stats
-		stats.ContainerStats[cont.ID] = &ContainerStat{
-			Name:          name,
-			ID:            cont.ID[:12],
-			CPUPercent:    cpuPercent,
-			MemoryPercent: memPercent,
-			MemoryUsageMB: memUsage,
-			MemoryLimitMB: memLimit,
-			NetworkRxMB:   networkRx,
-			NetworkTxMB:   networkTx,
-			BlockReadMB:   blockRead,
-			BlockWriteMB:  blockWrite,
+		stats.ContainerStats[dockerStat.Container] = &ContainerStat{
+			Name:          dockerStat.Name,
+			ID:            containerID,
+			CPUPercent:    parsePercentage(dockerStat.CPUPerc),
+			MemoryPercent: parsePercentage(dockerStat.MemPerc),
+			MemoryUsage:   dockerStat.MemUsage,
+			NetworkIO:     dockerStat.NetIO,
+			BlockIO:       dockerStat.BlockIO,
 		}
 	}
 
@@ -168,18 +139,13 @@ func updateDockerStats(ctx context.Context) error {
 }
 
 // collectStats periodically collects Docker statistics
-func collectStats(ctx context.Context, interval time.Duration) {
+func collectStats(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := updateDockerStats(ctx); err != nil {
-				log.Printf("Error updating stats: %v", err)
-			}
+	for range ticker.C {
+		if err := updateDockerStats(); err != nil {
+			log.Printf("Error updating stats: %v", err)
 		}
 	}
 }
@@ -217,48 +183,27 @@ func metricsHandler(w http.ResponseWriter, r *http.Request) {
 			cs.Name, cs.ID, cs.MemoryPercent)
 	}
 
-	fmt.Fprintln(w, "# HELP docker_container_memory_usage_mb Container memory usage in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_memory_usage_mb gauge")
+	fmt.Fprintln(w, "# HELP docker_container_memory_usage Container memory usage")
+	fmt.Fprintln(w, "# TYPE docker_container_memory_usage gauge")
 	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_memory_usage_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.MemoryUsageMB)
-	}
-
-	fmt.Fprintln(w, "# HELP docker_container_memory_limit_mb Container memory limit in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_memory_limit_mb gauge")
-	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_memory_limit_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.MemoryLimitMB)
+		fmt.Fprintf(w, "docker_container_memory_usage{container=\"%s\",id=\"%s\",value=\"%s\"} 1\n",
+			cs.Name, cs.ID, cs.MemoryUsage)
 	}
 
 	// Network I/O metrics
-	fmt.Fprintln(w, "# HELP docker_container_network_rx_mb Container network received in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_network_rx_mb counter")
+	fmt.Fprintln(w, "# HELP docker_container_network_io Container network I/O")
+	fmt.Fprintln(w, "# TYPE docker_container_network_io gauge")
 	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_network_rx_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.NetworkRxMB)
-	}
-
-	fmt.Fprintln(w, "# HELP docker_container_network_tx_mb Container network transmitted in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_network_tx_mb counter")
-	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_network_tx_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.NetworkTxMB)
+		fmt.Fprintf(w, "docker_container_network_io{container=\"%s\",id=\"%s\",value=\"%s\"} 1\n",
+			cs.Name, cs.ID, cs.NetworkIO)
 	}
 
 	// Block I/O metrics
-	fmt.Fprintln(w, "# HELP docker_container_block_read_mb Container block read in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_block_read_mb counter")
+	fmt.Fprintln(w, "# HELP docker_container_block_io Container block I/O")
+	fmt.Fprintln(w, "# TYPE docker_container_block_io gauge")
 	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_block_read_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.BlockReadMB)
-	}
-
-	fmt.Fprintln(w, "# HELP docker_container_block_write_mb Container block write in MB")
-	fmt.Fprintln(w, "# TYPE docker_container_block_write_mb counter")
-	for _, cs := range stats.ContainerStats {
-		fmt.Fprintf(w, "docker_container_block_write_mb{container=\"%s\",id=\"%s\"} %.2f\n",
-			cs.Name, cs.ID, cs.BlockWriteMB)
+		fmt.Fprintf(w, "docker_container_block_io{container=\"%s\",id=\"%s\",value=\"%s\"} 1\n",
+			cs.Name, cs.ID, cs.BlockIO)
 	}
 
 	// Exporter metadata
@@ -287,24 +232,15 @@ func main() {
 
 	log.Println("Starting Docker Stats Exporter (Go)")
 
-	// Initialize Docker client
-	var err error
-	dockerClient, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		log.Fatalf("Failed to create Docker client: %v", err)
-	}
-	defer dockerClient.Close()
-
 	// Get CPU cores
 	stats.TotalCPUCores = getCPUCores()
 	log.Printf("Detected %d CPU cores", stats.TotalCPUCores)
 
 	// Start stats collection
-	ctx := context.Background()
-	go collectStats(ctx, 5*time.Second)
+	go collectStats(5 * time.Second)
 
 	// Do initial collection
-	if err := updateDockerStats(ctx); err != nil {
+	if err := updateDockerStats(); err != nil {
 		log.Printf("Warning: Initial stats collection failed: %v", err)
 	}
 
