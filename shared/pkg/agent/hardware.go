@@ -40,11 +40,36 @@ func DetectHardware() (*models.NodeCapabilities, error) {
 	ramBytes := detectRAM()
 	caps.RAMTotalBytes = ramBytes
 
+	// Detect encoder capabilities
+	encoderCaps := DetectEncoders()
+	caps.GPUCapabilities = buildGPUCapabilities(encoderCaps)
+
 	// Add OS label
 	caps.Labels["os"] = runtime.GOOS
 	caps.Labels["arch"] = runtime.GOARCH
 
 	return caps, nil
+}
+
+// buildGPUCapabilities creates a list of encoder capabilities for GPU
+func buildGPUCapabilities(encoderCaps *EncoderCapabilities) []string {
+	capabilities := []string{}
+	
+	// Add hardware H.264 encoders
+	for _, encoder := range encoderCaps.H264Encoders {
+		if encoder != "libx264" { // Skip software encoder
+			capabilities = append(capabilities, encoder)
+		}
+	}
+	
+	// Add hardware H.265 encoders
+	for _, encoder := range encoderCaps.H265Encoders {
+		if encoder != "libx265" { // Skip software encoder
+			capabilities = append(capabilities, encoder)
+		}
+	}
+	
+	return capabilities
 }
 
 // detectCPU detects CPU information

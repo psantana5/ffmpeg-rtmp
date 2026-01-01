@@ -33,12 +33,15 @@ worker/
 
 **Lifecycle**:
 1. Detect local hardware (CPU, GPU, RAM)
-2. Register with master node
-3. Poll master for available jobs
-4. Execute job (run FFmpeg + collect metrics)
-5. Analyze results (energy efficiency scoring)
-6. Report results back to master
-7. Repeat
+2. Detect available encoders (h264_nvenc, h264_qsv, h264_vaapi, libx264)
+3. Register with master node
+4. Poll master for available jobs
+5. Generate test input video (if needed)
+6. Execute job (run FFmpeg + collect metrics)
+7. Cleanup generated inputs
+8. Analyze results (energy efficiency scoring)
+9. Report results back to master
+10. Repeat
 
 ### 2. Worker-Side Exporters
 
@@ -140,6 +143,69 @@ sudo systemctl status ffmpeg-agent
 - nvidia-docker runtime installed
 - NVML library installed
 
+## Hardware-Aware Features
+
+### Automatic Encoder Detection
+
+The worker automatically detects available hardware encoders at startup:
+
+**Priority order for H.264:**
+1. `h264_nvenc` (NVIDIA NVENC)
+2. `h264_qsv` (Intel Quick Sync Video)
+3. `h264_vaapi` (Video Acceleration API)
+4. `libx264` (Software fallback)
+
+**Priority order for H.265:**
+1. `hevc_nvenc` (NVIDIA NVENC)
+2. `hevc_qsv` (Intel Quick Sync Video)
+3. `hevc_vaapi` (Video Acceleration API)
+4. `libx265` (Software fallback)
+
+The detected encoders are reported during startup and used for both:
+- Input video generation (faster with hardware acceleration)
+- Transcoding jobs (when hardware encoder is optimal)
+
+### Dynamic Input Video Generation
+
+Workers can automatically generate test input videos for jobs that don't specify an input file:
+
+**Features:**
+- Hardware-accelerated generation using detected encoders
+- Automatic fallback to software encoding if hardware fails
+- Configurable resolution, framerate, and duration from job parameters
+- Realistic content with noise filter for better ML model testing
+- Automatic cleanup after job completion
+- Optional persistence for debugging (PERSIST_INPUTS=true)
+
+**Job Parameters:**
+```json
+{
+  "resolution_width": 1920,
+  "resolution_height": 1080,
+  "frame_rate": 30,
+  "duration_seconds": 10
+}
+```
+
+**Metrics collected:**
+- `input_generation_duration_sec`: Time to generate input
+- `input_file_size_bytes`: Size of generated input file
+- `input_encoder_used`: Encoder used for generation
+
+**Examples:**
+
+```bash
+# Enable input generation (default)
+./bin/agent --register --master http://master:8080 --generate-input=true
+
+# Disable input generation (use existing files)
+./bin/agent --register --master http://master:8080 --generate-input=false
+
+# Keep generated inputs for debugging
+export PERSIST_INPUTS=true
+./bin/agent --register --master http://master:8080
+```
+
 ## Network Requirements
 
 **Outbound only**:
@@ -216,6 +282,7 @@ Workers don't expose a metrics endpoint directly. Instead:
 ### Environment Variables
 - `MASTER_API_KEY`: API key for authentication (required if master has auth enabled)
 - `MASTER_URL`: Master node URL (can be set via flag instead)
+- `PERSIST_INPUTS`: Set to `true` to keep generated input videos (default: false)
 
 ### Command-Line Flags
 - `--master`: Master node URL (e.g., `https://192.168.1.100:8080`)
@@ -223,10 +290,12 @@ Workers don't expose a metrics endpoint directly. Instead:
 - `--poll-interval`: How often to check for new jobs (default: 10s)
 - `--heartbeat-interval`: How often to send heartbeat (default: 30s)
 - `--api-key`: API key for authentication
+- `--generate-input`: Automatically generate input videos for jobs (default: true)
 - `--allow-master-as-worker`: Allow master to be worker (dev only)
 - `--cert`, `--key`: Client certificate for mTLS
 - `--ca`: CA cert to verify server
 - `--insecure-skip-verify`: Skip TLS verification (insecure)
+- `--metrics-port`: Prometheus metrics port (default: 9091)
 
 ## Scaling Workers
 
@@ -268,13 +337,19 @@ sudo systemctl stop ffmpeg-agent
 
 When a worker receives a job:
 
-1. **Start exporters**: CPU, GPU, FFmpeg exporters begin collecting metrics
-2. **Run FFmpeg**: Execute transcoding with specified parameters
-3. **Collect metrics**: Exporters record power, performance data
-4. **Analyze results**: Calculate energy efficiency scores
-5. **Package results**: Create JSON result file
-6. **Report to master**: POST results to master's `/results` endpoint
-7. **Poll for next job**: Check master for more work
+1. **Determine input needs**: Check if input video generation is required
+2. **Generate input (if needed)**: Create test video using hardware-accelerated encoder
+   - Uses detected encoders (NVENC, QSV, VAAPI, or fallback to libx264)
+   - Configurable resolution, framerate, and duration based on job parameters
+   - Records generation metrics (duration, file size, encoder used)
+3. **Start exporters**: CPU, GPU, FFmpeg exporters begin collecting metrics
+4. **Run FFmpeg**: Execute transcoding with specified parameters
+5. **Collect metrics**: Exporters record power, performance data
+6. **Cleanup inputs**: Remove generated input files (unless PERSIST_INPUTS=true)
+7. **Analyze results**: Calculate energy efficiency scores
+8. **Package results**: Create JSON result file with input generation metrics
+9. **Report to master**: POST results to master's `/results` endpoint
+10. **Poll for next job**: Check master for more work
 
 ## Related Documentation
 
@@ -338,6 +413,103 @@ docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
 ldconfig -p | grep libnvidia-ml
 
 # Install nvidia-container-toolkit if missing
+```
+
+### Hardware encoder detection issues
+
+**Runtime Validation:**  
+The worker now performs runtime validation of hardware encoders, not just compile-time detection.
+
+**Detection Process:**
+1. **Compile-time check**: Query `ffmpeg -encoders` to see what's compiled in
+2. **Runtime validation**: Run a 0.1s test encode to verify encoder actually works
+3. **Selection**: Choose highest-priority encoder that passes runtime validation
+
+**Example logs:**
+```bash
+=== H.264 Encoder Detection ===
+✓ h264_nvenc: detected (compile-time)
+  → Running runtime validation for h264_nvenc...
+  ✗ h264_nvenc: NOT USABLE - CUDA runtime not available (libcuda.so.1 not found)
+✓ h264_qsv: detected (compile-time)
+  → Running runtime validation for h264_qsv...
+  ✗ h264_qsv: NOT USABLE - encode test failed
+✓ libx264: detected (compile-time)
+  → No hardware encoders validated, using libx264
+```
+
+If hardware encoders are detected but not working:
+
+
+**Common issues:**
+- **NVENC**: Requires CUDA runtime libraries (libcuda.so.1)
+  ```bash
+  # Check CUDA installation
+  ldconfig -p | grep cuda
+  
+  # Install CUDA runtime (Ubuntu)
+  sudo apt-get install nvidia-cuda-toolkit
+  ```
+
+- **QSV**: Requires Intel Media SDK or oneVPL
+  ```bash
+  # Check for Intel GPU
+  lspci | grep VGA
+  
+  # Install oneVPL (Ubuntu 22.04+)
+  sudo apt-get install intel-media-va-driver-non-free
+  ```
+
+- **VAAPI**: Requires VA-API driver and render device
+  ```bash
+  # Check VA-API support
+  vainfo
+  
+  # Install VA-API drivers
+  sudo apt-get install va-driver-all
+  ```
+
+**Prometheus Metrics:**
+The worker exposes runtime validation status:
+```
+ffrtmp_worker_nvenc_available{node_id="worker1"} 0
+ffrtmp_worker_qsv_available{node_id="worker1"} 0
+ffrtmp_worker_vaapi_available{node_id="worker1"} 0
+```
+
+**Fallback Behavior:**  
+Worker automatically falls back to software encoding (libx264/libx265) if hardware validation fails. Jobs continue to execute normally.
+
+### Testing encoder availability
+
+**Manual test:**
+
+If input video generation fails:
+
+```bash
+# Check FFmpeg installation
+which ffmpeg
+ffmpeg -version
+
+# Test basic video generation
+ffmpeg -f lavfi -i testsrc=duration=2 -c:v libx264 -preset ultrafast test.mp4
+
+# Disable input generation and use existing file
+./bin/agent --register --master http://master:8080 --generate-input=false
+```
+
+### Input files not being cleaned up
+
+```bash
+# Check for leftover input files
+ls -lh /tmp/input_*.mp4
+
+# Enable persistence for debugging
+export PERSIST_INPUTS=true
+./bin/agent --register --master http://master:8080
+
+# Manual cleanup
+rm /tmp/input_*.mp4
 ```
 
 ## Production Considerations
