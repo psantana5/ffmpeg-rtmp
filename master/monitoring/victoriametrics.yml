@@ -88,6 +88,14 @@ scrape_configs:
       - targets: ['cost-exporter:9504']
         labels:
           service: 'cost-analysis'
+          exporter: 'python'
+
+  - job_name: 'cost-exporter-go'
+    static_configs:
+      - targets: ['cost-exporter-go:9504']
+        labels:
+          service: 'cost-analysis'
+          exporter: 'go-rust'
 
   - job_name: 'exporter-health'
     static_configs:

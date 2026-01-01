@@ -140,13 +140,21 @@ make up-build
 ### Run Local Test
 
 ```bash
-# Run a simple streaming test
-python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
+# Build the CLI tool first
+go build -o bin/ffrtmp ./cmd/ffrtmp
+
+# Run a simple transcoding job
+./bin/ffrtmp jobs submit --scenario "test1" --bitrate 2000k --duration 60
 
 # View dashboards at http://localhost:3000
 ```
 
 **See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+
+**For running exporters without Docker**, see:
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Quick commands and setup
+- **[Master Exporters Guide](master/exporters/README.md)** - Detailed Python exporter deployment
+- **[Worker Exporters Guide](worker/exporters/DEPLOYMENT.md)** - Detailed Go exporter deployment
 
 ## What's New: Production-Ready v2.2
 
@@ -267,8 +275,11 @@ Documentation organized by topic:
 
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - 🚀 Quick commands for deploying exporters without Docker
 - **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
+- **[Master Exporters Manual Deployment](master/exporters/README.md)** - Running master exporters without Docker
 - **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
+- **[Worker Exporters Manual Deployment](worker/exporters/DEPLOYMENT.md)** - Running worker exporters without Docker
 - **[Energy Advisor](shared/advisor/README.md)** - ML models and efficiency scoring
 - **[Documentation Index](shared/docs/)** - All technical documentation
 
@@ -342,8 +353,10 @@ Use local testing mode to iterate quickly:
 # Start local stack
 make up-build
 
-# Run batch tests with different configurations
-python3 scripts/run_tests.py batch --file batch_stress_matrix.json
+# Submit multiple test jobs with different configurations
+ffrtmp jobs submit --scenario "4K60-h264" --bitrate 10M --duration 120
+ffrtmp jobs submit --scenario "1080p60-h265" --bitrate 5M --duration 60
+ffrtmp jobs submit --scenario "720p30-h264" --bitrate 2M --duration 60
 
 # Analyze results and get recommendations
 python3 scripts/analyze_results.py
@@ -353,12 +366,16 @@ The analyzer ranks configurations by energy efficiency and recommends optimal se
 
 ### Development: Compare H.264 vs H.265 Power Consumption
 
-Create batch configuration testing codecs:
+Submit jobs to test different codecs:
 
 ```bash
-# Edit batch_stress_matrix.json with h264 and h265 scenarios
-# Run tests locally
-python3 scripts/run_tests.py batch --file codec_comparison.json
+# H.264 tests
+ffrtmp jobs submit --scenario "4K60-h264" --bitrate 10M --duration 120
+ffrtmp jobs submit --scenario "1080p60-h264" --bitrate 5M --duration 60
+
+# H.265 tests
+ffrtmp jobs submit --scenario "4K60-h265" --bitrate 10M --duration 120
+ffrtmp jobs submit --scenario "1080p60-h265" --bitrate 5M --duration 60
 
 # Compare results in Grafana dashboards
 ```
