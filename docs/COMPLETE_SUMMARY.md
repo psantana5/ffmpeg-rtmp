@@ -332,7 +332,7 @@ open http://localhost:3000
 
 ### 4. Generate Test Data
 ```bash
-python3 scripts/run_tests.py single --name "test1" --duration 60
+ffrtmp jobs submit --scenario "test1" --duration 60
 
 # Wait for metrics (10s refresh)
 sleep 15

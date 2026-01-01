@@ -3,6 +3,20 @@
 ## Prerequisites
 - Docker and Docker Compose installed
 - Repository cloned and in project root
+- Go 1.21+ installed (for building the CLI tool)
+
+## Step 0: Build the CLI Tool
+
+```bash
+# Build the ffrtmp CLI for submitting jobs
+go build -o bin/ffrtmp ./cmd/ffrtmp
+
+# Optional: Add to PATH
+export PATH=$PATH:$(pwd)/bin
+
+# Or install it
+go install ./cmd/ffrtmp
+```
 
 ## Step 1: Start the Stack
 
@@ -68,14 +82,15 @@ curl -s 'http://localhost:8428/api/v1/query?query=cost_exporter_alive' | jq .
 
 ## Step 5: Generate Test Data
 
-To see metrics in the dashboard, you need test results:
+To see metrics in the dashboard, you need to submit transcoding jobs using the Go CLI tool:
 
 ```bash
 # Option 1: Run a simple test
-python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
+ffrtmp jobs submit --scenario "test1" --bitrate 2000k --duration 60
 
-# Option 2: Run batch tests
-python3 scripts/run_tests.py batch --file batch_stress_matrix.json
+# Option 2: Submit multiple jobs for comparison
+ffrtmp jobs submit --scenario "4K60-h264" --duration 120 --bitrate 10M
+ffrtmp jobs submit --scenario "1080p60-h265" --duration 60 --bitrate 5M
 
 # Wait 10 seconds for metrics to update
 sleep 10
@@ -148,7 +163,7 @@ ls -la test_results/
 # Should see files like: test_results_20260101_*.json
 
 # If empty, run a test
-python3 scripts/run_tests.py single --name "quick-test" --duration 30
+ffrtmp jobs submit --scenario "quick-test" --duration 30
 ```
 
 ### Wrong datasource error
@@ -181,7 +196,7 @@ sleep 10
 curl http://localhost:9514/health
 
 # 4. Run a test
-python3 scripts/run_tests.py single --name "e2e-test" --bitrate 2000k --duration 30
+ffrtmp jobs submit --scenario "e2e-test" --bitrate 2000k --duration 30
 
 # 5. Wait for metrics to be scraped
 sleep 15
@@ -247,6 +262,44 @@ Once the dashboard is working:
 3. **Monitor costs** in real-time during encoding
 4. **Set up alerts** for cost thresholds
 5. **Export data** from summary table for reports
+
+## CLI Tool Reference
+
+The `ffrtmp` CLI tool provides comprehensive job management capabilities:
+
+```bash
+# Submit jobs
+ffrtmp jobs submit --scenario <name> [options]
+
+# Check job status
+ffrtmp jobs status <job-id>
+
+# List compute nodes
+ffrtmp nodes list
+
+# Cancel jobs
+ffrtmp jobs cancel <job-id>
+```
+
+**For complete CLI documentation**, see: `cmd/ffrtmp/README.md`
+
+**Options:**
+- `--scenario` - Test scenario name (e.g., "4K60-h264", "1080p60-h265")
+- `--bitrate` - Target bitrate (e.g., "10M", "5M", "2000k")
+- `--duration` - Duration in seconds
+- `--confidence` - Confidence level: "auto", "high", "medium", "low"
+- `--queue` - Queue type: "live", "default", "batch"
+- `--priority` - Priority: "high", "medium", "low"
+
+**Master URL configuration:**
+```bash
+# Option 1: Command-line flag
+ffrtmp jobs submit --scenario test --master http://localhost:8080
+
+# Option 2: Config file ~/.ffrtmp/config.yaml
+master_url: http://localhost:8080
+api_key: your-api-key-here
+```
 
 ## Documentation
 

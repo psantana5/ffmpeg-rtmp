@@ -35,7 +35,7 @@ open http://localhost:3000/d/cost-energy-monitoring
 # Login: admin/admin
 
 # Generate test data
-python3 scripts/run_tests.py single --name "test1" --duration 60
+ffrtmp jobs submit --scenario "test1" --duration 60
 
 # Watch dashboard update (10s refresh)
 ```
