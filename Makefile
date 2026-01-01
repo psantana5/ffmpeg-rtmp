@@ -50,6 +50,11 @@ help:
 	@echo "  make analyze         Analyze latest test results (and export CSV)"
 	@echo "  make retrain-models  Retrain ML models from test results"
 	@echo ""
+	@echo "ML Predictions"
+	@echo "  make train-model     Train ML models with synthetic data"
+	@echo "  make deploy-ml       Deploy ML prediction exporter"
+	@echo "  make update-dashboards  Update Grafana dashboards"
+	@echo ""
 	@echo "Development"
 	@echo "  make lint            Run ruff checks"
 	@echo "  make format          Run ruff formatter"
@@ -123,6 +128,27 @@ analyze:
 
 retrain-models:
 	$(PYTHON) scripts/retrain_models.py --results-dir ./test_results --models-dir ./models
+
+train-model:
+	@echo "Training ML prediction models..."
+	$(PYTHON) scripts/export_training_data.py --output ./ml_models/training_data.csv --synthetic
+	@echo "Building Rust ML library..."
+	cd ml_rust && cargo build --release
+	@echo "✓ ML model training complete"
+
+deploy-ml:
+	@echo "Deploying ML prediction system..."
+	@mkdir -p ml_models
+	@echo "Building ML exporter..."
+	docker compose build ml-predictions-exporter
+	@echo "Starting ML exporter..."
+	docker compose up -d ml-predictions-exporter
+	@echo "✓ ML prediction system deployed"
+
+update-dashboards:
+	@echo "Reloading Grafana dashboards..."
+	@echo "Dashboards are auto-loaded from master/monitoring/grafana/provisioning/dashboards/"
+	@echo "✓ Dashboards updated (restart grafana if needed: docker compose restart grafana)"
 
 run-benchmarks:
 	@mkdir -p test_results

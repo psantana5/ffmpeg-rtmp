@@ -90,6 +90,13 @@ scrape_configs:
           service: 'cost-analysis'
           exporter: 'go'
 
+  - job_name: 'ml-predictions-exporter'
+    static_configs:
+      - targets: ['ml-predictions-exporter:9505']
+        labels:
+          service: 'ml-predictions'
+          exporter: 'go-rust'
+
   - job_name: 'exporter-health'
     static_configs:
       - targets: ['exporter-health-checker:9600']
