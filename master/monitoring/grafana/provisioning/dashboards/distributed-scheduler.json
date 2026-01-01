@@ -41,7 +41,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -115,7 +117,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -176,7 +180,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -250,7 +256,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -324,7 +332,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -398,7 +408,9 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "dtdurations",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -473,7 +485,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -536,7 +550,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -612,7 +628,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         }
       },
       "gridPos": {
@@ -662,7 +680,8 @@
               "legend": false
             }
           },
-          "mappings": []
+          "mappings": [],
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -749,7 +768,9 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "decimals": 2,
+          "noValue": "No data"
         },
         "overrides": [
           {
