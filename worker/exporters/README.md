@@ -79,7 +79,7 @@ go build -o bin/ffmpeg-exporter ./worker/exporters/ffmpeg_exporter
 sudo ./bin/cpu-exporter --port 9510
 ./bin/gpu-exporter --port 9511
 ./bin/ffmpeg-exporter --port 9506
-python3 worker/exporters/docker_stats/docker_stats_exporter.py --port 9501
+./bin/docker-stats-exporter --port 9501
 ```
 
 For complete instructions including systemd services, see [DEPLOYMENT.md](DEPLOYMENT.md).

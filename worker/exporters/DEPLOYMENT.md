@@ -53,8 +53,8 @@ sudo ./bin/cpu-exporter --port 9510
 # FFmpeg Exporter
 ./bin/ffmpeg-exporter --port 9506
 
-# Docker Stats Exporter (Python)
-python3 worker/exporters/docker_stats/docker_stats_exporter.py --port 9501
+# Docker Stats Exporter (Go)
+./bin/docker-stats-exporter --port 9501
 ```
 
 ---
@@ -244,10 +244,10 @@ pip install requests  # If not already installed
 
 **Run**:
 ```bash
-DOCKER_STATS_PORT=9501 python3 worker/exporters/docker_stats/docker_stats_exporter.py
+DOCKER_STATS_PORT=9501 ./bin/docker-stats-exporter
 
 # Or with flag
-python3 worker/exporters/docker_stats/docker_stats_exporter.py --port 9501
+./bin/docker-stats-exporter --port 9501
 ```
 
 **Permissions**:
@@ -257,7 +257,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 
 # Or run with sudo
-sudo python3 worker/exporters/docker_stats/docker_stats_exporter.py --port 9501
+sudo ./bin/docker-stats-exporter --port 9501
 ```
 
 **Metrics Exposed**:
@@ -442,7 +442,7 @@ WorkingDirectory=/opt/ffmpeg-rtmp/worker
 
 Environment="DOCKER_STATS_PORT=9501"
 
-ExecStart=/usr/bin/python3 /opt/ffmpeg-rtmp/worker/docker_stats/docker_stats_exporter.py --port 9501
+ExecStart=/opt/ffmpeg-rtmp/bin/docker-stats-exporter --port 9501
 
 Restart=on-failure
 RestartSec=10s
