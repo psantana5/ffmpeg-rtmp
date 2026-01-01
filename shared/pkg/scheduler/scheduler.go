@@ -11,9 +11,10 @@ import (
 
 // Scheduler manages background job scheduling tasks
 type Scheduler struct {
-	store         store.Store
-	checkInterval time.Duration
-	stopCh        chan struct{}
+	store           store.Store
+	recoveryManager *RecoveryManager
+	checkInterval   time.Duration
+	stopCh          chan struct{}
 }
 
 // New creates a new Scheduler instance
@@ -21,10 +22,15 @@ func New(st store.Store, checkInterval time.Duration) *Scheduler {
 	if checkInterval <= 0 {
 		checkInterval = 5 * time.Second // default: check every 5 seconds
 	}
+	
+	// Create recovery manager with default settings
+	recoveryManager := NewRecoveryManager(st, 3, 2*time.Minute)
+	
 	return &Scheduler{
-		store:         st,
-		checkInterval: checkInterval,
-		stopCh:        make(chan struct{}),
+		store:           st,
+		recoveryManager: recoveryManager,
+		checkInterval:   checkInterval,
+		stopCh:          make(chan struct{}),
 	}
 }
 
@@ -50,6 +56,7 @@ func (s *Scheduler) run() {
 		case <-ticker.C:
 			s.processPendingJobs()
 			s.checkStaleJobs()
+			s.recoveryManager.RunRecoveryCheck()
 		case <-s.stopCh:
 			log.Println("Scheduler stopped")
 			return
