@@ -186,7 +186,7 @@ curl http://localhost:8428/api/v1/targets | jq '.data.activeTargets[] | {job: .l
 
 ```bash
 # Terminal 1: Start a simple transcoding test
-python3 scripts/run_tests.py single --name "test1" --bitrate 2000k --duration 60
+ffrtmp jobs submit --scenario "test1" --bitrate 2000k --duration 60
 
 # Browser: Open these dashboards in separate tabs
 # Tab 1: System Overview - watch power consumption rise
@@ -308,8 +308,10 @@ Now that everything is verified:
 
 ### For Development/Testing:
 ```bash
-# Run batch tests to populate data
-python3 scripts/run_tests.py batch --file batch_stress_matrix.json
+# Run multiple tests to populate data
+ffrtmp jobs submit --scenario "4K60-h264" --bitrate 10M --duration 120
+ffrtmp jobs submit --scenario "1080p60-h265" --bitrate 5M --duration 60
+ffrtmp jobs submit --scenario "720p30-h264" --bitrate 2M --duration 60
 
 # Then explore:
 # - Energy Efficiency Analysis - find optimal settings

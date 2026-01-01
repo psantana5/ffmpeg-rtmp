@@ -301,6 +301,29 @@ services:
       timeout: 5s
       retries: 3
 
+  cost-exporter-go:
+    build:
+      context: .
+      dockerfile: master/exporters/cost_go/Dockerfile
+    container_name: cost-exporter-go
+    volumes:
+      - ./test_results:/results:ro
+    ports:
+      - "9514:9504"
+    restart: unless-stopped
+    networks:
+      - streaming-net
+    environment:
+      - RESULTS_DIR=/results
+      - REGION=us-east-1
+      - ENERGY_COST=0.0
+      - CPU_COST=0.50
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:9504/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
 networks:
   streaming-net:
     driver: bridge
