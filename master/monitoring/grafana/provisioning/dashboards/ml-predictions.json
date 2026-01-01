@@ -24,7 +24,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -94,7 +94,10 @@
       "id": 1,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -109,7 +112,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_predicted_vmaf",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -122,7 +125,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -184,7 +187,10 @@
       "id": 2,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -199,7 +205,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_predicted_psnr",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -212,7 +218,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -280,7 +286,10 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -295,7 +304,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "cost_predicted_usd",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -308,7 +317,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -368,7 +377,10 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -383,7 +395,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "cost_predicted_co2_kg",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -396,7 +408,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -466,7 +478,10 @@
       "id": 5,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -481,7 +496,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "prediction_confidence",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -494,14 +509,20 @@
         "conditions": [
           {
             "evaluator": {
-              "params": [0.7],
+              "params": [
+                0.7
+              ],
               "type": "lt"
             },
             "operator": {
               "type": "and"
             },
             "query": {
-              "params": ["A", "5m", "now"]
+              "params": [
+                "A",
+                "5m",
+                "now"
+              ]
             },
             "reducer": {
               "params": [],
@@ -523,7 +544,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -583,7 +604,10 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -598,7 +622,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "recommended_bitrate_kbps",
           "legendFormat": "{{config}} - {{resolution}}@{{fps}}fps",
@@ -611,7 +635,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -645,7 +669,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -656,7 +682,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "ml_model_version",
           "refId": "A"
@@ -668,7 +694,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -722,7 +748,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -733,7 +761,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "ml_exporter_up",
           "refId": "A"
@@ -745,7 +773,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -787,7 +815,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -798,7 +828,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "time() - ml_model_last_update_timestamp",
           "refId": "A"
@@ -810,7 +840,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -884,7 +914,9 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "showHeader": true
@@ -894,7 +926,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_predicted_vmaf",
           "format": "table",
@@ -904,7 +936,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_predicted_psnr",
           "format": "table",
@@ -914,7 +946,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "cost_predicted_usd",
           "format": "table",
@@ -924,7 +956,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "prediction_confidence",
           "format": "table",
@@ -966,7 +998,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -1057,7 +1089,9 @@
       "id": 11,
       "options": {
         "legend": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -1072,7 +1106,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_predicted_vmaf{config=\"1080p30_4mbps\"}",
           "legendFormat": "Predicted",
@@ -1081,7 +1115,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "qoe_vmaf_score{resolution=\"1920x1080\"}",
           "legendFormat": "Actual",
@@ -1094,7 +1128,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "victoriametrics"
+        "uid": "DS_VICTORIAMETRICS"
       },
       "fieldConfig": {
         "defaults": {
@@ -1162,7 +1196,10 @@
       "id": 12,
       "options": {
         "legend": {
-          "calcs": ["mean", "lastNotNull"],
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
@@ -1177,7 +1214,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "victoriametrics"
+            "uid": "DS_VICTORIAMETRICS"
           },
           "expr": "abs(qoe_predicted_vmaf - qoe_vmaf_score) / 100",
           "legendFormat": "VMAF Drift",
@@ -1189,9 +1226,14 @@
       "description": "Shows the difference between predicted and actual values. High drift indicates model needs retraining."
     }
   ],
-  "refresh": "10s",
+  "refresh": "5s",
   "schemaVersion": 38,
-  "tags": ["ml", "predictions", "qoe", "cost"],
+  "tags": [
+    "ml",
+    "predictions",
+    "qoe",
+    "cost"
+  ],
   "templating": {
     "list": []
   },
