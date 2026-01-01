@@ -151,6 +151,11 @@ go build -o bin/ffrtmp ./cmd/ffrtmp
 
 **See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
 
+**For running exporters without Docker**, see:
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Quick commands and setup
+- **[Master Exporters Guide](master/exporters/README.md)** - Detailed Python exporter deployment
+- **[Worker Exporters Guide](worker/exporters/DEPLOYMENT.md)** - Detailed Go exporter deployment
+
 ## What's New: Production-Ready v2.2
 
 **Distributed mode now production-ready with enterprise features:**
@@ -270,8 +275,11 @@ Documentation organized by topic:
 
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - 🚀 Quick commands for deploying exporters without Docker
 - **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
+- **[Master Exporters Manual Deployment](master/exporters/README.md)** - Running master exporters without Docker
 - **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
+- **[Worker Exporters Manual Deployment](worker/exporters/DEPLOYMENT.md)** - Running worker exporters without Docker
 - **[Energy Advisor](shared/advisor/README.md)** - ML models and efficiency scoring
 - **[Documentation Index](shared/docs/)** - All technical documentation
 
