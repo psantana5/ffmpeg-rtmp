@@ -169,6 +169,51 @@ go build -o bin/ffrtmp ./cmd/ffrtmp
 
 See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
+## 🛡️ NEW: Enterprise-Grade Fault Tolerance
+
+**Production-ready reliability features for mission-critical workloads:**
+
+### Automatic Job Recovery
+- **Node Failure Detection** - Identifies dead nodes based on heartbeat timeout (2min default)
+- **Automatic Job Reassignment** - Jobs from failed nodes automatically reassigned to healthy workers
+- **Transient Failure Retry** - Smart retry for connection errors, timeouts, network issues
+- **Configurable Max Retries** - Default 3 attempts with exponential backoff
+- **Stale Job Detection** - Batch jobs timeout after 30min, live jobs after 5min inactivity
+
+### Priority Queue Management
+- **Multi-Level Priorities** - Live > High > Medium > Low > Batch
+- **Queue-Based Scheduling** - `live`, `default`, `batch` queues with different SLAs
+- **FIFO Within Priority** - Fair scheduling for same-priority jobs
+- **Smart Job Selection** - Automatic priority-based job assignment
+
+### Observability
+- **Distributed Tracing** - OpenTelemetry integration for end-to-end visibility
+- **Prometheus Metrics** - Comprehensive metrics for jobs, nodes, and system health
+- **Structured Logging** - Production-grade logging with context
+- **Rate Limiting** - Built-in per-IP rate limiting (100 req/s default)
+
+### Security
+- **TLS/mTLS** - Mutual TLS authentication between master and workers
+- **API Key Authentication** - Required for all API operations
+- **Certificate Management** - Auto-generation and rotation support
+
+```bash
+# Submit high-priority live stream job
+./bin/ffrtmp jobs submit \
+    --scenario live-4k \
+    --queue live \
+    --priority high \
+    --duration 3600
+
+# Configure fault tolerance
+./bin/master \
+    --max-retries 5 \
+    --scheduler-interval 10s \
+    --heartbeat-interval 30s
+```
+
+**See [docs/PRODUCTION.md](docs/PRODUCTION.md) for complete production deployment guide.**
+
 ## ⚡ NEW: Dual Transcoding Engine Support
 
 **Choose the best transcoding engine for your workload:**
