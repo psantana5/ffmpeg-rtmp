@@ -371,12 +371,20 @@
       "end_time": 1767293074,
       "name": "doc-test",
       "start_time": 1767293067
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.907993678,
+      "encoder_type": "auto",
+      "end_time": 1767295988,
+      "name": "test-720p",
+      "start_time": 1767295982
     }
   ],
-  "test_date": "2026-01-01T19:44:34+01:00",
+  "test_date": "2026-01-01T20:33:08+01:00",
   "test_metadata": {
     "platform": "distributed",
     "source": "scheduler",
-    "timestamp": "2026-01-01T19:44:34+01:00"
+    "timestamp": "2026-01-01T20:33:08+01:00"
   }
 }
