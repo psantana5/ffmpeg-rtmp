@@ -34,6 +34,7 @@ func main() {
 	caFile := flag.String("ca", "", "CA certificate file to verify server")
 	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
 	metricsPort := flag.String("metrics-port", "9091", "Prometheus metrics port")
+	generateInput := flag.Bool("generate-input", true, "Automatically generate input videos for jobs (default: true)")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -56,6 +57,30 @@ func main() {
 	caps, err := agent.DetectHardware()
 	if err != nil {
 		log.Fatalf("Failed to detect hardware: %v", err)
+	}
+
+	// Detect encoder capabilities with runtime validation
+	log.Println("Detecting and validating encoders...")
+	encoderCaps := agent.DetectEncoders()
+	log.Printf("Selected H.264 encoder: %s", encoderCaps.SelectedH264)
+	log.Printf("Selected H.265 encoder: %s", encoderCaps.SelectedH265)
+	log.Printf("Reason: %s", encoderCaps.GetEncoderReason())
+	
+	// Log validation results
+	nvencAvailable := encoderCaps.ValidationResults["h264_nvenc"]
+	qsvAvailable := encoderCaps.ValidationResults["h264_qsv"]
+	vaapiAvailable := encoderCaps.ValidationResults["h264_vaapi"]
+	
+	log.Printf("Encoder Runtime Validation:")
+	log.Printf("  NVENC: %v", nvencAvailable)
+	log.Printf("  QSV: %v", qsvAvailable)
+	log.Printf("  VAAPI: %v", vaapiAvailable)
+	
+	// Log validation failures
+	for encoder, reason := range encoderCaps.ValidationReasons {
+		if reason != "" {
+			log.Printf("  %s validation failed: %s", encoder, reason)
+		}
 	}
 
 	// Determine node type
@@ -88,6 +113,15 @@ func main() {
 	availableEngines := engineSelector.GetAvailableEngines()
 	log.Printf("  Available engines: %v", availableEngines)
 
+	// Create input generator
+	inputGenerator := agent.NewInputGenerator(encoderCaps)
+	log.Printf("Input generation: %s", func() string {
+		if *generateInput {
+			return "enabled"
+		}
+		return "disabled"
+	}())
+
 	// Start Prometheus metrics exporter
 	hostname, _ := os.Hostname()
 	nodeID := fmt.Sprintf("%s:%s", hostname, *metricsPort)
@@ -100,6 +134,9 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy"}`))
 	}).Methods("GET")
+	
+	// Set encoder availability metrics
+	metricsExporter.SetEncoderAvailability(nvencAvailable, qsvAvailable, vaapiAvailable)
 	
 	go func() {
 		log.Printf("✓ Prometheus metrics endpoint: http://localhost:%s/metrics", *metricsPort)
@@ -278,7 +315,7 @@ func main() {
 		// Execute job with hardware-optimized parameters
 		// Pass client to access master URL for RTMP streaming
 		metricsExporter.SetActiveJobs(1)
-		result := executeJob(job, client, ffmpegOpt, engineSelector)
+		result := executeJob(job, client, ffmpegOpt, engineSelector, inputGenerator, *generateInput, metricsExporter)
 		metricsExporter.SetActiveJobs(0)
 
 		// Send results
@@ -342,22 +379,95 @@ func confirmMasterAsWorker() bool {
 }
 
 // executeJob executes a job and returns the result
-func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization, engineSelector *agent.EngineSelector) *models.JobResult {
-	log.Printf("Executing job %s (scenario: %s)...", job.ID, job.Scenario)
+func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOptimization, engineSelector *agent.EngineSelector, inputGenerator *agent.InputGenerator, generateInputFlag bool, metricsExporter *prometheus.WorkerExporter) *models.JobResult {
+	log.Printf("╔════════════════════════════════════════════════════════════════╗")
+	log.Printf("║ EXECUTING JOB: %s", job.ID)
+	log.Printf("╠════════════════════════════════════════════════════════════════╣")
+	log.Printf("║ Scenario: %s", job.Scenario)
+	log.Printf("║ Job Parameters:")
+	if job.Parameters != nil {
+		for key, value := range job.Parameters {
+			log.Printf("║   %s: %v", key, value)
+		}
+	} else {
+		log.Printf("║   (no parameters specified - using defaults)")
+	}
+	log.Printf("╚════════════════════════════════════════════════════════════════╝")
+	
 	startTime := time.Now()
 
+	// Generate input video if needed
+	var inputGenResult *agent.InputGenerationResult
+	var generatedInputPath string
+	if agent.ShouldGenerateInput(job, generateInputFlag) {
+		log.Println("\n>>> INPUT GENERATION PHASE <<<")
+		var err error
+		inputGenResult, err = inputGenerator.GenerateInput(job)
+		if err != nil {
+			log.Printf("❌ Failed to generate input: %v", err)
+			return &models.JobResult{
+				JobID:       job.ID,
+				NodeID:      client.GetNodeID(),
+				Status:      models.JobStatusFailed,
+				Error:       fmt.Sprintf("input generation failed: %v", err),
+				CompletedAt: time.Now(),
+			}
+		}
+		
+		// Record metrics
+		metricsExporter.RecordInputGeneration(inputGenResult.GenerationTime, inputGenResult.FileSizeBytes)
+		
+		generatedInputPath = inputGenResult.FilePath
+		
+		// Set input path in job parameters if not already set
+		if job.Parameters == nil {
+			job.Parameters = make(map[string]interface{})
+		}
+		if _, exists := job.Parameters["input"]; !exists {
+			job.Parameters["input"] = inputGenResult.FilePath
+			log.Printf("✓ Input path added to job parameters: %s", inputGenResult.FilePath)
+		}
+	} else {
+		log.Println("\n>>> SKIPPING INPUT GENERATION <<<")
+		if job.Parameters != nil {
+			if input, ok := job.Parameters["input"].(string); ok {
+				log.Printf("Using existing input file: %s", input)
+			}
+		}
+	}
+
 	// Select the best engine for this job
+	log.Println("\n>>> ENGINE SELECTION PHASE <<<")
 	selectedEngine, reason := engineSelector.SelectEngine(job)
-	log.Printf("Selected engine: %s", selectedEngine.Name())
-	log.Printf("Selection reason: %s", reason)
+	log.Printf("Selected Engine: %s", selectedEngine.Name())
+	log.Printf("Selection Reason: %s", reason)
 
 	// Execute the actual job with the selected engine
+	log.Println("\n>>> TRANSCODING EXECUTION PHASE <<<")
 	metrics, analyzerOutput, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt)
+	
+	// Cleanup generated input if needed
+	log.Println("\n>>> CLEANUP PHASE <<<")
+	persistInputs := os.Getenv("PERSIST_INPUTS") == "true"
+	if generatedInputPath != "" && !persistInputs {
+		log.Printf("PERSIST_INPUTS=false, cleaning up generated input...")
+		if cleanupErr := inputGenerator.CleanupInput(generatedInputPath); cleanupErr != nil {
+			log.Printf("⚠️  Warning: failed to cleanup input file: %v", cleanupErr)
+		}
+	} else if generatedInputPath != "" && persistInputs {
+		log.Printf("PERSIST_INPUTS=true, keeping input file: %s", generatedInputPath)
+	} else {
+		log.Printf("No generated input to cleanup")
+	}
 	
 	duration := time.Since(startTime).Seconds()
 	
 	if err != nil {
-		log.Printf("Job %s failed: %v", job.ID, err)
+		log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
+		log.Printf("║ ❌ JOB FAILED: %s", job.ID)
+		log.Printf("║ Error: %v", err)
+		log.Printf("║ Duration: %.2f seconds", duration)
+		log.Printf("╚════════════════════════════════════════════════════════════════╝\n")
 		return &models.JobResult{
 			JobID:       job.ID,
 			NodeID:      client.GetNodeID(),
@@ -378,8 +488,22 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	metrics["duration"] = duration
 	metrics["scenario"] = job.Scenario
 	metrics["engine"] = selectedEngine.Name()
+	
+	// Add input generation metrics if applicable
+	if inputGenResult != nil {
+		metrics["input_generation_duration_sec"] = inputGenResult.GenerationTime
+		metrics["input_file_size_bytes"] = inputGenResult.FileSizeBytes
+		metrics["input_encoder_used"] = inputGenResult.EncoderUsed
+	}
 
-	log.Printf("Job %s completed successfully in %.2f seconds using %s", job.ID, duration, selectedEngine.Name())
+	log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
+	log.Printf("║ ✅ JOB COMPLETED: %s", job.ID)
+	log.Printf("║ Total Duration: %.2f seconds", duration)
+	log.Printf("║ Engine Used: %s", selectedEngine.Name())
+	if inputGenResult != nil {
+		log.Printf("║ Input Generation: %.2f seconds", inputGenResult.GenerationTime)
+	}
+	log.Printf("╚════════════════════════════════════════════════════════════════╝\n")
 	return &models.JobResult{
 		JobID:          job.ID,
 		NodeID:         client.GetNodeID(),

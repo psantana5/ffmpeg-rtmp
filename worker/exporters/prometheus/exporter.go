@@ -32,6 +32,16 @@ type WorkerExporter struct {
 	// GPU capabilities
 	hasGPU           bool
 	gpuModel         string
+	
+	// Input generation metrics
+	inputGenerationDurationSeconds float64
+	inputFileSizeBytes             int64
+	totalInputsGenerated           int64
+	
+	// Encoder availability metrics (runtime-validated)
+	nvencAvailable  bool
+	qsvAvailable    bool
+	vaapiAvailable  bool
 }
 
 // NewWorkerExporter creates a new Prometheus exporter for worker
@@ -103,6 +113,44 @@ func (e *WorkerExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hasGPUValue = 1
 	}
 	fmt.Fprintf(w, "ffrtmp_worker_has_gpu{node_id=\"%s\"} %d\n", e.nodeID, hasGPUValue)
+
+	// Input generation metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_input_generation_duration_seconds Duration of last input video generation\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_input_generation_duration_seconds gauge\n")
+	fmt.Fprintf(w, "ffrtmp_worker_input_generation_duration_seconds{node_id=\"%s\"} %.2f\n", e.nodeID, e.inputGenerationDurationSeconds)
+
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_input_file_size_bytes Size of last generated input file\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_input_file_size_bytes gauge\n")
+	fmt.Fprintf(w, "ffrtmp_worker_input_file_size_bytes{node_id=\"%s\"} %d\n", e.nodeID, e.inputFileSizeBytes)
+
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_total_inputs_generated Total number of input videos generated\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_total_inputs_generated counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_total_inputs_generated{node_id=\"%s\"} %d\n", e.nodeID, e.totalInputsGenerated)
+	
+	// Encoder availability metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_nvenc_available NVENC encoder runtime availability (1=available, 0=unavailable)\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_nvenc_available gauge\n")
+	nvencValue := 0
+	if e.nvencAvailable {
+		nvencValue = 1
+	}
+	fmt.Fprintf(w, "ffrtmp_worker_nvenc_available{node_id=\"%s\"} %d\n", e.nodeID, nvencValue)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_qsv_available Intel QSV encoder runtime availability (1=available, 0=unavailable)\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_qsv_available gauge\n")
+	qsvValue := 0
+	if e.qsvAvailable {
+		qsvValue = 1
+	}
+	fmt.Fprintf(w, "ffrtmp_worker_qsv_available{node_id=\"%s\"} %d\n", e.nodeID, qsvValue)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_vaapi_available VAAPI encoder runtime availability (1=available, 0=unavailable)\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_vaapi_available gauge\n")
+	vaapiValue := 0
+	if e.vaapiAvailable {
+		vaapiValue = 1
+	}
+	fmt.Fprintf(w, "ffrtmp_worker_vaapi_available{node_id=\"%s\"} %d\n", e.nodeID, vaapiValue)
 }
 
 // updateMetrics updates hardware metrics
@@ -193,4 +241,22 @@ func (e *WorkerExporter) GetMemoryFree() uint64 {
 // GetCPUCores returns the number of CPU cores
 func (e *WorkerExporter) GetCPUCores() int {
 	return runtime.NumCPU()
+}
+
+// RecordInputGeneration records metrics for input video generation
+func (e *WorkerExporter) RecordInputGeneration(durationSeconds float64, fileSizeBytes int64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.inputGenerationDurationSeconds = durationSeconds
+	e.inputFileSizeBytes = fileSizeBytes
+	e.totalInputsGenerated++
+}
+
+// SetEncoderAvailability sets the runtime-validated encoder availability
+func (e *WorkerExporter) SetEncoderAvailability(nvenc, qsv, vaapi bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.nvencAvailable = nvenc
+	e.qsvAvailable = qsv
+	e.vaapiAvailable = vaapi
 }
