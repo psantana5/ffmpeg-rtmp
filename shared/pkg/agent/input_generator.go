@@ -55,7 +55,20 @@ func (ig *InputGenerator) GenerateInput(job *models.Job) (*InputGenerationResult
 	width := getIntParam(params, "resolution_width", 1280)
 	height := getIntParam(params, "resolution_height", 720)
 	fps := getIntParam(params, "frame_rate", 30)
-	duration := getIntParam(params, "duration_seconds", 10)
+	
+	// Check both duration and duration_seconds parameters
+	duration := getIntParam(params, "duration", 0)
+	if duration == 0 {
+		duration = getIntParam(params, "duration_seconds", 10)
+	}
+	// Cap duration at reasonable limit for input generation (max 120s)
+	if duration > 120 {
+		log.Printf("⚠️  Requested duration %ds exceeds maximum for input generation (120s), capping at 120s", duration)
+		duration = 120
+	}
+	if duration == 0 {
+		duration = 10 // Final fallback
+	}
 
 	// Log all parameters being used
 	log.Printf("=== Input Generation Parameters ===")
@@ -64,7 +77,8 @@ func (ig *InputGenerator) GenerateInput(job *models.Job) (*InputGenerationResult
 	log.Printf("Resolution: %dx%d (from job params: width=%v, height=%v, using defaults if nil)",
 		width, height, params["resolution_width"], params["resolution_height"])
 	log.Printf("Frame Rate: %d fps (from job params: %v, using default if nil)", fps, params["frame_rate"])
-	log.Printf("Duration: %d seconds (from job params: %v, using default if nil)", duration, params["duration_seconds"])
+	log.Printf("Duration: %d seconds (from job params: duration=%v, duration_seconds=%v)", 
+		duration, params["duration"], params["duration_seconds"])
 	
 	// Generate output path
 	outputPath := filepath.Join(ig.workDir, fmt.Sprintf("input_%s.mp4", job.ID))

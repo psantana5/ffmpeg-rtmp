@@ -114,15 +114,25 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		pipeline = append(pipeline,
 			"filesrc", fmt.Sprintf("location=%s", inputFile), "!",
 			"decodebin", "!",
-			"videoconvert", "!",
 		)
 		
-		// Add num-buffers limit if duration specified
+		// Add duration limiter for file inputs
 		if duration > 0 {
-			// Note: For file sources, duration control is trickier
-			// We rely on context timeout in the worker instead
-			log.Printf("Note: File input with duration=%d - using context timeout for control", duration)
+			//Calculate number of buffers based on framerate assumption (30fps default)
+			// This caps the video at specified duration
+			numBuffers := duration * 30
+			pipeline = append(pipeline,
+				"identity", fmt.Sprintf("drop-allocation=true"), "!",
+				"videorate", "!",
+				"video/x-raw,framerate=30/1", "!",
+				"identity", fmt.Sprintf("num-buffers=%d", numBuffers), "!",
+			)
+			log.Printf("→ File input: limiting to %d buffers (%d seconds at 30fps)", numBuffers, duration)
+		} else {
+			log.Printf("→ File input: no duration limit, will process entire file")
 		}
+		
+		pipeline = append(pipeline, "videoconvert", "!")
 	} else {
 		// Test pattern pipeline
 		pipeline = append(pipeline,
