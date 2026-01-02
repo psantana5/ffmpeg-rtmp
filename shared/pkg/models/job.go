@@ -7,17 +7,17 @@ import (
 // JobStatus represents the status of a job
 type JobStatus string
 
+// Legacy states (for backward compatibility)
 const (
-	JobStatusPending    JobStatus = "pending"
-	JobStatusQueued     JobStatus = "queued"
-	JobStatusAssigned   JobStatus = "assigned"
-	JobStatusProcessing JobStatus = "processing"
-	JobStatusRunning    JobStatus = "running"
-	JobStatusPaused     JobStatus = "paused"
-	JobStatusCompleted  JobStatus = "completed"
-	JobStatusFailed     JobStatus = "failed"
-	JobStatusCanceled   JobStatus = "canceled"
+	JobStatusPending    JobStatus = "pending"    // Legacy: maps to QUEUED
+	JobStatusProcessing JobStatus = "processing" // Legacy: maps to RUNNING
+	JobStatusPaused     JobStatus = "paused"     // Legacy: maps to ASSIGNED
 )
+
+// Note: Current FSM states defined in fsm.go:
+// - JobStatusQueued, JobStatusAssigned, JobStatusRunning
+// - JobStatusCompleted, JobStatusFailed, JobStatusTimedOut
+// - JobStatusRetrying, JobStatusCanceled
 
 // Job represents a workload to be executed on a compute node
 type Job struct {
@@ -38,8 +38,11 @@ type Job struct {
 	LastActivityAt   *time.Time             `json:"last_activity_at,omitempty"` // Tracks last heartbeat/progress update
 	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
 	RetryCount       int                    `json:"retry_count"`
+	MaxRetries       int                    `json:"max_retries,omitempty"`       // Max retry attempts (default: 3)
+	RetryReason      string                 `json:"retry_reason,omitempty"`      // Reason for current retry
 	Error            string                 `json:"error,omitempty"`
 	Logs             string                 `json:"logs,omitempty"`              // Worker execution logs
+	TimeoutAt        *time.Time             `json:"timeout_at,omitempty"`        // Calculated timeout deadline
 	StateTransitions []StateTransition      `json:"state_transitions,omitempty"`
 }
 
