@@ -119,3 +119,6 @@ bin/*
 !/master/
 !/agent/
 
+# Rust build artifacts
+ml_rust/target/debug/
+ml_rust/target/release/

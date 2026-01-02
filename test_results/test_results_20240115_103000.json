@@ -1811,12 +1811,60 @@
       "end_time": 1767343641,
       "name": "720p30-crf30",
       "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.647494365,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343651,
+      "name": "720p30-complex-1",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.880096146,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343661,
+      "name": "720p30-complex-2",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.015618264,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343670,
+      "name": "480p30-complex-1",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.8757107880000001,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343681,
+      "name": "480p30-complex-2",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.966835623,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343690,
+      "name": "360p15-minimal",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.1368484739999998,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343701,
+      "name": "480p60-retro",
+      "start_time": 1767342647
     }
   ],
-  "test_date": "2026-01-02T09:47:21+01:00",
+  "test_date": "2026-01-02T09:48:21+01:00",
   "test_metadata": {
     "platform": "distributed",
     "source": "scheduler",
-    "timestamp": "2026-01-02T09:47:21+01:00"
+    "timestamp": "2026-01-02T09:48:21+01:00"
   }
 }
