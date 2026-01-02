@@ -19,7 +19,7 @@ This project is organized into three main directories for clarity:
 - **[`worker/`](worker/)** - Worker node components (transcoding, hardware metrics)
 - **[`shared/`](shared/)** - Shared libraries, scripts, and documentation
 
-See [FOLDER_ORGANIZATION.md](docs/FOLDER_ORGANIZATION.md) for detailed structure and [ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) for visual diagrams.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for system architecture and design.
 
 ## Quick Start (Local Development)
 
@@ -438,3 +438,18 @@ See [LICENSE](LICENSE) file for details.
 - [Full Documentation](shared/docs/)
 - [Scripts Documentation](shared/scripts/README.md)
 - [Folder Organization Guide](docs/FOLDER_ORGANIZATION.md)
+
+## 📚 Documentation
+
+Core documentation has been streamlined for clarity:
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System design and architecture
+- **[docs/API.md](docs/API.md)** - Complete API reference
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[docs/SECURITY.md](docs/SECURITY.md)** - Security best practices
+- **[docs/LOCAL_STACK_GUIDE.md](docs/LOCAL_STACK_GUIDE.md)** - Local development setup
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+
+Additional technical documentation is available in `docs/archive/` for reference.
