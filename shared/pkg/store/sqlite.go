@@ -467,12 +467,15 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	}
 
 	// Generate sequence number if not set (protected by mutex for concurrency)
-	if job.SequenceNumber == 0 {
+	// Keep mutex locked until after INSERT to prevent race condition
+	needsSequenceNumber := job.SequenceNumber == 0
+	if needsSequenceNumber {
 		s.mu.Lock()
+		defer s.mu.Unlock()
+		
 		var maxSeq sql.NullInt64
 		err := s.db.QueryRow("SELECT MAX(sequence_number) FROM jobs").Scan(&maxSeq)
 		if err != nil && err != sql.ErrNoRows {
-			s.mu.Unlock()
 			return fmt.Errorf("failed to get max sequence number: %w", err)
 		}
 		if maxSeq.Valid {
@@ -480,7 +483,6 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 		} else {
 			job.SequenceNumber = 1
 		}
-		s.mu.Unlock()
 	}
 
 	_, err = s.db.Exec(`
