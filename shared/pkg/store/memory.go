@@ -484,3 +484,225 @@ func (s *MemoryStore) RetryJob(jobID string, errorMsg string) error {
 	
 	return nil
 }
+
+// FSM Methods (for MemoryStore compatibility with production scheduler)
+
+// TransitionJobState performs a validated state transition with idempotency
+func (s *MemoryStore) TransitionJobState(jobID string, toState models.JobStatus, reason string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return false, ErrJobNotFound
+	}
+
+	fromState := job.Status
+
+	// Idempotency: if already in target state, no-op
+	if fromState == toState {
+		return false, nil
+	}
+
+	// Validate transition
+	if err := models.ValidateTransition(fromState, toState); err != nil {
+		return false, fmt.Errorf("invalid transition: %w", err)
+	}
+
+	// Add transition
+	transition := models.StateTransition{
+		From:      fromState,
+		To:        toState,
+		Timestamp: time.Now(),
+		Reason:    reason,
+	}
+	job.StateTransitions = append(job.StateTransitions, transition)
+	job.Status = toState
+
+	return true, nil
+}
+
+// AssignJobToWorker atomically assigns a job to a worker with idempotency
+func (s *MemoryStore) AssignJobToWorker(jobID, nodeID string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return false, ErrJobNotFound
+	}
+
+	// Idempotency check
+	if job.Status == models.JobStatusAssigned && job.NodeID == nodeID {
+		return false, nil
+	}
+
+	// Only assign from QUEUED or RETRYING states
+	if job.Status != models.JobStatusQueued && job.Status != models.JobStatusRetrying {
+		return false, fmt.Errorf("job %s in state %s, cannot assign", jobID, job.Status)
+	}
+
+	// Validate node exists
+	node, ok := s.nodes[nodeID]
+	if !ok {
+		return false, fmt.Errorf("node not found: %s", nodeID)
+	}
+
+	// Add transition
+	now := time.Now()
+	transition := models.StateTransition{
+		From:      job.Status,
+		To:        models.JobStatusAssigned,
+		Timestamp: now,
+		Reason:    fmt.Sprintf("Assigned to worker %s", nodeID),
+	}
+	job.StateTransitions = append(job.StateTransitions, transition)
+	job.Status = models.JobStatusAssigned
+	job.NodeID = nodeID
+	job.StartedAt = &now
+	job.LastActivityAt = &now
+
+	// Update node
+	node.Status = "busy"
+	node.CurrentJobID = jobID
+	node.LastHeartbeat = now
+
+	return true, nil
+}
+
+// CompleteJob marks a job as completed (idempotent)
+func (s *MemoryStore) CompleteJob(jobID, nodeID string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return false, ErrJobNotFound
+	}
+
+	// Idempotency: already completed
+	if job.Status == models.JobStatusCompleted {
+		return false, nil
+	}
+
+	// Security: verify the node completing the job is the assigned node
+	if job.NodeID != nodeID {
+		return false, fmt.Errorf("job %s assigned to node %s, not %s", jobID, job.NodeID, nodeID)
+	}
+
+	// Only complete from RUNNING or ASSIGNED states
+	if job.Status != models.JobStatusRunning && job.Status != models.JobStatusAssigned {
+		return false, fmt.Errorf("job %s in state %s, cannot complete", jobID, job.Status)
+	}
+
+	// Add transition
+	now := time.Now()
+	transition := models.StateTransition{
+		From:      job.Status,
+		To:        models.JobStatusCompleted,
+		Timestamp: now,
+		Reason:    fmt.Sprintf("Completed by worker %s", nodeID),
+	}
+	job.StateTransitions = append(job.StateTransitions, transition)
+	job.Status = models.JobStatusCompleted
+	job.CompletedAt = &now
+
+	// Free up node
+	if node, ok := s.nodes[nodeID]; ok {
+		node.Status = "available"
+		node.CurrentJobID = ""
+	}
+
+	return true, nil
+}
+
+// UpdateJobHeartbeat updates the last activity timestamp
+func (s *MemoryStore) UpdateJobHeartbeat(jobID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	// Only update heartbeat for active jobs
+	if job.Status == models.JobStatusAssigned || job.Status == models.JobStatusRunning {
+		now := time.Now()
+		job.LastActivityAt = &now
+	}
+
+	return nil
+}
+
+// GetJobsInState returns all jobs in a specific state
+func (s *MemoryStore) GetJobsInState(state models.JobStatus) ([]*models.Job, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := []*models.Job{}
+	for _, job := range s.jobs {
+		if job.Status == state {
+			result = append(result, job)
+		}
+	}
+
+	return result, nil
+}
+
+// GetOrphanedJobs finds jobs assigned/running on offline/dead workers
+func (s *MemoryStore) GetOrphanedJobs(workerTimeout time.Duration) ([]*models.Job, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	cutoff := time.Now().Add(-workerTimeout)
+	result := []*models.Job{}
+
+	for _, job := range s.jobs {
+		if job.Status != models.JobStatusAssigned && job.Status != models.JobStatusRunning {
+			continue
+		}
+
+		if job.NodeID == "" {
+			continue
+		}
+
+		// Check if node is offline or hasn't sent heartbeat
+		node, ok := s.nodes[job.NodeID]
+		if !ok || node.Status == "offline" || node.LastHeartbeat.Before(cutoff) {
+			result = append(result, job)
+		}
+	}
+
+	return result, nil
+}
+
+// GetTimedOutJobs finds jobs that exceeded their timeout
+func (s *MemoryStore) GetTimedOutJobs() ([]*models.Job, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	now := time.Now()
+	timeoutConfig := models.DefaultJobTimeout()
+	result := []*models.Job{}
+
+	for _, job := range s.jobs {
+		if job.Status != models.JobStatusAssigned && job.Status != models.JobStatusRunning {
+			continue
+		}
+
+		if job.LastActivityAt == nil {
+			continue
+		}
+
+		timeout := timeoutConfig.CalculateTimeout(job)
+		deadline := job.LastActivityAt.Add(timeout)
+
+		if now.After(deadline) {
+			result = append(result, job)
+		}
+	}
+
+	return result, nil
+}
+
