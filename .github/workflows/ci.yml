@@ -132,3 +132,64 @@ jobs:
         with:
           name: ffrtmp-cli
           path: bin/ffrtmp
+
+  docker-compose-test:
+    name: Docker Compose Integration Test
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create required directories
+        run: |
+          mkdir -p test_results
+          mkdir -p streams
+      
+      - name: Build and start services
+        run: docker compose up -d --build
+      
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for services to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8428/health >/dev/null 2>&1; then
+              echo "✓ Services are ready after ${i} seconds"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "✗ Services did not become ready in time"
+              docker compose ps
+              docker compose logs
+              exit 1
+            fi
+            sleep 1
+          done
+      
+      - name: Check VictoriaMetrics is healthy
+        run: |
+          curl -sf http://localhost:8428/health || exit 1
+          echo "✓ VictoriaMetrics is healthy"
+      
+      - name: Check Grafana is healthy
+        run: |
+          curl -sf http://localhost:3000/api/health || exit 1
+          echo "✓ Grafana is healthy"
+      
+      - name: Check Alertmanager is healthy
+        run: |
+          curl -sf http://localhost:9093/-/healthy || exit 1
+          echo "✓ Alertmanager is healthy"
+      
+      - name: Show running containers
+        if: always()
+        run: docker compose ps
+      
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v
