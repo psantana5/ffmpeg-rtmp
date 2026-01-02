@@ -25,6 +25,8 @@ func main() {
 	// Command-line flags
 	port := flag.String("port", "8080", "Master node port")
 	dbPath := flag.String("db", "master.db", "SQLite database path (default: master.db, use empty string for in-memory)")
+	dbType := flag.String("db-type", "", "Database type: 'sqlite', 'postgres' (defaults to sqlite if db path given)")
+	dbDSN := flag.String("db-dsn", "", "Database connection string (for PostgreSQL: postgresql://user:pass@host/db)")
 	useTLS := flag.Bool("tls", true, "Enable TLS (default: true)")
 	certFile := flag.String("cert", "certs/master.crt", "TLS certificate file")
 	keyFile := flag.String("key", "certs/master.key", "TLS key file")
@@ -106,10 +108,55 @@ func main() {
 		return // Exit after generating certificate
 	}
 
-	// Create store
+	// Create store based on configuration
 	var dataStore store.Store
 
-	if *dbPath != "" {
+	// Check for environment variable overrides
+	envDBType := os.Getenv("DATABASE_TYPE")
+	envDBDSN := os.Getenv("DATABASE_DSN")
+	
+	// Priority: env vars > flags > defaults
+	if envDBType != "" {
+		*dbType = envDBType
+	}
+	if envDBDSN != "" {
+		*dbDSN = envDBDSN
+	}
+
+	// Determine database type
+	if *dbType == "" && *dbDSN != "" {
+		// Infer type from DSN
+		if strings.HasPrefix(*dbDSN, "postgres") {
+			*dbType = "postgres"
+		}
+	}
+	if *dbType == "" && *dbPath != "" {
+		*dbType = "sqlite"
+	}
+
+	// Create appropriate store
+	if *dbType == "postgres" || *dbType == "postgresql" {
+		if *dbDSN == "" {
+			log.Fatal("PostgreSQL requires --db-dsn or DATABASE_DSN environment variable")
+		}
+		log.Printf("Using PostgreSQL database")
+		log.Printf("DSN: %s", maskPassword(*dbDSN))
+		
+		pgStore, err := store.NewStore(store.Config{
+			Type:            "postgres",
+			DSN:             *dbDSN,
+			MaxOpenConns:    25,
+			MaxIdleConns:    5,
+			ConnMaxLifetime: 5 * time.Minute,
+			ConnMaxIdleTime: 1 * time.Minute,
+		})
+		if err != nil {
+			log.Fatalf("Failed to create PostgreSQL store: %v", err)
+		}
+		dataStore = pgStore
+		log.Println("✓ PostgreSQL connected successfully")
+		log.Println("✓ Persistent storage enabled with production-grade database")
+	} else if *dbPath != "" {
 		log.Printf("Using SQLite database: %s", *dbPath)
 		sqliteStore, sErr := store.NewSQLiteStore(*dbPath)
 		if sErr != nil {
@@ -122,6 +169,11 @@ func main() {
 		log.Println("WARNING: Using in-memory store (data will not persist)")
 		log.Println("Consider using --db flag with a database path for production")
 		dataStore = store.NewMemoryStore()
+	}
+
+	// Ensure we can close the store on shutdown
+	if closer, ok := dataStore.(interface{ Close() error }); ok {
+		defer closer.Close()
 	}
 
 	// Setup authentication if API key provided
@@ -333,4 +385,21 @@ func main() {
 	}
 
 	log.Println("Server stopped")
+}
+
+// maskPassword masks the password in a database DSN for logging
+func maskPassword(dsn string) string {
+// postgresql://user:password@host/db -> postgresql://user:****@host/db
+if idx := strings.Index(dsn, "://"); idx != -1 {
+afterScheme := dsn[idx+3:]
+if atIdx := strings.Index(afterScheme, "@"); atIdx != -1 {
+beforeAt := afterScheme[:atIdx]
+if colonIdx := strings.Index(beforeAt, ":"); colonIdx != -1 {
+user := beforeAt[:colonIdx]
+rest := dsn[idx+3+atIdx:]
+return dsn[:idx+3] + user + ":****" + rest
+}
+}
+}
+return dsn
 }

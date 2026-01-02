@@ -30,6 +30,15 @@ type Store interface {
 	UpdateJobFailureReason(id string, reason models.FailureReason, errorMsg string) error
 	UpdateJob(job *models.Job) error
 
+	// Job state management
+	AddStateTransition(id string, from, to models.JobStatus, reason string) error
+	PauseJob(id string) error
+	ResumeJob(id string) error
+	CancelJob(id string) error
+	RetryJob(jobID string, errorMsg string) error
+	TryQueuePendingJob(jobID string) (bool, error)
+	GetQueuedJobs(queue string, priority string) []*models.Job
+
 	// FSM operations (for production scheduler)
 	TransitionJobState(jobID string, toState models.JobStatus, reason string) (bool, error)
 	AssignJobToWorker(jobID, nodeID string) (bool, error)
