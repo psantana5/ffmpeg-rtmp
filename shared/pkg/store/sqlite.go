@@ -1333,3 +1333,44 @@ func (s *SQLiteStore) scanJobRow(scanner interface{
 	return &job, nil
 }
 
+
+// Tenant operations (multi-tenancy) - Stub implementations for backward compatibility
+func (s *SQLiteStore) CreateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) GetTenant(id string) (*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) GetTenantByName(name string) (*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) ListTenants() ([]*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) UpdateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) DeleteTenant(id string) error {
+return fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) UpdateTenantUsage(id string, usage *models.TenantUsage) error {
+return fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) GetTenantStats(id string) (*models.TenantUsage, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) GetJobsByTenant(tenantID string) ([]*models.Job, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+func (s *SQLiteStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}

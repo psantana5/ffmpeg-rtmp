@@ -48,6 +48,20 @@ type Store interface {
 	GetOrphanedJobs(workerTimeout time.Duration) ([]*models.Job, error)
 	GetTimedOutJobs() ([]*models.Job, error)
 
+	// Tenant operations (multi-tenancy)
+	CreateTenant(tenant *models.Tenant) error
+	GetTenant(id string) (*models.Tenant, error)
+	GetTenantByName(name string) (*models.Tenant, error)
+	ListTenants() ([]*models.Tenant, error)
+	UpdateTenant(tenant *models.Tenant) error
+	DeleteTenant(id string) error
+	UpdateTenantUsage(id string, usage *models.TenantUsage) error
+	GetTenantStats(id string) (*models.TenantUsage, error)
+
+	// Tenant-aware operations
+	GetJobsByTenant(tenantID string) ([]*models.Job, error)
+	GetNodesByTenant(tenantID string) ([]*models.Node, error)
+
 	// Lifecycle
 	Close() error
 	HealthCheck() error

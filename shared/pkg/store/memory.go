@@ -735,3 +735,44 @@ return nil
 func (s *MemoryStore) HealthCheck() error {
 return nil
 }
+
+// Tenant operations (multi-tenancy) - Stub implementations
+func (s *MemoryStore) CreateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) GetTenant(id string) (*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) GetTenantByName(name string) (*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) ListTenants() ([]*models.Tenant, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) UpdateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) DeleteTenant(id string) error {
+return fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) UpdateTenantUsage(id string, usage *models.TenantUsage) error {
+return fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) GetTenantStats(id string) (*models.TenantUsage, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) GetJobsByTenant(tenantID string) ([]*models.Job, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+func (s *MemoryStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
+return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
