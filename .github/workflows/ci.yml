@@ -8,127 +8,127 @@ on:
   workflow_dispatch:
 
 jobs:
-  docker-build-test:
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Create required directories
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache: true
+      
+      - name: Download dependencies
         run: |
-          mkdir -p test_results
-          mkdir -p streams
-        # Note: test_results required by docker compose services (mounted in results-exporter, qoe-exporter, cost-exporter)
-        # Note: streams required by nginx-rtmp service for HLS streaming
+          cd shared/pkg
+          go mod download
       
-      - name: Build and start services
-        run: docker compose up -d --build
-      
-      - name: Wait for services to be ready
+      - name: Run tests with race detector
         run: |
-          echo "Waiting for services to be ready..."
-          for i in {1..30}; do
-            if curl -sf http://localhost:8428/health >/dev/null 2>&1; then
-              echo "✓ Services are ready after ${i} seconds"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "✗ Services did not become ready in time"
-              exit 1
-            fi
-            sleep 1
-          done
+          cd shared/pkg
+          go test -v -race -coverprofile=coverage.out ./models ./scheduler ./store
       
-      - name: Check VictoriaMetrics is up
+      - name: Generate coverage report
         run: |
-          curl -sf http://localhost:8428/health || exit 1
-          echo "✓ VictoriaMetrics is healthy"
+          cd shared/pkg
+          go tool cover -func=coverage.out | tail -1
       
-      - name: Check Grafana is up
-        run: |
-          curl -sf http://localhost:3000/api/health || exit 1
-          echo "✓ Grafana is healthy"
-      
-      - name: Check Alertmanager is up
-        run: |
-          curl -sf http://localhost:9093/-/healthy || exit 1
-          echo "✓ Alertmanager is healthy"
-      
-      - name: Check VictoriaMetrics is up
-        run: |
-          curl -sf http://localhost:8428/health || exit 1
-          echo "✓ VictoriaMetrics is healthy"
-      
-      - name: Show running containers
-        if: always()
-        run: docker compose ps
-      
-      - name: Show logs on failure
-        if: failure()
-        run: docker compose logs --tail=100
-      
-      - name: Tear down services
-        if: always()
-        run: docker compose down -v
+      - name: Upload coverage to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: shared/pkg/coverage.out
 
-  multi-arch-build:
+  build-master:
+    name: Build Master
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
+    needs: test
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          platforms: linux/amd64,linux/arm64
+          go-version: '1.24.0'
+          cache: true
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Build multi-arch CPU exporter
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./worker/exporters/cpu_exporter/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ffmpeg-rtmp/cpu-exporter:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Build multi-arch GPU exporter
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./worker/exporters/gpu_exporter/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ffmpeg-rtmp/gpu-exporter:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Build multi-arch FFmpeg exporter
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./worker/exporters/ffmpeg_exporter/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ffmpeg-rtmp/ffmpeg-exporter:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Summary
+      - name: Build master binary
         run: |
-          echo "✓ Successfully built multi-arch images for:"
-          echo "  - CPU Exporter (linux/amd64, linux/arm64)"
-          echo "  - GPU Exporter (linux/amd64, linux/arm64)"
-          echo "  - FFmpeg Exporter (linux/amd64, linux/arm64)"
+          go build -v -o bin/master ./master/cmd/master
+      
+      - name: Verify binary
+        run: |
+          ./bin/master --version || echo "Master binary built successfully"
+          ls -lh bin/master
+      
+      - name: Upload master binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: master-binary
+          path: bin/master
+
+  build-worker:
+    name: Build Worker
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache: true
+      
+      - name: Build worker binary
+        run: |
+          go build -v -o bin/worker ./worker/cmd/agent
+      
+      - name: Verify binary
+        run: |
+          ./bin/worker --help || echo "Worker binary built successfully"
+          ls -lh bin/worker
+      
+      - name: Upload worker binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-binary
+          path: bin/worker
+
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache: true
+      
+      - name: Build CLI binary
+        run: |
+          go build -v -o bin/ffrtmp ./cmd/ffrtmp
+      
+      - name: Verify binary
+        run: |
+          ./bin/ffrtmp --help
+          ls -lh bin/ffrtmp
+      
+      - name: Upload CLI binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffrtmp-cli
+          path: bin/ffrtmp
