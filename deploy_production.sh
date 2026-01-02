@@ -111,10 +111,10 @@ start_master() {
   log_info "Database: $DB_PATH"
   log_info "Logs: $LOG_DIR/master.log"
 
-  # Start master with production scheduler enabled (disable TLS for local dev)
+  # Start master with production scheduler enabled
   PORT="$MASTER_PORT" \
     DB_PATH="$DB_PATH" \
-    DISABLE_TLS="${DISABLE_TLS:-true}" \
+    TLS_ENABLED="${TLS_ENABLED:-false}" \
     nohup "$MASTER_BINARY" \
     >>"$LOG_DIR/master.log" 2>&1 &
 
@@ -155,11 +155,11 @@ start_workers() {
 
     log_info "Starting $worker_name on port $worker_port..."
 
-    # Start worker with unique port and registration flag
+    # Start worker with production flags
     PORT="$worker_port" \
       MASTER_URL="$master_url" \
       WORKER_NAME="$worker_name" \
-      nohup "$WORKER_BINARY" --register \
+      nohup "$WORKER_BINARY" --register --allow-master-as-worker \
       >>"$LOG_DIR/${worker_name}.log" 2>&1 &
 
     local pid=$!
