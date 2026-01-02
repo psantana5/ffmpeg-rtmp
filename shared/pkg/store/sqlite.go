@@ -12,6 +12,15 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 )
 
+// Helper functions for JSON marshaling
+func marshalJSON(v interface{}) ([]byte, error) {
+	return json.Marshal(v)
+}
+
+func unmarshalJSON(data []byte, v interface{}) error {
+	return json.Unmarshal(data, v)
+}
+
 // SQLiteStore is a SQLite-based implementation of the data store
 type SQLiteStore struct {
 	db *sql.DB
@@ -86,8 +95,11 @@ func (s *SQLiteStore) initSchema() error {
 		started_at DATETIME,
 		last_activity_at DATETIME,
 		completed_at DATETIME,
-		retry_count INTEGER NOT NULL,
+		retry_count INTEGER NOT NULL DEFAULT 0,
+		max_retries INTEGER DEFAULT 3,
+		retry_reason TEXT,
 		error TEXT,
+		logs TEXT,
 		state_transitions TEXT
 	);
 
@@ -186,6 +198,32 @@ func (s *SQLiteStore) initSchema() error {
 		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN logs TEXT DEFAULT ''")
 		if err != nil {
 			return fmt.Errorf("failed to add logs column: %w", err)
+		}
+	}
+	
+	// Migration 5: Add max_retries column to jobs (if missing)
+	var maxRetriesExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='max_retries'")
+	if err := row.Scan(&maxRetriesExists); err != nil {
+		return fmt.Errorf("failed to check max_retries column: %w", err)
+	}
+	if maxRetriesExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN max_retries INTEGER DEFAULT 3")
+		if err != nil {
+			return fmt.Errorf("failed to add max_retries column: %w", err)
+		}
+	}
+	
+	// Migration 6: Add retry_reason column to jobs (if missing)
+	var retryReasonExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='retry_reason'")
+	if err := row.Scan(&retryReasonExists); err != nil {
+		return fmt.Errorf("failed to check retry_reason column: %w", err)
+	}
+	if retryReasonExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN retry_reason TEXT DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("failed to add retry_reason column: %w", err)
 		}
 	}
 
@@ -1208,3 +1246,68 @@ func (s *SQLiteStore) RetryJob(jobID string, errorMsg string) error {
 
 	return tx.Commit()
 }
+
+// scanJobRow scans a single job row (helper for fsm_store.go)
+func (s *SQLiteStore) scanJobRow(scanner interface{
+	Scan(...interface{}) error
+}) (*models.Job, error) {
+	var job models.Job
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
+	var maxRetriesNull sql.NullInt64
+	var retryReasonNull sql.NullString
+	var startedAt, lastActivityAt, completedAt sql.NullTime
+
+	err := scanner.Scan(
+		&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine,
+		&paramsJSON, &job.Status, &job.Queue, &job.Priority, &job.Progress,
+		&nodeIDNull, &job.CreatedAt, &startedAt, &lastActivityAt, &completedAt,
+		&job.RetryCount, &job.Error, &logsNull, &transitionsJSON,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable fields
+	if nodeIDNull.Valid {
+		job.NodeID = nodeIDNull.String
+	}
+	if logsNull.Valid {
+		job.Logs = logsNull.String
+	}
+	if maxRetriesNull.Valid {
+		job.MaxRetries = int(maxRetriesNull.Int64)
+	} else {
+		job.MaxRetries = 3 // default
+	}
+	if retryReasonNull.Valid {
+		job.RetryReason = retryReasonNull.String
+	}
+
+	// Parse JSON fields
+	if paramsJSON.Valid && paramsJSON.String != "" && paramsJSON.String != "null" {
+		if err := json.Unmarshal([]byte(paramsJSON.String), &job.Parameters); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal parameters: %w", err)
+		}
+	}
+
+	if transitionsJSON.Valid && transitionsJSON.String != "" && transitionsJSON.String != "null" {
+		if err := json.Unmarshal([]byte(transitionsJSON.String), &job.StateTransitions); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal state_transitions: %w", err)
+		}
+	}
+
+	// Handle time fields
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if lastActivityAt.Valid {
+		job.LastActivityAt = &lastActivityAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	return &job, nil
+}
+
