@@ -1283,12 +1283,540 @@
       "end_time": 1767342980,
       "name": "1080p60-hevc-nvenc",
       "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.975138938,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767342990,
+      "name": "1080p60-veryfast",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.039058337,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343000,
+      "name": "1080p60-crf18",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.011627491,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343010,
+      "name": "1080p60-crf20",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.64419423,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343021,
+      "name": "4K60-complex-1",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.9802826329999998,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343031,
+      "name": "4K60-complex-2",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.226036196,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343040,
+      "name": "4K60-HDR-h265",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.16703583,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343050,
+      "name": "4K60-HDR-hevc-nvenc",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.835945709,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343060,
+      "name": "8K60-extreme",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.999496838,
+      "encoder_type": "auto",
+      "end_time": 1767343070,
+      "name": "4K60-h264",
+      "start_time": 1767342643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.010151088,
+      "encoder_type": "auto",
+      "end_time": 1767343080,
+      "name": "1080p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.984854975,
+      "encoder_type": "auto",
+      "end_time": 1767343090,
+      "name": "720p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.046516887,
+      "encoder_type": "auto",
+      "end_time": 1767343100,
+      "name": "1080p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.999630222,
+      "encoder_type": "auto",
+      "end_time": 1767343110,
+      "name": "720p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.987780205,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343120,
+      "name": "1080p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.054702999,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343130,
+      "name": "720p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.8992241029999999,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343141,
+      "name": "1080p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.908144714,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343151,
+      "name": "720p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.094334192,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343160,
+      "name": "720p30-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.09923914,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343170,
+      "name": "720p30-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.021610272,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343180,
+      "name": "720p30-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.082004818,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343190,
+      "name": "720p30-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.1389969,
+      "encoder_type": "auto",
+      "end_time": 1767343200,
+      "name": "1080p60-h265",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.143607166,
+      "encoder_type": "auto",
+      "end_time": 1767343210,
+      "name": "1080p60-h265",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.1069841440000001,
+      "encoder_type": "auto",
+      "end_time": 1767343220,
+      "name": "1080p60-h265",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.0989711070000001,
+      "encoder_type": "auto",
+      "end_time": 1767343230,
+      "name": "720p30-h264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.043970691,
+      "encoder_type": "auto",
+      "end_time": 1767343240,
+      "name": "720p30-h264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.017762359,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343250,
+      "name": "1080p60-x264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.009865668,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343260,
+      "name": "1080p60-x265",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.342905335,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343270,
+      "name": "1080p60-fast",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.646727673,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343281,
+      "name": "1080p60-medium",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.047398753,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343290,
+      "name": "1080p60-crf23",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.026133288,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343300,
+      "name": "1080p60-crf26",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.6435134599999999,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343311,
+      "name": "1080p60-complex-1",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.233356586,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343320,
+      "name": "1080p60-complex-2",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.207960208,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343330,
+      "name": "1080p60-10bit",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.14929199,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343340,
+      "name": "1080p60-444",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.104271355,
+      "encoder_type": "auto",
+      "end_time": 1767343350,
+      "name": "4K60-h264",
+      "start_time": 1767342643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.099271174,
+      "encoder_type": "auto",
+      "end_time": 1767343360,
+      "name": "1080p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.057907279,
+      "encoder_type": "auto",
+      "end_time": 1767343370,
+      "name": "720p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.094388803,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343380,
+      "name": "720p30-422",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.122169196,
+      "encoder_type": "auto",
+      "end_time": 1767343390,
+      "name": "4K60-h264",
+      "start_time": 1767342643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.096287807,
+      "encoder_type": "auto",
+      "end_time": 1767343400,
+      "name": "1080p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.138234238,
+      "encoder_type": "auto",
+      "end_time": 1767343410,
+      "name": "720p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.046959141,
+      "encoder_type": "auto",
+      "end_time": 1767343420,
+      "name": "4K60-h264",
+      "start_time": 1767342643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.060683066,
+      "encoder_type": "auto",
+      "end_time": 1767343430,
+      "name": "1080p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.999787635,
+      "encoder_type": "auto",
+      "end_time": 1767343440,
+      "name": "720p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.931149474,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343452,
+      "name": "4K24-cinema",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.044352883,
+      "encoder_type": "auto",
+      "end_time": 1767343460,
+      "name": "4K60-h264",
+      "start_time": 1767342643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.945875686,
+      "encoder_type": "auto",
+      "end_time": 1767343470,
+      "name": "1080p60-h265",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.980327305,
+      "encoder_type": "auto",
+      "end_time": 1767343480,
+      "name": "720p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.00758382,
+      "encoder_type": "auto",
+      "end_time": 1767343490,
+      "name": "480p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.97844639,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343500,
+      "name": "480p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.008809858,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343511,
+      "name": "480p30-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.054826525,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343521,
+      "name": "480p60-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.020280759,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343531,
+      "name": "480p60-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.989922237,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343541,
+      "name": "480p60-h264",
+      "start_time": 1767342644
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.9888486109999999,
+      "encoder_type": "gstreamer",
+      "end_time": 1767343551,
+      "name": "480p60-h264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.025415042,
+      "encoder_type": "auto",
+      "end_time": 1767343560,
+      "name": "480p30-h264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.008319018,
+      "encoder_type": "auto",
+      "end_time": 1767343570,
+      "name": "480p30-h264",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.998769632,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343580,
+      "name": "720p30-vp9",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.968307193,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343590,
+      "name": "720p30-av1",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.1957133620000002,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343601,
+      "name": "1080p60-slow",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 3.088546486,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343612,
+      "name": "1080p60-slower",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 5.363918321,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343624,
+      "name": "720p30-veryslow",
+      "start_time": 1767342645
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.045733018,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343630,
+      "name": "720p30-crf28",
+      "start_time": 1767342646
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.8024621299999999,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767343641,
+      "name": "720p30-crf30",
+      "start_time": 1767342646
     }
   ],
-  "test_date": "2026-01-02T09:36:20+01:00",
+  "test_date": "2026-01-02T09:47:21+01:00",
   "test_metadata": {
     "platform": "distributed",
     "source": "scheduler",
-    "timestamp": "2026-01-02T09:36:20+01:00"
+    "timestamp": "2026-01-02T09:47:21+01:00"
   }
 }
