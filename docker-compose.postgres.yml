@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ffmpeg-postgres
+    environment:
+      POSTGRES_DB: ffmpeg_rtmp
+      POSTGRES_USER: ffmpeg
+      POSTGRES_PASSWORD: password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ffmpeg"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ffmpeg-network
+
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    container_name: ffmpeg-master
+    environment:
+      - DATABASE_TYPE=postgres
+      - DATABASE_DSN=postgresql://ffmpeg:password@postgres:5432/ffmpeg_rtmp?sslmode=disable
+      - MASTER_API_KEY=${MASTER_API_KEY:-changeme}
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ffmpeg-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  ffmpeg-network:
+    driver: bridge
