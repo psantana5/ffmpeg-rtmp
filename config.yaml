@@ -1,0 +1,17 @@
+master:
+  url: https://localhost:8080
+  tls:
+    enabled: true
+    cert_file: certs/server.crt
+    key_file: certs/server.key
+  auth:
+    enabled: false
+  fault_tolerance:
+    enabled: true
+    heartbeat_check_interval: 5s
+    node_timeout: 15s
+    max_retries: 3
+  tracing:
+    enabled: true
+    exporter: stdout
+    endpoint: ""

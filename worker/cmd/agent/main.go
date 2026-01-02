@@ -405,12 +405,14 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		var err error
 		inputGenResult, err = inputGenerator.GenerateInput(job)
 		if err != nil {
+			errMsg := fmt.Sprintf("input generation failed: %v", err)
 			log.Printf("❌ Failed to generate input: %v", err)
 			return &models.JobResult{
 				JobID:       job.ID,
 				NodeID:      client.GetNodeID(),
 				Status:      models.JobStatusFailed,
-				Error:       fmt.Sprintf("input generation failed: %v", err),
+				Error:       errMsg,
+				Logs:        fmt.Sprintf("=== Input Generation Failed ===\n%s\n", errMsg),
 				CompletedAt: time.Now(),
 			}
 		}
@@ -445,7 +447,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 
 	// Execute the actual job with the selected engine
 	log.Println("\n>>> TRANSCODING EXECUTION PHASE <<<")
-	metrics, analyzerOutput, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt)
+	metrics, analyzerOutput, executionLogs, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt)
 	
 	// Cleanup generated input if needed
 	log.Println("\n>>> CLEANUP PHASE <<<")
@@ -474,6 +476,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 			NodeID:      client.GetNodeID(),
 			Status:      models.JobStatusFailed,
 			Error:       err.Error(),
+			Logs:        executionLogs,
 			CompletedAt: time.Now(),
 			Metrics: map[string]interface{}{
 				"duration": duration,
@@ -509,6 +512,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		JobID:          job.ID,
 		NodeID:         client.GetNodeID(),
 		Status:         models.JobStatusCompleted,
+		Logs:           executionLogs,
 		CompletedAt:    time.Now(),
 		Metrics:        metrics,
 		AnalyzerOutput: analyzerOutput,
@@ -516,11 +520,11 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 }
 
 // executeEngineJob executes a job using the selected engine
-func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, err error) {
+func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, err error) {
 	// Build command using the selected engine
 	args, err := engine.BuildCommand(job, client.GetMasterURL())
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to build command: %w", err)
+		return nil, nil, "", fmt.Errorf("failed to build command: %w", err)
 	}
 
 	// Determine the command to run based on engine
@@ -531,13 +535,13 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		cmdPath, err = exec.LookPath("gst-launch-1.0")
 		cmdName = "gst-launch-1.0"
 		if err != nil {
-			return nil, nil, fmt.Errorf("gst-launch-1.0 not found in PATH: %w", err)
+			return nil, nil, "", fmt.Errorf("gst-launch-1.0 not found in PATH: %w", err)
 		}
 	} else {
 		cmdPath, err = exec.LookPath("ffmpeg")
 		cmdName = "ffmpeg"
 		if err != nil {
-			return nil, nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
+			return nil, nil, "", fmt.Errorf("ffmpeg not found in PATH: %w", err)
 		}
 	}
 
@@ -588,37 +592,50 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	log.Printf("Running: %s %s", cmdName, strings.Join(args, " "))
 	
 	startTime := time.Now()
-	if err := cmd.Run(); err != nil {
+	execErr := cmd.Run()
+	execDuration := time.Since(startTime).Seconds()
+	
+	// Capture all logs (combine stdout and stderr for comprehensive trace)
+	var logBuffer bytes.Buffer
+	logBuffer.WriteString(fmt.Sprintf("=== Command Execution ===\n"))
+	logBuffer.WriteString(fmt.Sprintf("Command: %s %s\n", cmdName, strings.Join(args, " ")))
+	logBuffer.WriteString(fmt.Sprintf("Duration: %.2f seconds\n", execDuration))
+	logBuffer.WriteString(fmt.Sprintf("\n=== STDOUT ===\n%s\n", stdout.String()))
+	logBuffer.WriteString(fmt.Sprintf("=== STDERR ===\n%s\n", stderr.String()))
+	
+	if execErr != nil {
 		// Check if context deadline exceeded
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Printf("⚠️  %s timed out after expected duration", cmdName)
+			logBuffer.WriteString(fmt.Sprintf("\n=== TIMEOUT ===\nContext deadline exceeded\n"))
 			// For GStreamer with duration, timeout is expected - not an error
 			if engine.Name() == "gstreamer" && duration > 0 {
 				log.Printf("✓ GStreamer completed via timeout (expected behavior)")
+				logBuffer.WriteString("GStreamer completed via timeout (expected behavior)\n")
 				// Not an error - continue to metrics
 			} else {
 				log.Printf("%s stderr: %s", cmdName, stderr.String())
-				return nil, nil, fmt.Errorf("%s execution timeout: %w", cmdName, err)
+				return nil, nil, logBuffer.String(), fmt.Errorf("%s execution timeout: %w", cmdName, execErr)
 			}
 		} else {
 			log.Printf("%s stderr: %s", cmdName, stderr.String())
+			logBuffer.WriteString(fmt.Sprintf("\n=== ERROR ===\n%v\n", execErr))
 			// Check for specific GStreamer errors
 			stderrStr := stderr.String()
 			if engine.Name() == "gstreamer" {
 				if strings.Contains(stderrStr, "Resource not found") {
-					return nil, nil, fmt.Errorf("GStreamer pipeline error: RTMP server not reachable or stream rejected")
+					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: RTMP server not reachable or stream rejected")
 				}
 				if strings.Contains(stderrStr, "Could not connect") {
-					return nil, nil, fmt.Errorf("GStreamer pipeline error: Failed to connect to RTMP server")
+					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: Failed to connect to RTMP server")
 				}
 				if strings.Contains(stderrStr, "No such element") {
-					return nil, nil, fmt.Errorf("GStreamer pipeline error: Missing GStreamer plugin (check gst-inspect-1.0)")
+					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: Missing GStreamer plugin (check gst-inspect-1.0)")
 				}
 			}
-			return nil, nil, fmt.Errorf("%s execution failed: %w", cmdName, err)
+			return nil, nil, logBuffer.String(), fmt.Errorf("%s execution failed: %w", cmdName, execErr)
 		}
 	}
-	execDuration := time.Since(startTime).Seconds()
 
 	// Determine output mode
 	outputMode := "file"
@@ -631,8 +648,10 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	// Log completion
 	if outputMode == "rtmp" || outputMode == "stream" {
 		log.Printf("✓ %s streaming completed (%.2f seconds)", engine.Name(), execDuration)
+		logBuffer.WriteString(fmt.Sprintf("\n✓ %s streaming completed (%.2f seconds)\n", engine.Name(), execDuration))
 	} else {
 		log.Printf("✓ %s transcoding completed (%.2f seconds)", engine.Name(), execDuration)
+		logBuffer.WriteString(fmt.Sprintf("\n✓ %s transcoding completed (%.2f seconds)\n", engine.Name(), execDuration))
 	}
 
 	// Parse output for metrics (works for both engines)
@@ -653,7 +672,7 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		"status":        "success",
 	}
 
-	return metrics, analyzerOutput, nil
+	return metrics, analyzerOutput, logBuffer.String(), nil
 }
 
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
