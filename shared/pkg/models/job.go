@@ -33,6 +33,7 @@ const (
 type Job struct {
 	ID               string                 `json:"id"`
 	SequenceNumber   int                    `json:"sequence_number,omitempty"`   // Human-friendly job number
+	TenantID         string                 `json:"tenant_id,omitempty"`         // Tenant/organization ID
 	Scenario         string                 `json:"scenario"`   // e.g., "4K60-h264"
 	Confidence       string                 `json:"confidence"` // "auto", "high", "medium", "low"
 	Engine           string                 `json:"engine,omitempty"`      // "auto", "ffmpeg", "gstreamer"

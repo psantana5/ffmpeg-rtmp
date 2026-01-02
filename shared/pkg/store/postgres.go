@@ -73,9 +73,29 @@ func NewPostgreSQLStore(config Config) (*PostgreSQLStore, error) {
 // initSchema creates tables if they don't exist
 func (s *PostgreSQLStore) initSchema() error {
 	schema := `
+	-- Tenants table (multi-tenancy support)
+	CREATE TABLE IF NOT EXISTS tenants (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		display_name TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'active',
+		plan TEXT NOT NULL DEFAULT 'free',
+		quotas JSONB NOT NULL,
+		usage JSONB NOT NULL,
+		metadata JSONB,
+		created_at TIMESTAMP NOT NULL,
+		updated_at TIMESTAMP NOT NULL,
+		expires_at TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+	CREATE INDEX IF NOT EXISTS idx_tenants_name ON tenants(name);
+
+	-- Nodes table
 	CREATE TABLE IF NOT EXISTS nodes (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL DEFAULT '',
+		tenant_id TEXT,
 		address TEXT NOT NULL UNIQUE,
 		type TEXT NOT NULL,
 		cpu_threads INTEGER NOT NULL,
@@ -90,12 +110,19 @@ func (s *PostgreSQLStore) initSchema() error {
 		status TEXT NOT NULL,
 		last_heartbeat TIMESTAMP NOT NULL,
 		registered_at TIMESTAMP NOT NULL,
-		current_job_id TEXT
+		current_job_id TEXT,
+		FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 	);
 
+	CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
+	CREATE INDEX IF NOT EXISTS idx_nodes_address ON nodes(address);
+	CREATE INDEX IF NOT EXISTS idx_nodes_tenant_id ON nodes(tenant_id);
+
+	-- Jobs table
 	CREATE TABLE IF NOT EXISTS jobs (
 		id TEXT PRIMARY KEY,
 		sequence_number INTEGER NOT NULL UNIQUE,
+		tenant_id TEXT,
 		scenario TEXT NOT NULL,
 		confidence TEXT,
 		engine TEXT NOT NULL DEFAULT 'auto',
@@ -115,14 +142,31 @@ func (s *PostgreSQLStore) initSchema() error {
 		error TEXT,
 		failure_reason TEXT,
 		logs TEXT,
-		state_transitions JSONB
+		state_transitions JSONB,
+		FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_jobs_sequence ON jobs(sequence_number);
 	CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 	CREATE INDEX IF NOT EXISTS idx_jobs_queue_priority ON jobs(queue, priority, created_at);
-	CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
-	CREATE INDEX IF NOT EXISTS idx_nodes_address ON nodes(address);
+	CREATE INDEX IF NOT EXISTS idx_jobs_tenant_id ON jobs(tenant_id);
+	CREATE INDEX IF NOT EXISTS idx_jobs_tenant_status ON jobs(tenant_id, status);
+
+	-- Create default tenant if none exists
+	INSERT INTO tenants (id, name, display_name, status, plan, quotas, usage, metadata, created_at, updated_at)
+	VALUES (
+		'default',
+		'default',
+		'Default Tenant',
+		'active',
+		'enterprise',
+		'{"max_jobs": 1000, "max_workers": 100, "max_jobs_per_hour": 10000, "max_cpu_cores": 256, "max_gpus": 16, "max_storage_gb": 10000, "max_bandwidth_mbps": 100000, "job_timeout_minutes": 1440}'::jsonb,
+		'{"active_jobs": 0, "total_jobs": 0, "completed_jobs": 0, "failed_jobs": 0, "active_workers": 0, "cpu_cores_used": 0, "gpus_used": 0, "storage_used_gb": 0, "jobs_this_hour": 0}'::jsonb,
+		'{}'::jsonb,
+		NOW(),
+		NOW()
+	)
+	ON CONFLICT (id) DO NOTHING;
 	`
 
 	_, err := s.db.Exec(schema)
