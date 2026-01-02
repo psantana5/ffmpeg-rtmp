@@ -724,3 +724,14 @@ func (s *MemoryStore) UpdateJobFailureReason(id string, reason models.FailureRea
 	return nil
 }
 
+
+
+// Close is a no-op for memory store
+func (s *MemoryStore) Close() error {
+return nil
+}
+
+// HealthCheck always returns nil for memory store
+func (s *MemoryStore) HealthCheck() error {
+return nil
+}

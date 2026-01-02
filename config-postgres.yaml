@@ -1,0 +1,45 @@
+# PostgreSQL Configuration Example
+
+# Database configuration
+database:
+  type: postgres
+  dsn: "postgresql://ffmpeg:password@localhost:5432/ffmpeg_rtmp?sslmode=disable"
+  
+  # Connection pool settings
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  conn_max_idle_time: 1m
+
+# API configuration
+api:
+  port: 8080
+  tls_enabled: true
+  tls_cert_path: ./certs/server.crt
+  tls_key_path: ./certs/server.key
+
+# Scheduler configuration  
+scheduler:
+  enabled: true
+  scheduling_interval: 5s
+  cleanup_interval: 30s
+  health_check_interval: 10s
+
+# Retry policy
+retry:
+  max_retries: 3
+  initial_backoff: 5s
+  max_backoff: 5m
+  backoff_multiplier: 2.0
+
+# Timeouts
+timeouts:
+  assigned_timeout: 30s
+  running_timeout_base: 5m
+  running_timeout_per_minute: 30s
+  heartbeat_timeout: 1m
+
+# Worker management
+workers:
+  heartbeat_timeout: 60s
+  recovery_check_interval: 30s

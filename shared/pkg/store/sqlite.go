@@ -1174,36 +1174,10 @@ func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
 
-// Store interface that both MemoryStore and SQLiteStore implement
-type Store interface {
-	RegisterNode(node *models.Node) error
-	GetNode(id string) (*models.Node, error)
-	GetNodeByAddress(address string) (*models.Node, error)
-	GetAllNodes() []*models.Node
-	UpdateNodeStatus(id, status string) error
-	UpdateNodeHeartbeat(id string) error
-	DeleteNode(id string) error
-	CreateJob(job *models.Job) error
-	GetJob(id string) (*models.Job, error)
-	GetJobBySequenceNumber(seqNum int) (*models.Job, error)
-	GetAllJobs() []*models.Job
-	GetNextJob(nodeID string) (*models.Job, error)
-	UpdateJobStatus(id string, status models.JobStatus, errorMsg string) error
-	UpdateJobProgress(id string, progress int) error
-	UpdateJobActivity(id string) error
-	UpdateJob(job *models.Job) error
-	AddStateTransition(id string, from, to models.JobStatus, reason string) error
-	PauseJob(id string) error
-	ResumeJob(id string) error
-	CancelJob(id string) error
-	GetQueuedJobs(queue string, priority string) []*models.Job
-	TryQueuePendingJob(jobID string) (bool, error)
-	RetryJob(jobID string, errorMsg string) error
+// HealthCheck verifies database connectivity
+func (s *SQLiteStore) HealthCheck() error {
+	return s.db.Ping()
 }
-
-// Ensure both implementations satisfy the interface
-var _ Store = (*MemoryStore)(nil)
-var _ Store = (*SQLiteStore)(nil)
 
 // TryQueuePendingJob atomically checks if a job is pending with no available workers and queues it
 // Returns true if job was queued, false if already queued or picked up
