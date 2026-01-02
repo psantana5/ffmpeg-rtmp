@@ -63,21 +63,35 @@ func (h *MasterHandler) getJobByIDOrSequence(idOrSeq string) (*models.Job, error
 
 // RegisterRoutes registers all API routes
 func (h *MasterHandler) RegisterRoutes(r *mux.Router) {
+	// Node routes
 	r.HandleFunc("/nodes/register", h.RegisterNode).Methods("POST")
 	r.HandleFunc("/nodes/{id}", h.GetNodeDetails).Methods("GET")
 	r.HandleFunc("/nodes/{id}", h.RemoveNode).Methods("DELETE")
 	r.HandleFunc("/nodes", h.ListNodes).Methods("GET")
 	r.HandleFunc("/nodes/{id}/heartbeat", h.NodeHeartbeat).Methods("POST")
+	
+	// Job routes (register specific routes before parameterized routes)
+	r.HandleFunc("/jobs/next", h.GetNextJob).Methods("GET")
 	r.HandleFunc("/jobs", h.CreateJob).Methods("POST")
 	r.HandleFunc("/jobs", h.ListJobs).Methods("GET")
-	// Register specific routes before parameterized routes
-	r.HandleFunc("/jobs/next", h.GetNextJob).Methods("GET")
 	r.HandleFunc("/jobs/{id}", h.GetJob).Methods("GET")
 	r.HandleFunc("/jobs/{id}/pause", h.PauseJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/resume", h.ResumeJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/cancel", h.CancelJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/retry", h.RetryJob).Methods("POST")
 	r.HandleFunc("/jobs/{id}/logs", h.GetJobLogs).Methods("GET")
+	
+	// Tenant routes (multi-tenancy)
+	r.HandleFunc("/tenants", h.CreateTenant).Methods("POST")
+	r.HandleFunc("/tenants", h.ListTenants).Methods("GET")
+	r.HandleFunc("/tenants/{id}", h.GetTenant).Methods("GET")
+	r.HandleFunc("/tenants/{id}", h.UpdateTenant).Methods("PUT")
+	r.HandleFunc("/tenants/{id}", h.DeleteTenant).Methods("DELETE")
+	r.HandleFunc("/tenants/{id}/stats", h.GetTenantStats).Methods("GET")
+	r.HandleFunc("/tenants/{id}/jobs", h.GetTenantJobs).Methods("GET")
+	r.HandleFunc("/tenants/{id}/nodes", h.GetTenantNodes).Methods("GET")
+	
+	// Other routes
 	r.HandleFunc("/results", h.ReceiveResults).Methods("POST")
 	r.HandleFunc("/health", h.Health).Methods("GET")
 }
