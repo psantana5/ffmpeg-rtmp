@@ -18,12 +18,19 @@ NC='\033[0m' # No Color
 # Configuration
 MASTER_PORT="${MASTER_PORT:-8080}"
 WORKER_BASE_PORT="${WORKER_BASE_PORT:-9000}"
-NUM_WORKERS="${NUM_WORKERS:-3}"
+NUM_WORKERS="${NUM_WORKERS:-1}"
 LOG_DIR="${LOG_DIR:-./logs}"
 PID_DIR="${PID_DIR:-./pids}"
 DB_PATH="${DB_PATH:-./master.db}"
 MASTER_BINARY="${MASTER_BINARY:-./bin/master}"
 WORKER_BINARY="${WORKER_BINARY:-./bin/agent}"
+
+# Use MASTER_API_KEY if set, otherwise generate new one
+if [ -n "$MASTER_API_KEY" ]; then
+  API_KEY="$MASTER_API_KEY"
+else
+  API_KEY="${FFMPEG_RTMP_API_KEY:-$(openssl rand -hex 32)}"
+fi
 
 # Ensure directories exist
 mkdir -p "$LOG_DIR" "$PID_DIR"
@@ -91,6 +98,27 @@ wait_for_service() {
   return 1
 }
 
+wait_for_service_https() {
+  local name=$1
+  local port=$2
+  local max_wait=30
+  local waited=0
+
+  log_info "Waiting for $name to be ready on port $port (HTTPS)..."
+  while [ $waited -lt $max_wait ]; do
+    if curl -sk "https://localhost:$port/health" >/dev/null 2>&1; then
+      log_info "$name is ready!"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+    echo -n "."
+  done
+  echo ""
+  log_error "$name failed to start within ${max_wait}s"
+  return 1
+}
+
 #############################################
 # Start Functions
 #############################################
@@ -107,17 +135,35 @@ start_master() {
     return 0
   fi
 
-  log_info "Starting master on port $MASTER_PORT..."
+  # Generate API key if not set
+  if [ -z "$MASTER_API_KEY" ] && [ -z "$FFMPEG_RTMP_API_KEY" ]; then
+    API_KEY="$(openssl rand -hex 32)"
+    log_info "Generated API key: $API_KEY"
+    log_info "Save this! Workers need it to register."
+    echo "$API_KEY" > .api_key
+    log_info "API key saved to .api_key file"
+  else
+    if [ -n "$MASTER_API_KEY" ]; then
+      API_KEY="$MASTER_API_KEY"
+      log_info "Using API key from MASTER_API_KEY environment"
+    else
+      API_KEY="$FFMPEG_RTMP_API_KEY"
+      log_info "Using API key from FFMPEG_RTMP_API_KEY environment"
+    fi
+  fi
+
+  log_info "Starting master on port $MASTER_PORT (HTTPS)..."
   log_info "Database: $DB_PATH"
   log_info "Logs: $LOG_DIR/master.log"
 
-  # Start master with production scheduler enabled (TLS & auth disabled for local dev)
-  # Run with explicit empty API key to disable authentication
-  env -u FFMPEG_RTMP_API_KEY nohup "$MASTER_BINARY" \
+  # Start master with HTTPS enabled and API key
+  FFMPEG_RTMP_API_KEY="$API_KEY" \
+    nohup "$MASTER_BINARY" \
     -port="$MASTER_PORT" \
     -db="$DB_PATH" \
-    -tls=false \
-    -api-key="" \
+    -tls=true \
+    -cert=certs/master.crt \
+    -key=certs/master.key \
     >>"$LOG_DIR/master.log" 2>&1 &
 
   local pid=$!
@@ -125,9 +171,10 @@ start_master() {
 
   log_info "Master started (PID: $pid)"
 
-  # Wait for master to be ready
-  if wait_for_service "Master" "$MASTER_PORT"; then
-    log_info "✓ Master node operational"
+  # Wait for master to be ready (HTTPS endpoint)
+  if wait_for_service_https "Master" "$MASTER_PORT"; then
+    log_info "✓ Master node operational (HTTPS)"
+    log_info "API Key: $API_KEY"
 
     # Show scheduler status
     log_info "Production scheduler active:"
@@ -143,12 +190,28 @@ start_workers() {
 
   check_binary "$WORKER_BINARY"
 
-  local master_url="http://localhost:$MASTER_PORT"
+  # Load API key
+  if [ -n "$MASTER_API_KEY" ]; then
+    API_KEY="$MASTER_API_KEY"
+    log_info "Using API key from MASTER_API_KEY environment"
+  elif [ -n "$FFMPEG_RTMP_API_KEY" ]; then
+    API_KEY="$FFMPEG_RTMP_API_KEY"
+    log_info "Using API key from FFMPEG_RTMP_API_KEY environment"
+  elif [ -f ".api_key" ]; then
+    API_KEY=$(cat .api_key)
+    log_info "Loaded API key from .api_key file"
+  else
+    log_error "No API key found! Set MASTER_API_KEY or run master first."
+    return 1
+  fi
+
+  local master_url="https://localhost:$MASTER_PORT"
 
   for i in $(seq 1 $NUM_WORKERS); do
     local worker_port=$((WORKER_BASE_PORT + i - 1))
     local worker_name="worker-$i"
     local pid_file="$PID_DIR/${worker_name}.pid"
+    local metrics_port=$((9090 + i))
 
     if is_running "$pid_file"; then
       log_warn "$worker_name already running (PID: $(cat $pid_file))"
@@ -157,15 +220,14 @@ start_workers() {
 
     log_info "Starting $worker_name on port $worker_port..."
 
-    # Start worker with production flags (uses env vars for PORT and WORKER_NAME)
-    # Set unique metrics port per worker to avoid conflicts
-    local metrics_port=$((9090 + i))
+    # Start worker with HTTPS master URL and API key
     PORT="$worker_port" \
       WORKER_NAME="$worker_name" \
-      FFMPEG_RTMP_API_KEY="" \
       nohup "$WORKER_BINARY" \
       -master="$master_url" \
+      -api-key="$API_KEY" \
       -metrics-port="$metrics_port" \
+      -insecure-skip-verify \
       -register \
       -allow-master-as-worker \
       -skip-confirmation \
@@ -174,7 +236,7 @@ start_workers() {
     local pid=$!
     echo $pid >"$pid_file"
 
-    log_info "  ✓ $worker_name started (PID: $pid, Port: $worker_port)"
+    log_info "  ✓ $worker_name started (PID: $pid, Port: $worker_port, Metrics: $metrics_port)"
 
     # Brief pause between workers
     sleep 1
@@ -184,7 +246,7 @@ start_workers() {
   sleep 3
 
   # Verify workers registered
-  local registered=$(curl -s "http://localhost:$MASTER_PORT/nodes" | grep -c '"status":"available"' || echo 0)
+  local registered=$(curl -sk -H "Authorization: Bearer $API_KEY" "https://localhost:$MASTER_PORT/nodes" | grep -c '"status":"available"' || echo 0)
   log_info "✓ $registered/$NUM_WORKERS workers registered and available"
 }
 
@@ -409,7 +471,7 @@ health_check() {
 
   # Check master
   echo -n "Master API: "
-  if curl -s -f "http://localhost:$MASTER_PORT/health" >/dev/null 2>&1; then
+  if curl -sk -H "Authorization: Bearer $API_KEY" "https://localhost:$MASTER_PORT/health" >/dev/null 2>&1; then
     echo -e "${GREEN}✓ HEALTHY${NC}"
   else
     echo -e "${RED}✗ UNHEALTHY${NC}"
