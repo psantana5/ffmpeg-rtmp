@@ -51,11 +51,20 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Count jobs by status
 	jobsByStatus := make(map[string]int)
+	jobsByFailureReason := make(map[string]int)
 	totalRetries := 0
 	for _, job := range jobs {
 		jobsByStatus[string(job.Status)]++
 		if job.RetryCount > 0 {
 			totalRetries += job.RetryCount
+		}
+		// Count failures by reason
+		if job.Status == "failed" || job.Status == "rejected" {
+			if job.FailureReason != "" {
+				jobsByFailureReason[string(job.FailureReason)]++
+			} else {
+				jobsByFailureReason["unknown"]++
+			}
 		}
 	}
 
@@ -87,6 +96,17 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "\n# HELP ffmpeg_master_job_retries_total Total number of job retries\n")
 	fmt.Fprintf(w, "# TYPE ffmpeg_master_job_retries_total counter\n")
 	fmt.Fprintf(w, "ffmpeg_master_job_retries_total %d\n", totalRetries)
+
+	fmt.Fprintf(w, "\n# HELP ffmpeg_master_jobs_rejected_total Total number of rejected jobs\n")
+	fmt.Fprintf(w, "# TYPE ffmpeg_master_jobs_rejected_total counter\n")
+	rejectedCount := jobsByStatus["rejected"]
+	fmt.Fprintf(w, "ffmpeg_master_jobs_rejected_total %d\n", rejectedCount)
+
+	fmt.Fprintf(w, "\n# HELP ffmpeg_master_jobs_failed_total Total number of failed jobs by reason\n")
+	fmt.Fprintf(w, "# TYPE ffmpeg_master_jobs_failed_total counter\n")
+	for reason, count := range jobsByFailureReason {
+		fmt.Fprintf(w, "ffmpeg_master_jobs_failed_total{reason=\"%s\"} %d\n", reason, count)
+	}
 
 	// Node capacity metrics
 	totalCPUThreads := 0

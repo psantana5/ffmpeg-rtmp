@@ -99,6 +99,7 @@ func (s *SQLiteStore) initSchema() error {
 		max_retries INTEGER DEFAULT 3,
 		retry_reason TEXT,
 		error TEXT,
+		failure_reason TEXT,
 		logs TEXT,
 		state_transitions TEXT
 	);
@@ -224,6 +225,19 @@ func (s *SQLiteStore) initSchema() error {
 		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN retry_reason TEXT DEFAULT ''")
 		if err != nil {
 			return fmt.Errorf("failed to add retry_reason column: %w", err)
+		}
+	}
+	
+	// Migration 7: Add failure_reason column to jobs (if missing)
+	var failureReasonExists int
+	row = s.db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('jobs') WHERE name='failure_reason'")
+	if err := row.Scan(&failureReasonExists); err != nil {
+		return fmt.Errorf("failed to check failure_reason column: %w", err)
+	}
+	if failureReasonExists == 0 {
+		_, err = s.db.Exec("ALTER TABLE jobs ADD COLUMN failure_reason TEXT DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("failed to add failure_reason column: %w", err)
 		}
 	}
 
@@ -472,11 +486,11 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 	_, err = s.db.Exec(`
 		INSERT INTO jobs 
 		(id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, 
-		 created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 created_at, started_at, last_activity_at, completed_at, retry_count, error, failure_reason, logs, state_transitions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, job.ID, job.SequenceNumber, job.Scenario, job.Confidence, job.Engine, string(params), job.Status, job.Queue,
 		job.Priority, job.Progress, job.NodeID, job.CreatedAt, job.StartedAt, job.LastActivityAt,
-		job.CompletedAt, job.RetryCount, job.Error, job.Logs, string(transitions))
+		job.CompletedAt, job.RetryCount, job.Error, string(job.FailureReason), job.Logs, string(transitions))
 
 	return err
 }
@@ -484,16 +498,16 @@ func (s *SQLiteStore) CreateJob(job *models.Job) error {
 // GetJob retrieves a job by ID
 func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	var job models.Job
-	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull, failureReasonNull sql.NullString
 	var startedAt, lastActivityAt, completedAt sql.NullTime
 
 	err := s.db.QueryRow(`
 		SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id,
-		       created_at, started_at, last_activity_at, completed_at, retry_count, error, logs, state_transitions
+		       created_at, started_at, last_activity_at, completed_at, retry_count, error, failure_reason, logs, state_transitions
 		FROM jobs WHERE id = ?
 	`, id).Scan(&job.ID, &job.SequenceNumber, &job.Scenario, &job.Confidence, &job.Engine, &paramsJSON, &job.Status,
 		&job.Queue, &job.Priority, &job.Progress, &nodeIDNull, &job.CreatedAt, 
-		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &logsNull, &transitionsJSON)
+		&startedAt, &lastActivityAt, &completedAt, &job.RetryCount, &job.Error, &failureReasonNull, &logsNull, &transitionsJSON)
 
 	if err == sql.ErrNoRows {
 		return nil, ErrJobNotFound
@@ -510,6 +524,11 @@ func (s *SQLiteStore) GetJob(id string) (*models.Job, error) {
 	// Handle nullable logs
 	if logsNull.Valid {
 		job.Logs = logsNull.String
+	}
+	
+	// Handle nullable failure_reason
+	if failureReasonNull.Valid {
+		job.FailureReason = models.FailureReason(failureReasonNull.String)
 	}
 
 	if paramsJSON.Valid {
@@ -916,6 +935,27 @@ func (s *SQLiteStore) UpdateJobActivity(id string) error {
 	return nil
 }
 
+// UpdateJobFailureReason updates the failure_reason field for a job
+func (s *SQLiteStore) UpdateJobFailureReason(id string, reason models.FailureReason, errorMsg string) error {
+	result, err := s.db.Exec(`
+		UPDATE jobs SET failure_reason = ?, error = ? WHERE id = ?
+	`, string(reason), errorMsg, id)
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrJobNotFound
+	}
+
+	return nil
+}
+
 // UpdateJob updates a job's complete state
 func (s *SQLiteStore) UpdateJob(job *models.Job) error {
 	params, err := json.Marshal(job.Parameters)
@@ -1255,7 +1295,7 @@ func (s *SQLiteStore) scanJobRow(scanner interface{
 	Scan(...interface{}) error
 }) (*models.Job, error) {
 	var job models.Job
-	var paramsJSON, transitionsJSON, nodeIDNull, logsNull sql.NullString
+	var paramsJSON, transitionsJSON, nodeIDNull, logsNull, failureReasonNull sql.NullString
 	var maxRetriesNull sql.NullInt64
 	var retryReasonNull sql.NullString
 	var startedAt, lastActivityAt, completedAt sql.NullTime
@@ -1277,6 +1317,9 @@ func (s *SQLiteStore) scanJobRow(scanner interface{
 	}
 	if logsNull.Valid {
 		job.Logs = logsNull.String
+	}
+	if failureReasonNull.Valid {
+		job.FailureReason = models.FailureReason(failureReasonNull.String)
 	}
 	if maxRetriesNull.Valid {
 		job.MaxRetries = int(maxRetriesNull.Int64)

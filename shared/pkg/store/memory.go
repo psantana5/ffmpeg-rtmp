@@ -706,3 +706,21 @@ func (s *MemoryStore) GetTimedOutJobs() ([]*models.Job, error) {
 	return result, nil
 }
 
+// UpdateJobFailureReason updates the failure_reason field for a job
+func (s *MemoryStore) UpdateJobFailureReason(id string, reason models.FailureReason, errorMsg string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	job, ok := s.jobs[id]
+	if !ok {
+		return ErrJobNotFound
+	}
+
+	job.FailureReason = reason
+	if errorMsg != "" {
+		job.Error = errorMsg
+	}
+
+	return nil
+}
+

@@ -203,23 +203,46 @@ func (s *ProductionScheduler) runSchedulingCycle() {
 		return
 	}
 
-	// Get available workers
+	// Get ALL workers for capability validation
+	allWorkers := s.store.GetAllNodes()
+	
+	// Get available workers for assignment
 	availableWorkers := s.getAvailableWorkers()
-	if len(availableWorkers) == 0 {
+	if len(availableWorkers) == 0 && len(allWorkers) == 0 {
 		return
 	}
 
 	log.Printf("[Scheduler] Scheduling: %d queued jobs, %d available workers",
 		len(queuedJobs), len(availableWorkers))
 
-	// Assign jobs to workers (with fairness)
-	assigned := 0
-	for i, job := range queuedJobs {
-		if i >= len(availableWorkers) {
-			break // No more workers available
+	// Process each queued job
+	for _, job := range queuedJobs {
+		// First, check if ANY worker in cluster can ever run this job
+		canRunAnywhere, clusterReason := ValidateClusterCapabilities(job, allWorkers)
+		if !canRunAnywhere {
+			// Job cannot be satisfied by cluster - reject immediately
+			log.Printf("[Scheduler] Rejecting job %d: %s", job.SequenceNumber, clusterReason)
+			s.rejectJob(job, clusterReason)
+			continue
 		}
 
-		worker := availableWorkers[i]
+		// Job CAN run somewhere, but check if any worker is available now
+		if len(availableWorkers) == 0 {
+			// No workers available right now, but job is valid - keep in queue
+			continue
+		}
+
+		// Find compatible available workers
+		compatibleWorkers, reason := FindCompatibleWorkers(job, availableWorkers)
+		if len(compatibleWorkers) == 0 {
+			// No compatible workers available right now, but job is valid - keep in queue
+			log.Printf("[Scheduler] Job %d waiting for compatible worker: %s", 
+				job.SequenceNumber, reason)
+			continue
+		}
+
+		// Assign to first compatible worker
+		worker := compatibleWorkers[0]
 		s.metrics.AssignmentAttempts++
 
 		// Attempt idempotent assignment
@@ -238,15 +261,18 @@ func (s *ProductionScheduler) runSchedulingCycle() {
 		}
 
 		if success {
-			assigned++
 			s.metrics.AssignmentSuccesses++
 			log.Printf("[Scheduler] Assigned job %d (queue=%s, priority=%s) to worker %s",
 				job.SequenceNumber, job.Queue, job.Priority, worker.Name)
+			
+			// Remove assigned worker from available list
+			availableWorkers = removeWorker(availableWorkers, worker.ID)
 		}
-	}
-
-	if assigned > 0 {
-		log.Printf("[Scheduler] Successfully assigned %d jobs", assigned)
+		
+		// Stop if no more workers available
+		if len(availableWorkers) == 0 {
+			break
+		}
 	}
 }
 
@@ -520,4 +546,52 @@ func (s *ProductionScheduler) storeExt() ExtendedStore {
 		panic("Store does not implement ExtendedStore interface")
 	}
 	return ext
+}
+
+// rejectJob marks a job as rejected due to capability mismatch
+func (s *ProductionScheduler) rejectJob(job *models.Job, reason string) {
+	_, err := s.storeExt().TransitionJobState(
+		job.ID,
+		models.JobStatusRejected,
+		reason,
+	)
+
+	if err != nil {
+		log.Printf("[Scheduler] Failed to reject job %s: %v", job.ID, err)
+		return
+	}
+
+	// Update failure reason in database
+	if err := s.updateJobFailureReason(job.ID, models.FailureReasonCapabilityMismatch, reason); err != nil {
+		log.Printf("[Scheduler] Failed to update failure reason for job %s: %v", job.ID, err)
+	}
+
+	log.Printf("[Scheduler] Job %d rejected: %s", job.SequenceNumber, reason)
+}
+
+// updateJobFailureReason updates the failure_reason field for a job
+func (s *ProductionScheduler) updateJobFailureReason(jobID string, reason models.FailureReason, errorMsg string) error {
+	// This is a direct SQL update - store interface doesn't have this method yet
+	type sqlStore interface {
+		UpdateJobFailureReason(jobID string, reason models.FailureReason, errorMsg string) error
+	}
+	
+	if ss, ok := s.store.(sqlStore); ok {
+		return ss.UpdateJobFailureReason(jobID, reason, errorMsg)
+	}
+	
+	// Fallback: just log - failure reason will be empty but state is correct
+	log.Printf("[Scheduler] Store doesn't support UpdateJobFailureReason, failure_reason not set")
+	return nil
+}
+
+// removeWorker removes a worker from the list by ID
+func removeWorker(workers []*models.Node, workerID string) []*models.Node {
+	result := make([]*models.Node, 0, len(workers))
+	for _, w := range workers {
+		if w.ID != workerID {
+			result = append(result, w)
+		}
+	}
+	return result
 }

@@ -15,6 +15,7 @@ const (
 	JobStatusTimedOut  JobStatus = "timed_out"  // Job exceeded timeout threshold
 	JobStatusRetrying  JobStatus = "retrying"   // Job is being retried after failure
 	JobStatusCanceled  JobStatus = "canceled"   // Job explicitly canceled by user
+	JobStatusRejected  JobStatus = "rejected"   // Job rejected due to missing capabilities
 )
 
 // StateTransitionRule defines valid state transitions
@@ -30,6 +31,7 @@ var validTransitions = map[JobStatus]map[JobStatus]bool{
 		JobStatusAssigned:  true, // Queue → Assigned (worker picks up job)
 		JobStatusCanceled:  true, // Queue → Canceled (user cancels)
 		JobStatusRetrying:  true, // Queue → Retrying (immediate retry scheduling)
+		JobStatusRejected:  true, // Queue → Rejected (capability mismatch)
 	},
 	JobStatusAssigned: {
 		JobStatusRunning:   true, // Assigned → Running (worker starts execution)
@@ -58,6 +60,7 @@ var validTransitions = map[JobStatus]map[JobStatus]bool{
 	JobStatusCompleted: {},
 	JobStatusFailed:    {},
 	JobStatusCanceled:  {},
+	JobStatusRejected:  {},
 }
 
 // ValidateTransition checks if a state transition is valid
@@ -98,7 +101,7 @@ func normalizeState(state JobStatus) JobStatus {
 // IsTerminalState returns true if the state is terminal (no further transitions)
 func IsTerminalState(state JobStatus) bool {
 	state = normalizeState(state)
-	return state == JobStatusCompleted || state == JobStatusFailed || state == JobStatusCanceled
+	return state == JobStatusCompleted || state == JobStatusFailed || state == JobStatusCanceled || state == JobStatusRejected
 }
 
 // IsActiveState returns true if the job is actively being processed
@@ -219,8 +222,13 @@ func (rp *RetryPolicy) ShouldRetry(job *Job, reason string) bool {
 		return false
 	}
 
-	// Never retry canceled jobs
-	if job.Status == JobStatusCanceled {
+	// Never retry canceled or rejected jobs
+	if job.Status == JobStatusCanceled || job.Status == JobStatusRejected {
+		return false
+	}
+
+	// Never retry capability mismatches
+	if job.FailureReason == FailureReasonCapabilityMismatch {
 		return false
 	}
 

@@ -17,7 +17,17 @@ const (
 // Note: Current FSM states defined in fsm.go:
 // - JobStatusQueued, JobStatusAssigned, JobStatusRunning
 // - JobStatusCompleted, JobStatusFailed, JobStatusTimedOut
-// - JobStatusRetrying, JobStatusCanceled
+// - JobStatusRetrying, JobStatusCanceled, JobStatusRejected
+
+// FailureReason represents the reason for job failure
+type FailureReason string
+
+const (
+	FailureReasonCapabilityMismatch FailureReason = "capability_mismatch" // Missing GPU/encoder/engine
+	FailureReasonRuntimeError       FailureReason = "runtime_error"       // Execution error
+	FailureReasonTimeout            FailureReason = "timeout"             // Job exceeded timeout
+	FailureReasonUserError          FailureReason = "user_error"          // Invalid parameters/config
+)
 
 // Job represents a workload to be executed on a compute node
 type Job struct {
@@ -41,6 +51,7 @@ type Job struct {
 	MaxRetries       int                    `json:"max_retries,omitempty"`       // Max retry attempts (default: 3)
 	RetryReason      string                 `json:"retry_reason,omitempty"`      // Reason for current retry
 	Error            string                 `json:"error,omitempty"`
+	FailureReason    FailureReason          `json:"failure_reason,omitempty"`    // Explicit failure classification
 	Logs             string                 `json:"logs,omitempty"`              // Worker execution logs
 	TimeoutAt        *time.Time             `json:"timeout_at,omitempty"`        // Calculated timeout deadline
 	StateTransitions []StateTransition      `json:"state_transitions,omitempty"`

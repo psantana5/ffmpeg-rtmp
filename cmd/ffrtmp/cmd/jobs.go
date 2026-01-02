@@ -147,6 +147,7 @@ type jobResponse struct {
 	CompletedAt    *time.Time             `json:"completed_at,omitempty"`
 	RetryCount     int                    `json:"retry_count"`
 	Error          string                 `json:"error,omitempty"`
+	FailureReason  string                 `json:"failure_reason,omitempty"`
 }
 
 type jobsListResponse struct {
@@ -323,7 +324,7 @@ func listAllJobs() error {
 	} else {
 		// Output as table
 		table := tablewriter.NewWriter(os.Stdout)
-		table.Header("Job #", "Scenario", "Status", "Progress", "Node", "Created")
+		table.Header("Job #", "Scenario", "Status", "Progress", "Node", "Failure", "Created")
 
 		for _, job := range result.Jobs {
 			progress := fmt.Sprintf("%d%%", job.Progress)
@@ -334,6 +335,14 @@ func listAllJobs() error {
 				nodeName = "-"
 			}
 			
+			// Format failure reason
+			failureDisplay := "-"
+			if job.FailureReason != "" {
+				failureDisplay = formatFailureReason(job.FailureReason)
+			} else if job.Status == "failed" || job.Status == "rejected" {
+				failureDisplay = "unknown"
+			}
+			
 			createdAt := job.CreatedAt.Format("2006-01-02 15:04")
 			
 			table.Append(
@@ -342,6 +351,7 @@ func listAllJobs() error {
 				job.Status,
 				progress,
 				nodeName,
+				failureDisplay,
 				createdAt,
 			)
 		}
@@ -435,6 +445,10 @@ func displayJobStatus(result *jobResponse, renderTable bool) {
 	if result.Error != "" {
 		table.Append("Error", result.Error)
 	}
+	
+	if result.FailureReason != "" {
+		table.Append("Failure Reason", formatFailureReason(result.FailureReason))
+	}
 
 	// Display parameters if any
 	if len(result.Parameters) > 0 {
@@ -446,6 +460,22 @@ func displayJobStatus(result *jobResponse, renderTable bool) {
 		table.Render()
 	} else {
 		table.Render()
+	}
+}
+
+// formatFailureReason converts failure reason codes to human-readable text
+func formatFailureReason(reason string) string {
+	switch reason {
+	case "capability_mismatch":
+		return "Capability Mismatch"
+	case "runtime_error":
+		return "Runtime Error"
+	case "timeout":
+		return "Timeout"
+	case "user_error":
+		return "User Error"
+	default:
+		return reason
 	}
 }
 
