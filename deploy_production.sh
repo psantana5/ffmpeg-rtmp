@@ -112,11 +112,12 @@ start_master() {
   log_info "Logs: $LOG_DIR/master.log"
 
   # Start master with production scheduler enabled (TLS & auth disabled for local dev)
-  # Run with empty FFMPEG_RTMP_API_KEY to disable authentication
+  # Run with explicit empty API key to disable authentication
   env -u FFMPEG_RTMP_API_KEY nohup "$MASTER_BINARY" \
     -port="$MASTER_PORT" \
     -db="$DB_PATH" \
     -tls=false \
+    -api-key="" \
     >>"$LOG_DIR/master.log" 2>&1 &
 
   local pid=$!
@@ -157,12 +158,14 @@ start_workers() {
     log_info "Starting $worker_name on port $worker_port..."
 
     # Start worker with production flags (uses env vars for PORT and WORKER_NAME)
-    # Set empty API key to disable authentication
+    # Set unique metrics port per worker to avoid conflicts
+    local metrics_port=$((9090 + i))
     PORT="$worker_port" \
       WORKER_NAME="$worker_name" \
       FFMPEG_RTMP_API_KEY="" \
       nohup "$WORKER_BINARY" \
       -master="$master_url" \
+      -metrics-port="$metrics_port" \
       -register \
       -allow-master-as-worker \
       -skip-confirmation \
