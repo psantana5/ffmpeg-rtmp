@@ -313,3 +313,120 @@ func (s *PostgreSQLStore) UpdateJob(job *models.Job) error {
 }
 
 // Continue in next file...
+
+// AddStateTransition adds a state transition to a job's history
+func (s *PostgreSQLStore) AddStateTransition(id string, from, to models.JobStatus, reason string) error {
+// Use TransitionJobState which already handles this
+_, err := s.TransitionJobState(id, to, reason)
+return err
+}
+
+// PauseJob pauses a running job
+func (s *PostgreSQLStore) PauseJob(id string) error {
+_, err := s.TransitionJobState(id, models.JobStatusAssigned, "Job paused by user")
+return err
+}
+
+// ResumeJob resumes a paused job
+func (s *PostgreSQLStore) ResumeJob(id string) error {
+_, err := s.TransitionJobState(id, models.JobStatusRunning, "Job resumed by user")
+return err
+}
+
+// CancelJob cancels a job
+func (s *PostgreSQLStore) CancelJob(id string) error {
+_, err := s.TransitionJobState(id, models.JobStatusCanceled, "Job canceled by user")
+return err
+}
+
+// RetryJob retries a failed job
+func (s *PostgreSQLStore) RetryJob(jobID string, errorMsg string) error {
+tx, err := s.db.Begin()
+if err != nil {
+return err
+}
+defer tx.Rollback()
+
+// Get current job
+var retryCount int
+var status string
+err = tx.QueryRow("SELECT retry_count, status FROM jobs WHERE id = $1 FOR UPDATE", jobID).
+Scan(&retryCount, &status)
+if err != nil {
+return err
+}
+
+// Increment retry count and set to queued
+_, err = tx.Exec(`
+UPDATE jobs 
+SET status = $1, retry_count = $2, error = $3, node_id = NULL
+WHERE id = $4
+`, models.JobStatusQueued, retryCount+1, errorMsg, jobID)
+
+if err != nil {
+return err
+}
+
+return tx.Commit()
+}
+
+// TryQueuePendingJob atomically queues a pending job (for legacy scheduler)
+func (s *PostgreSQLStore) TryQueuePendingJob(jobID string) (bool, error) {
+result, err := s.db.Exec(`
+UPDATE jobs 
+SET status = $1
+WHERE id = $2 AND status = $3
+`, models.JobStatusQueued, jobID, models.JobStatusPending)
+
+if err != nil {
+return false, err
+}
+
+rows, err := result.RowsAffected()
+if err != nil {
+return false, err
+}
+
+return rows > 0, nil
+}
+
+// GetQueuedJobs returns queued jobs filtered by queue and priority
+func (s *PostgreSQLStore) GetQueuedJobs(queue string, priority string) []*models.Job {
+query := `
+SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, 
+       progress, node_id, created_at, started_at, last_activity_at, completed_at, 
+       retry_count, error, failure_reason, logs, state_transitions
+FROM jobs 
+WHERE status IN ($1, $2)
+`
+args := []interface{}{models.JobStatusQueued, models.JobStatusRetrying}
+
+if queue != "" {
+query += " AND queue = $" + fmt.Sprintf("%d", len(args)+1)
+args = append(args, queue)
+}
+
+if priority != "" {
+query += " AND priority = $" + fmt.Sprintf("%d", len(args)+1)
+args = append(args, priority)
+}
+
+query += " ORDER BY created_at ASC"
+
+rows, err := s.db.Query(query, args...)
+if err != nil {
+return []*models.Job{}
+}
+defer rows.Close()
+
+var jobs []*models.Job
+for rows.Next() {
+job, err := s.scanJobRow(rows)
+if err != nil {
+continue
+}
+jobs = append(jobs, job)
+}
+
+return jobs
+}
