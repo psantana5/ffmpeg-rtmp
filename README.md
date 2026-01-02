@@ -160,16 +160,16 @@ go build -o bin/ffrtmp ./cmd/ffrtmp
 
 **Distributed mode now production-ready with enterprise features:**
 
-- **✅ TLS/HTTPS** - Enabled by default with auto-generated certificates
-- **✅ API Authentication** - Required via `MASTER_API_KEY` environment variable
-- **✅ SQLite Persistence** - Default storage, survives restarts
-- **✅ Automatic Job Retry** - Failed jobs retry up to 3 times
-- **✅ Prometheus Metrics** - Built-in metrics endpoint on port 9090
-- **✅ Structured Logging** - Production-grade logging support
+- **TLS/HTTPS** - Enabled by default with auto-generated certificates
+- **API Authentication** - Required via `MASTER_API_KEY` environment variable
+- **SQLite Persistence** - Default storage, survives restarts
+- **Automatic Job Retry** - Failed jobs retry up to 3 times
+- **Prometheus Metrics** - Built-in metrics endpoint on port 9090
+- **Structured Logging** - Production-grade logging support
 
 See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for complete feature guide.
 
-## 🛡️ NEW: Enterprise-Grade Fault Tolerance
+## NEW: Enterprise-Grade Fault Tolerance
 
 **Production-ready reliability features for mission-critical workloads:**
 
@@ -214,12 +214,12 @@ See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for
 
 **See [docs/PRODUCTION.md](docs/PRODUCTION.md) for complete production deployment guide.**
 
-## ⚡ NEW: Dual Transcoding Engine Support
+## Dual Transcoding Engine Support
 
 **Choose the best transcoding engine for your workload:**
 
 - **FFmpeg** (default) - Versatile, mature, excellent for file transcoding
-- **GStreamer** (new) - Optimized for low-latency live streaming
+- **GStreamer** - Optimized for low-latency live streaming
 - **Intelligent Auto-Selection** - System picks the best engine automatically
 - **Hardware Acceleration** - NVIDIA NVENC, Intel QSV/VAAPI support for both engines
 
@@ -239,21 +239,6 @@ ffrtmp jobs submit --scenario live-rtmp --engine gstreamer
 - GPU+NVENC+streaming → GStreamer
 
 See **[docs/DUAL_ENGINE_SUPPORT.md](docs/DUAL_ENGINE_SUPPORT.md)** for complete documentation.
-
-## What's New: Go Exporters + VictoriaMetrics (v2.0)
-
-This project now features **production-ready Go exporters** that have replaced Python exporters for all critical telemetry:
-
-- **70%+ CPU reduction** vs Python exporters
-- **1-second scrape granularity** with minimal jitter
-- **VictoriaMetrics** as primary TSDB for 10x storage efficiency
-- **30-day retention** by default (vs 7 days)
-- **Zero missing metrics** under high load
-- **ARM64 support** for edge deployment
-- **FFmpeg stats exporter** for real-time encoding metrics
-- **Automated benchmarking** with 4 workload profiles
-
-See [CHANGELOG.md](CHANGELOG.md) for full v2.0 release notes.
 
 ## What This Project Does
 
