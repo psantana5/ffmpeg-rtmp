@@ -18,7 +18,6 @@ type Node struct {
 	ID               string            `json:"id"`
 	TenantID         string            `json:"tenant_id"`        // Tenant/organization ID
 	Name             string            `json:"name"`             // Human-friendly node name (hostname)
-	TenantID         string            `json:"tenant_id,omitempty"` // Tenant/organization ID
 	Address          string            `json:"address"`
 	Type             NodeType          `json:"type"`
 	CPUThreads       int               `json:"cpu_threads"`
