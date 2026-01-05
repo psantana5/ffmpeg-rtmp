@@ -57,6 +57,11 @@ type WorkerExporter struct {
 	jobsSLACompliant           int64   // Jobs completed within SLA targets
 	jobsSLAViolation           int64   // Jobs that violated SLA
 	currentSLAComplianceRate   float64 // Percentage (0-100)
+	
+	// Cancellation metrics
+	jobsCanceledTotal          int64
+	jobsCanceledGracefulTotal  int64 // Terminated with SIGTERM
+	jobsCanceledForcefulTotal  int64 // Terminated with SIGKILL
 }
 
 // NewWorkerExporter creates a new Prometheus exporter for worker
@@ -213,6 +218,19 @@ func (e *WorkerExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_sla_compliance_rate Current SLA compliance rate as percentage (0-100)\n")
 	fmt.Fprintf(w, "# TYPE ffrtmp_worker_sla_compliance_rate gauge\n")
 	fmt.Fprintf(w, "ffrtmp_worker_sla_compliance_rate{node_id=\"%s\"} %.2f\n", e.nodeID, e.currentSLAComplianceRate)
+	
+	// Cancellation metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_canceled_total Total number of jobs canceled\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_canceled_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_canceled_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsCanceledTotal)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_canceled_graceful_total Jobs terminated gracefully with SIGTERM\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_canceled_graceful_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_canceled_graceful_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsCanceledGracefulTotal)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_canceled_forceful_total Jobs terminated forcefully with SIGKILL\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_canceled_forceful_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_canceled_forceful_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsCanceledForcefulTotal)
 }
 
 // updateMetrics updates hardware metrics
@@ -419,4 +437,25 @@ func (e *WorkerExporter) GetJobCompletionStats() (completed, failed, slaComplian
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.jobsCompletedTotal, e.jobsFailedTotal, e.jobsSLACompliant, e.jobsSLAViolation
+}
+
+// RecordJobCancellation records a canceled job
+// graceful: true if terminated with SIGTERM, false if SIGKILL was needed
+func (e *WorkerExporter) RecordJobCancellation(graceful bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	
+	e.jobsCanceledTotal++
+	if graceful {
+		e.jobsCanceledGracefulTotal++
+	} else {
+		e.jobsCanceledForcefulTotal++
+	}
+}
+
+// GetCancellationStats returns cancellation statistics
+func (e *WorkerExporter) GetCancellationStats() (total, graceful, forceful int64) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.jobsCanceledTotal, e.jobsCanceledGracefulTotal, e.jobsCanceledForcefulTotal
 }
