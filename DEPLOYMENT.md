@@ -92,18 +92,24 @@ tail -f logs/master.log | grep '\[Cleanup\]'
 ```
 
 ### API Endpoints
+
+**Note**: All examples use HTTPS. For local development with self-signed certs, add `-k` flag to curl.
+
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl -k https://localhost:8080/health
 
-# List jobs
-curl http://localhost:8080/jobs | jq
+# List jobs (requires authentication)
+curl -k https://localhost:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" | jq
 
 # List workers
-curl http://localhost:8080/nodes | jq
+curl -k https://localhost:8080/nodes \
+  -H "Authorization: Bearer $MASTER_API_KEY" | jq
 
 # Submit job
-curl -X POST http://localhost:8080/jobs \
+curl -k -X POST https://localhost:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "scenario": "1080p30-h264",
@@ -173,9 +179,10 @@ After=network.target ffmpeg-master.service
 Type=simple
 User=ffmpeg
 WorkingDirectory=/opt/ffmpeg-rtmp
+Environment="MASTER_API_KEY=your-secure-api-key"
 ExecStart=/opt/ffmpeg-rtmp/bin/worker
 Environment="PORT=900%i"
-Environment="MASTER_URL=http://localhost:8080"
+Environment="MASTER_URL=https://localhost:8080"
 Environment="WORKER_NAME=worker-%i"
 Restart=always
 RestartSec=5
@@ -192,7 +199,9 @@ sudo systemctl start ffmpeg-master
 sudo systemctl start ffmpeg-worker@{1..3}
 ```
 
-### 2. Docker Compose
+### 2. Docker Compose (Development Only)
+
+**Warning**: This Docker Compose example uses HTTP for simplicity and is intended for local development only. For production, use systemd deployment with HTTPS and authentication.
 
 Create `docker-compose.production.yml`:
 ```yaml
@@ -282,8 +291,8 @@ sqlite3 master.db "SELECT COUNT(*) FROM jobs;"
 # Check worker logs
 cat logs/worker-1.log
 
-# Check master is reachable
-curl http://localhost:8080/health
+# Check master is reachable (development - use -k for self-signed cert)
+curl -k https://localhost:8080/health
 
 # Check worker port
 lsof -i :9000
@@ -291,8 +300,9 @@ lsof -i :9000
 
 ### Jobs stuck in queue
 ```bash
-# Check worker availability
-curl http://localhost:8080/nodes | jq '.[] | select(.status=="available")'
+# Check worker availability (requires API key)
+curl -k https://localhost:8080/nodes \
+  -H "Authorization: Bearer $MASTER_API_KEY" | jq '.[] | select(.status=="available")'
 
 # Check scheduler logs
 grep '\[Scheduler\]' logs/master.log | tail -20
@@ -329,7 +339,8 @@ config := &SchedulerConfig{
 NUM_WORKERS=10 ./deploy_production.sh start
 
 # Or add workers while running
-PORT=9010 MASTER_URL=http://localhost:8080 ./bin/worker &
+# Manual startup for debugging
+PORT=9010 MASTER_URL=https://localhost:8080 MASTER_API_KEY="$MASTER_API_KEY" ./bin/worker &
 ```
 
 ### Database Optimization
@@ -388,7 +399,7 @@ export TLS_KEY=/path/to/key.pem
 ## Monitoring & Alerting
 
 ### Prometheus (Optional)
-Metrics endpoint: `http://localhost:8080/metrics`
+Metrics endpoint: `http://localhost:9090/metrics` (Prometheus metrics - HTTP OK for metrics)
 
 ### Alert Rules
 - Worker offline > 2 minutes
@@ -401,7 +412,7 @@ Metrics endpoint: `http://localhost:8080/metrics`
 - Documentation: `docs/`
 - Issues: GitHub Issues
 - Logs: `./logs/`
-- Health: `http://localhost:8080/health`
+- Health: `https://localhost:8080/health` (use `-k` for self-signed cert)
 
 ---
 
