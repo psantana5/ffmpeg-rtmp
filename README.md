@@ -130,6 +130,141 @@ See [deployment/README.md](deployment/README.md) for systemd service templates a
 
 ---
 
+## Resource Management & Production Best Practices
+
+### Running as Root (Recommended for Production)
+
+**For production deployments, running the worker agent as root is strongly recommended** to enable full resource management capabilities:
+
+```bash
+# Run worker with full cgroup support (recommended)
+sudo ./bin/agent \
+  --register \
+  --master https://MASTER_IP:8080 \
+  --api-key "$MASTER_API_KEY" \
+  --max-concurrent-jobs 4 \
+  --poll-interval 3s
+```
+
+**Benefits of running as root:**
+- ✅ **Full CPU limits**: Enforce per-job CPU quotas via cgroups
+- ✅ **Memory limits**: Hard memory caps with OOM protection
+- ✅ **Resource isolation**: Complete process isolation per job
+- ✅ **Production stability**: Prevent resource exhaustion and runaway jobs
+
+**Without root privileges**, the system gracefully falls back to:
+- ✅ Disk space monitoring (always enforced)
+- ✅ Timeout enforcement (always enforced)  
+- ✅ Process priority control via nice (always enforced)
+- ⚠️ CPU/Memory limits disabled (soft limits only)
+
+### Resource Limits Per Job
+
+Every job supports configurable resource limits to ensure system stability:
+
+```json
+{
+  "scenario": "1080p-h264",
+  "parameters": {
+    "bitrate": "4M",
+    "duration": 300
+  },
+  "resource_limits": {
+    "max_cpu_percent": 200,      // 200% = 2 CPU cores
+    "max_memory_mb": 2048,        // 2GB memory limit
+    "max_disk_mb": 5000,          // 5GB temp space required
+    "timeout_sec": 600            // 10 minute timeout
+  }
+}
+```
+
+**Default limits** (if not specified):
+- **CPU**: All available cores (numCPU × 100%)
+- **Memory**: 2048 MB (2GB)
+- **Disk**: 5000 MB (5GB)
+- **Timeout**: 3600 seconds (1 hour)
+
+### Resource Management Features
+
+**1. CPU Limits (cgroup-based)**
+- Prevent jobs from monopolizing CPU resources
+- Support for cgroup v1 and v2
+- Automatic fallback to nice priority without root
+- Per-job CPU percentage allocation (100% = 1 core)
+
+**2. Memory Limits (cgroup-based)**
+- Hard memory caps via Linux cgroups
+- OOM (Out of Memory) protection
+- Automatic process termination if limits exceeded
+- Requires root for enforcement
+
+**3. Disk Space Monitoring**
+- Pre-job disk space validation
+- Reject jobs if < 5% disk space available
+- Warning alerts at 90% disk usage
+- Automatic cleanup of temporary files
+
+**4. Timeout Enforcement**
+- Configurable per-job timeouts
+- Process group cleanup (SIGTERM → SIGKILL)
+- Prevents runaway jobs
+- Always enforced (no special permissions needed)
+
+**5. Process Priority Management**
+- Lower priority (nice=10) for transcoding jobs
+- System remains responsive under heavy load
+- Automatic background prioritization
+
+### Best Practices by Workload
+
+**720p Fast Encoding:**
+```json
+"resource_limits": {
+  "max_cpu_percent": 150,     // 1.5 cores
+  "max_memory_mb": 1024,      // 1GB
+  "timeout_sec": 300          // 5 minutes
+}
+```
+
+**1080p Standard Encoding:**
+```json
+"resource_limits": {
+  "max_cpu_percent": 300,     // 3 cores
+  "max_memory_mb": 2048,      // 2GB
+  "timeout_sec": 900          // 15 minutes
+}
+```
+
+**4K High Quality Encoding:**
+```json
+"resource_limits": {
+  "max_cpu_percent": 600,     // 6 cores
+  "max_memory_mb": 4096,      // 4GB
+  "timeout_sec": 3600         // 1 hour
+}
+```
+
+### System Requirements for Resource Limits
+
+**Minimum (without root):**
+- Linux kernel 3.10+
+- /tmp with 10GB+ free space
+- 2GB+ RAM per worker
+
+**Recommended (with root):**
+- Linux kernel 4.5+ (cgroup v2 support)
+- /tmp with 50GB+ free space  
+- 8GB+ RAM per worker
+- SSD storage for /tmp
+- Root or sudo access
+
+**For complete documentation**, see:
+- **[Resource Limits Guide](docs/RESOURCE_LIMITS.md)** - Complete API and configuration reference
+- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Additional production hardening
+- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues and solutions
+
+---
+
 ## Quick Start (Development - Local Testing Mode)
 
 For **development and local testing only**, you can use Docker Compose to run all components on a single machine.
