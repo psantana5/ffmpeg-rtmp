@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -21,6 +22,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 	"github.com/psantana5/ffmpeg-rtmp/worker/exporters/prometheus"
+	"github.com/psantana5/ffmpeg-rtmp/worker/pkg/resources"
 )
 
 func main() {
@@ -442,6 +444,48 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	
 	startTime := time.Now()
 
+	// Check disk space before starting job
+	log.Println("\n>>> RESOURCE CHECK PHASE <<<")
+	diskInfo, err := resources.CheckDiskSpace("/tmp")
+	if err != nil {
+		log.Printf("⚠️  WARNING: Failed to check disk space: %v", err)
+	} else {
+		log.Printf("Disk space: %.1f%% used (%d MB available)", diskInfo.UsedPercent, diskInfo.AvailableMB)
+		if diskInfo.UsedPercent > 95 {
+			errMsg := fmt.Sprintf("insufficient disk space: %.1f%% used", diskInfo.UsedPercent)
+			log.Printf("❌ %s", errMsg)
+			return &models.JobResult{
+				JobID:       job.ID,
+				NodeID:      client.GetNodeID(),
+				Status:      models.JobStatusFailed,
+				Error:       errMsg,
+				Logs:        fmt.Sprintf("=== Resource Check Failed ===\n%s\n", errMsg),
+				CompletedAt: time.Now(),
+			}
+		}
+	}
+	
+	// Parse resource limits from job parameters
+	limits := resources.DefaultLimits()
+	if job.Parameters != nil {
+		if resourceLimits, ok := job.Parameters["resource_limits"].(map[string]interface{}); ok {
+			if maxCPU, ok := resourceLimits["max_cpu_percent"].(float64); ok {
+				limits.MaxCPUPercent = int(maxCPU)
+			}
+			if maxMem, ok := resourceLimits["max_memory_mb"].(float64); ok {
+				limits.MaxMemoryMB = int(maxMem)
+			}
+			if maxDisk, ok := resourceLimits["max_disk_mb"].(float64); ok {
+				limits.MaxDiskMB = int(maxDisk)
+			}
+			if timeout, ok := resourceLimits["timeout_sec"].(float64); ok {
+				limits.TimeoutSec = int(timeout)
+			}
+		}
+	}
+	log.Printf("Resource limits: CPU=%d%%, Memory=%dMB, Disk=%dMB, Timeout=%ds", 
+		limits.MaxCPUPercent, limits.MaxMemoryMB, limits.MaxDiskMB, limits.TimeoutSec)
+
 	// Generate input video if needed
 	var inputGenResult *agent.InputGenerationResult
 	var generatedInputPath string
@@ -492,7 +536,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 
 	// Execute the actual job with the selected engine
 	log.Println("\n>>> TRANSCODING EXECUTION PHASE <<<")
-	metrics, analyzerOutput, executionLogs, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt)
+	metrics, analyzerOutput, executionLogs, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt, limits)
 	
 	// Cleanup generated input if needed
 	log.Println("\n>>> CLEANUP PHASE <<<")
@@ -564,8 +608,8 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 }
 
-// executeEngineJob executes a job using the selected engine
-func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, err error) {
+// executeEngineJob executes a job using the selected engine with resource limits
+func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization, limits *resources.ResourceLimits) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, err error) {
 	// Build command using the selected engine
 	args, err := engine.BuildCommand(job, client.GetMasterURL())
 	if err != nil {
@@ -604,30 +648,32 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		}
 	}
 
-	// Create context with timeout for GStreamer jobs
-	// Add buffer time: duration + 30 seconds for startup/cleanup
-	var ctx context.Context
-	var cancel context.CancelFunc
-	
-	if engine.Name() == "gstreamer" && duration > 0 {
+	// Determine timeout from either duration or resource limits
+	var timeoutDuration time.Duration
+	if limits.TimeoutSec > 0 {
+		timeoutDuration = time.Duration(limits.TimeoutSec) * time.Second
+		log.Printf("→ Using resource limit timeout: %d seconds", limits.TimeoutSec)
+	} else if engine.Name() == "gstreamer" && duration > 0 {
 		// GStreamer needs explicit timeout since it runs continuously
-		timeout := time.Duration(duration+30) * time.Second
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+		timeoutDuration = time.Duration(duration+30) * time.Second
 		log.Printf("→ GStreamer job will timeout after %d seconds (duration: %d + 30s buffer)", duration+30, duration)
 	} else if duration > 0 {
 		// FFmpeg handles duration internally, but add safety timeout
-		timeout := time.Duration(duration*2 + 60) * time.Second // 2x duration + 1 minute buffer
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+		timeoutDuration = time.Duration(duration*2 + 60) * time.Second // 2x duration + 1 minute buffer
 	} else {
 		// No duration specified - use default 10 minute timeout
-		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Minute)
-		defer cancel()
+		timeoutDuration = 10 * time.Minute
 	}
+	
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+	defer cancel()
 
 	// Execute the command with context
 	cmd := exec.CommandContext(ctx, cmdPath, args...)
+	
+	// Set up process group for easier cleanup
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	
 	// Capture output for metrics
 	var stdout, stderr bytes.Buffer
@@ -636,9 +682,56 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 
 	log.Printf("Running: %s %s", cmdName, strings.Join(args, " "))
 	
+	// Start the command
 	startTime := time.Now()
-	execErr := cmd.Run()
+	if err := cmd.Start(); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to start %s: %w", cmdName, err)
+	}
+	
+	pid := cmd.Process.Pid
+	log.Printf("Process started with PID: %d", pid)
+	
+	// Set process priority (nice value) for lower priority
+	if err := resources.SetProcessPriority(pid, 10); err != nil {
+		log.Printf("WARNING: Failed to set process priority: %v", err)
+	} else {
+		log.Printf("Set process priority: nice=10 (lower than normal)")
+	}
+	
+	// Create cgroup for resource limits (best effort, will warn if fails)
+	cgroupMgr, err := resources.NewCgroupManager()
+	cgroupPath := ""
+	if err != nil {
+		log.Printf("WARNING: Failed to initialize cgroup manager: %v", err)
+	} else {
+		cgroupPath, err = cgroupMgr.CreateCgroup(job.ID, limits)
+		if err != nil {
+			log.Printf("WARNING: Failed to create cgroup: %v", err)
+		} else if cgroupPath != "" {
+			// Add process to cgroup
+			if err := cgroupMgr.AddProcessToCgroup(cgroupPath, pid); err != nil {
+				log.Printf("WARNING: Failed to add process to cgroup: %v", err)
+			} else {
+				log.Printf("✓ Process added to cgroup: %s", cgroupPath)
+			}
+		}
+	}
+	
+	// Monitor process for resource limits and timeout
+	doneChan := make(chan struct{})
+	go resources.MonitorProcess(cmd, limits, doneChan)
+	
+	// Wait for command to complete
+	execErr := cmd.Wait()
+	close(doneChan) // Stop monitoring
 	execDuration := time.Since(startTime).Seconds()
+	
+	// Cleanup cgroup
+	if cgroupPath != "" && cgroupMgr != nil {
+		if err := cgroupMgr.RemoveCgroup(cgroupPath); err != nil {
+			log.Printf("WARNING: Failed to remove cgroup: %v", err)
+		}
+	}
 	
 	// Capture all logs (combine stdout and stderr for comprehensive trace)
 	var logBuffer bytes.Buffer
