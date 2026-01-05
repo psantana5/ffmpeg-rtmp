@@ -1,0 +1,301 @@
+# Alertmanager Configuration for FFmpeg RTMP
+#
+# Deploy to: /etc/alertmanager/alertmanager.yml
+# Or Docker: ./deployment/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
+global:
+  # Default SMTP configuration
+  smtp_from: 'alertmanager@company.com'
+  smtp_smarthost: 'smtp.company.com:587'
+  smtp_auth_username: 'alertmanager@company.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'  # Use environment variable
+  smtp_require_tls: true
+  
+  # Slack webhook URL (set via environment or file)
+  slack_api_url_file: '/etc/alertmanager/slack_webhook_url'
+  
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # Default resolve timeout
+  resolve_timeout: 5m
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert distribution
+route:
+  # Default receiver for unmatched alerts
+  receiver: 'default-email'
+  
+  # How long to wait to group alerts
+  group_wait: 30s
+  
+  # How long to wait before sending already grouped alerts
+  group_interval: 5m
+  
+  # How long to wait before re-sending an alert
+  repeat_interval: 4h
+  
+  # Group by these labels
+  group_by: ['alertname', 'component', 'severity']
+  
+  # Child routes (evaluated in order)
+  routes:
+    # ========================================================================
+    # CRITICAL ALERTS - Page immediately
+    # ========================================================================
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      group_wait: 10s           # Page quickly
+      repeat_interval: 30m      # Re-page if not ack'd
+      continue: true            # Also send to other receivers
+      
+      routes:
+        # Master down - highest priority
+        - match:
+            alertname: FFmpegMasterNodeDown
+          receiver: 'pagerduty-master-down'
+          group_wait: 0s        # Page immediately
+          repeat_interval: 15m
+        
+        # All workers down - very high priority
+        - match:
+            alertname: FFmpegAllWorkersDown
+          receiver: 'pagerduty-critical'
+          group_wait: 5s
+          repeat_interval: 20m
+    
+    # Also send critical alerts to Slack
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      group_wait: 15s
+      repeat_interval: 1h
+    
+    # ========================================================================
+    # WARNING ALERTS - Notify team channels
+    # ========================================================================
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 2m
+      repeat_interval: 3h
+      continue: true
+    
+    # Worker issues to operations channel
+    - match:
+        severity: warning
+        component: worker
+      receiver: 'slack-operations'
+      repeat_interval: 2h
+    
+    # Infrastructure issues to infra team
+    - match:
+        component: master
+      receiver: 'email-infrastructure'
+      repeat_interval: 4h
+    
+    # ========================================================================
+    # INFO/PERFORMANCE ALERTS - Low priority notifications
+    # ========================================================================
+    - match:
+        severity: info
+      receiver: 'slack-monitoring'
+      group_wait: 10m
+      repeat_interval: 12h
+    
+    # ========================================================================
+    # SILENCE CERTAIN ALERTS DURING MAINTENANCE
+    # ========================================================================
+    - match_re:
+        alertname: '.*Test.*'  # Silence test alerts
+      receiver: 'null'
+
+# Inhibition rules (suppress certain alerts when others fire)
+inhibit_rules:
+  # If master is down, don't alert on workers being down
+  - source_match:
+      alertname: 'FFmpegMasterNodeDown'
+    target_match_re:
+      alertname: 'FFmpegWorker.*'
+    equal: ['instance']
+  
+  # If critical alert is firing, suppress warning for same component
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+  
+  # If worker is down, don't alert on its high capacity
+  - source_match:
+      alertname: 'FFmpegWorkerNodeDown'
+    target_match:
+      alertname: 'FFmpegWorkerCapacityHigh'
+    equal: ['instance']
+  
+  # If queue is critical, suppress queue warning
+  - source_match:
+      alertname: 'FFmpegQueueCritical'
+    target_match:
+      alertname: 'FFmpegQueueWarning'
+
+# Receivers - notification endpoints
+receivers:
+  # Default email receiver
+  - name: 'default-email'
+    email_configs:
+      - to: 'ops-team@company.com'
+        headers:
+          Subject: '[FFmpeg RTMP] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ range .Alerts }}
+          <h2>{{ .Labels.severity | toUpper }}: {{ .Labels.alertname }}</h2>
+          <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+          <p><strong>Description:</strong></p>
+          <pre>{{ .Annotations.description }}</pre>
+          <p><strong>Labels:</strong> {{ .Labels.SortedPairs }}</p>
+          <p><strong>Dashboard:</strong> <a href="{{ .Annotations.dashboard_url }}">View</a></p>
+          <hr>
+          {{ end }}
+  
+  # PagerDuty for critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'  # Environment variable
+        description: '{{ .GroupLabels.alertname }}'
+        details:
+          summary: '{{ .CommonAnnotations.summary }}'
+          severity: '{{ .GroupLabels.severity }}'
+          component: '{{ .GroupLabels.component }}'
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+  
+  # PagerDuty escalation for master down
+  - name: 'pagerduty-master-down'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_ESCALATION_KEY}'
+        severity: critical
+        description: 'URGENT: FFmpeg Master Node Down'
+        details:
+          summary: '{{ .CommonAnnotations.summary }}'
+          instance: '{{ .GroupLabels.instance }}'
+          runbook: '{{ .CommonAnnotations.runbook }}'
+  
+  # Slack for critical alerts
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#ffmpeg-alerts-critical'
+        username: 'AlertManager'
+        icon_emoji: ':rotating_light:'
+        title: ':fire: CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Component:* {{ .Labels.component }}
+          *Instance:* {{ .Labels.instance }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        actions:
+          - type: button
+            text: 'View Dashboard'
+            url: '{{ .CommonAnnotations.dashboard_url }}'
+          - type: button
+            text: 'View Runbook'
+            url: 'https://github.com/psantana5/ffmpeg-rtmp/blob/main/docs/INCIDENT_PLAYBOOKS.md'
+  
+  # Slack for warning alerts
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#ffmpeg-alerts'
+        username: 'AlertManager'
+        icon_emoji: ':warning:'
+        title: ':warning: Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        short_fields: true
+  
+  # Slack for operations team
+  - name: 'slack-operations'
+    slack_configs:
+      - channel: '#ffmpeg-ops'
+        username: 'AlertManager'
+        title: 'Worker Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+  
+  # Slack for monitoring/performance alerts
+  - name: 'slack-monitoring'
+    slack_configs:
+      - channel: '#ffmpeg-monitoring'
+        username: 'AlertManager'
+        icon_emoji: ':chart_with_upwards_trend:'
+        title: 'Performance: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+  
+  # Email for infrastructure team
+  - name: 'email-infrastructure'
+    email_configs:
+      - to: 'infrastructure@company.com'
+        headers:
+          Subject: '[Infra] FFmpeg RTMP Alert: {{ .GroupLabels.alertname }}'
+  
+  # Null receiver (discard alerts)
+  - name: 'null'
+
+---
+# Configuration Notes:
+#
+# 1. Environment Variables Required:
+#    - SMTP_PASSWORD: SMTP authentication password
+#    - PAGERDUTY_SERVICE_KEY: PagerDuty integration key
+#    - PAGERDUTY_ESCALATION_KEY: PagerDuty escalation key (for critical)
+#    - /etc/alertmanager/slack_webhook_url: File containing Slack webhook URL
+#
+# 2. Slack Webhook Setup:
+#    a. Create Slack app: https://api.slack.com/apps
+#    b. Enable Incoming Webhooks
+#    c. Add webhook to workspace
+#    d. Save URL to file: echo "https://hooks.slack.com/..." > /etc/alertmanager/slack_webhook_url
+#
+# 3. PagerDuty Setup:
+#    a. Create service in PagerDuty
+#    b. Add Prometheus integration
+#    c. Copy integration key
+#    d. Set environment variable: export PAGERDUTY_SERVICE_KEY="xxx"
+#
+# 4. Email Setup:
+#    - Configure SMTP relay (Gmail, SendGrid, AWS SES, etc.)
+#    - Use app-specific password for Gmail
+#    - Test: swaks --to test@example.com --server smtp.gmail.com:587 --tls
+#
+# 5. Testing Configuration:
+#    amtool check-config /etc/alertmanager/alertmanager.yml
+#    amtool config routes test --config.file=/etc/alertmanager/alertmanager.yml
+#
+# 6. Reload Alertmanager:
+#    curl -X POST http://alertmanager:9093/-/reload
+#    systemctl reload alertmanager
+#
+# 7. Customization:
+#    - Update channel names (#ffmpeg-alerts-critical, etc.)
+#    - Update email addresses (ops-team@company.com)
+#    - Adjust repeat_interval based on team preferences
+#    - Add additional receivers (Opsgenie, VictorOps, webhooks)
+#
+# 8. Testing Alerts:
+#    # Send test alert to Alertmanager
+#    curl -XPOST http://localhost:9093/api/v1/alerts -d '[{
+#      "labels": {
+#        "alertname": "TestAlert",
+#        "severity": "warning"
+#      },
+#      "annotations": {
+#        "summary": "This is a test alert"
+#      }
+#    }]'

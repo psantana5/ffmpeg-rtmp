@@ -1,0 +1,426 @@
+# Prometheus Alerting Rules for FFmpeg RTMP Production Deployment
+# 
+# Deploy this file to: /etc/prometheus/rules/ffmpeg-rtmp-alerts.yml
+# Or mount in Docker: ./deployment/prometheus/rules/ffmpeg-rtmp-alerts.yml:/etc/prometheus/rules/ffmpeg-rtmp-alerts.yml
+#
+# Prometheus configuration should include:
+# rule_files:
+#   - '/etc/prometheus/rules/*.yml'
+
+groups:
+  # ============================================================================
+  # CRITICAL ALERTS - Page on-call immediately
+  # ============================================================================
+  
+  - name: ffmpeg_critical_alerts
+    interval: 30s
+    rules:
+    
+    # Master node completely down
+    - alert: FFmpegMasterNodeDown
+      expr: up{job="ffmpeg-master"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: master
+        team: infrastructure
+      annotations:
+        summary: "FFmpeg master node is down"
+        description: |
+          Master node {{ $labels.instance }} has been unreachable for 2+ minutes.
+          
+          **Impact:** 
+          - No new jobs can be submitted
+          - Workers cannot report status
+          - Complete system outage
+          
+          **Immediate Actions:**
+          1. Check master service: systemctl status ffmpeg-master
+          2. Check master logs: journalctl -u ffmpeg-master -n 100
+          3. Verify network connectivity
+          4. Restart if needed: systemctl restart ffmpeg-master
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#master-down
+        dashboard_url: "https://grafana/d/ffmpeg-master/overview"
+    
+    # All worker nodes offline
+    - alert: FFmpegAllWorkersDown
+      expr: count(up{job="ffmpeg-worker"} == 1) == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: worker
+        team: operations
+      annotations:
+        summary: "All FFmpeg worker nodes are offline"
+        description: |
+          No worker nodes are available. Complete transcoding capacity offline.
+          
+          **Impact:**
+          - Jobs cannot be processed
+          - Queue will grow indefinitely
+          - SLA breach imminent
+          
+          **Immediate Actions:**
+          1. Check worker services on all nodes
+          2. Verify master is reachable from workers
+          3. Check for network partitions
+          4. Review master logs for worker heartbeats
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#all-workers-down
+    
+    # Extremely high job failure rate
+    - alert: FFmpegCriticalFailureRate
+      expr: |
+        (
+          rate(jobs_failed_total{job="ffmpeg-master"}[5m]) / 
+          (rate(jobs_completed_total{job="ffmpeg-master"}[5m]) + rate(jobs_failed_total{job="ffmpeg-master"}[5m]) + 0.001)
+        ) * 100 > 50
+      for: 10m
+      labels:
+        severity: critical
+        component: jobs
+        team: operations
+      annotations:
+        summary: "Critical job failure rate: {{ $value | humanize }}%"
+        description: |
+          Over 50% of jobs are failing - system is critically degraded.
+          
+          **Current State:**
+          - Failure rate: {{ $value | humanize }}%
+          - Failed jobs (5m): {{ with query "rate(jobs_failed_total{job=\"ffmpeg-master\"}[5m]) * 300" }}{{ . | first | value | humanize }}{{ end }}
+          
+          **Common Causes:**
+          - Worker resource exhaustion
+          - Invalid input files/parameters
+          - Codec/encoder failures
+          - Storage issues
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#critical-failure-rate
+        dashboard_url: "https://grafana/d/ffmpeg-jobs/job-performance"
+    
+    # Queue critically overloaded
+    - alert: FFmpegQueueCritical
+      expr: jobs_queued_total{job="ffmpeg-master"} > 2000
+      for: 15m
+      labels:
+        severity: critical
+        component: queue
+        team: operations
+      annotations:
+        summary: "Job queue critically high: {{ $value }} jobs"
+        description: |
+          Job queue has grown beyond critical threshold (2000 jobs).
+          
+          **Impact:**
+          - Severe job processing delays
+          - SLA violations
+          - Possible memory pressure on master
+          
+          **Immediate Actions:**
+          1. Add emergency worker capacity
+          2. Increase max-concurrent-jobs on all workers
+          3. Consider job submission rate limiting
+          4. Check for stuck/failed workers
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#queue-critical
+    
+    # Master disk critically full
+    - alert: FFmpegMasterDiskCritical
+      expr: |
+        (
+          node_filesystem_avail_bytes{job="ffmpeg-master",mountpoint="/"} / 
+          node_filesystem_size_bytes{job="ffmpeg-master",mountpoint="/"}
+        ) * 100 < 5
+      for: 5m
+      labels:
+        severity: critical
+        component: master
+        team: infrastructure
+      annotations:
+        summary: "Master disk space critical: {{ $value | humanize }}% remaining"
+        description: |
+          Master node has less than 5% disk space remaining.
+          
+          **Impact:**
+          - Database writes may fail
+          - Metrics storage full
+          - System instability
+          
+          **Immediate Actions:**
+          1. Clean old logs: journalctl --vacuum-time=7d
+          2. Remove old database backups
+          3. Archive metrics if possible
+          4. Plan emergency disk expansion
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#disk-critical
+
+  # ============================================================================
+  # WARNING ALERTS - Investigate and plan remediation
+  # ============================================================================
+  
+  - name: ffmpeg_warning_alerts
+    interval: 1m
+    rules:
+    
+    # Individual worker offline
+    - alert: FFmpegWorkerNodeDown
+      expr: up{job="ffmpeg-worker"} == 0
+      for: 5m
+      labels:
+        severity: warning
+        component: worker
+        team: operations
+      annotations:
+        summary: "Worker {{ $labels.instance }} is offline"
+        description: |
+          Worker node {{ $labels.instance }} unreachable for 5+ minutes.
+          
+          **Impact:** Reduced transcoding capacity
+          
+          **Actions:**
+          1. SSH to worker node
+          2. Check service: systemctl status ffmpeg-worker
+          3. Check logs: journalctl -u ffmpeg-worker -n 50
+          4. Verify master connectivity: curl -k https://master:8080/health
+          5. Restart if needed: systemctl restart ffmpeg-worker
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#worker-down
+        dashboard_url: "https://grafana/d/ffmpeg-worker/worker-detail?var-instance={{ $labels.instance }}"
+    
+    # High job failure rate
+    - alert: FFmpegHighFailureRate
+      expr: |
+        (
+          rate(jobs_failed_total{job="ffmpeg-master"}[5m]) / 
+          (rate(jobs_completed_total{job="ffmpeg-master"}[5m]) + rate(jobs_failed_total{job="ffmpeg-master"}[5m]) + 0.001)
+        ) * 100 > 10
+      for: 10m
+      labels:
+        severity: warning
+        component: jobs
+        team: operations
+      annotations:
+        summary: "Elevated job failure rate: {{ $value | humanize }}%"
+        description: |
+          More than 10% of jobs are failing (threshold for investigation).
+          
+          **Current Metrics:**
+          - Failure rate: {{ $value | humanize }}%
+          - Failed (5m): {{ with query "rate(jobs_failed_total{job=\"ffmpeg-master\"}[5m]) * 300" }}{{ . | first | value | humanize }}{{ end }}
+          - Completed (5m): {{ with query "rate(jobs_completed_total{job=\"ffmpeg-master\"}[5m]) * 300" }}{{ . | first | value | humanize }}{{ end }}
+          
+          **Investigation Steps:**
+          1. Check failed job details: curl -k https://master:8080/jobs?status=failed
+          2. Review worker logs for errors
+          3. Check resource limits (CPU, memory, disk)
+          4. Verify input file availability
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#high-failure-rate
+    
+    # Queue growing beyond normal
+    - alert: FFmpegQueueWarning
+      expr: jobs_queued_total{job="ffmpeg-master"} > 500
+      for: 15m
+      labels:
+        severity: warning
+        component: queue
+        team: operations
+      annotations:
+        summary: "Job queue elevated: {{ $value }} jobs"
+        description: |
+          Job queue depth above normal threshold (500 jobs).
+          
+          **Trend:** {{ with query "delta(jobs_queued_total{job=\"ffmpeg-master\"}[15m])" }}{{ . | first | value | humanize }}{{ end }} jobs in last 15 min
+          
+          **Actions:**
+          1. Monitor queue growth rate
+          2. Check worker utilization
+          3. Consider adding temporary worker capacity
+          4. Review job submission patterns
+          
+          **Runbook:** See docs/INCIDENT_PLAYBOOKS.md#queue-warning
+    
+    # Worker capacity consistently high
+    - alert: FFmpegWorkerCapacityHigh
+      expr: |
+        (
+          jobs_processing_total{job="ffmpeg-worker"} / 
+          worker_max_concurrent_jobs{job="ffmpeg-worker"}
+        ) > 0.85
+      for: 30m
+      labels:
+        severity: warning
+        component: worker
+        team: operations
+      annotations:
+        summary: "Worker {{ $labels.instance }} at {{ $value | humanizePercentage }} capacity"
+        description: |
+          Worker consistently running at >85% capacity for 30+ minutes.
+          
+          **Current:** {{ with query "jobs_processing_total{instance=\"" }}{{ . | first | value }}{{ end }}/{{ with query "worker_max_concurrent_jobs{instance=\"" }}{{ . | first | value }}{{ end }} jobs
+          
+          **Consider:**
+          1. Increase max-concurrent-jobs (if resources available)
+          2. Add additional worker nodes
+          3. Optimize job parameters (faster presets)
+          4. Review job distribution logic
+    
+    # High job latency (queue wait time)
+    - alert: FFmpegHighJobLatency
+      expr: |
+        histogram_quantile(0.95,
+          rate(job_queue_wait_duration_seconds_bucket{job="ffmpeg-master"}[10m])
+        ) > 300
+      for: 15m
+      labels:
+        severity: warning
+        component: queue
+        team: operations
+      annotations:
+        summary: "High job queue latency: P95 = {{ $value | humanizeDuration }}"
+        description: |
+          Jobs are spending over 5 minutes in queue before execution (P95).
+          
+          **Capacity Analysis:**
+          - Queue depth: {{ with query "jobs_queued_total{job=\"ffmpeg-master\"}" }}{{ . | first | value }}{{ end }}
+          - Active workers: {{ with query "count(up{job=\"ffmpeg-worker\"} == 1)" }}{{ . | first | value }}{{ end }}
+          - Total capacity: {{ with query "sum(worker_max_concurrent_jobs{job=\"ffmpeg-worker\"})" }}{{ . | first | value }}{{ end }}
+          
+          **Actions:**
+          1. Add worker capacity
+          2. Increase concurrency on existing workers
+          3. Optimize slow-running jobs
+    
+    # Worker disk space warning
+    - alert: FFmpegWorkerDiskWarning
+      expr: |
+        (
+          node_filesystem_avail_bytes{job="ffmpeg-worker",mountpoint="/tmp"} / 
+          node_filesystem_size_bytes{job="ffmpeg-worker",mountpoint="/tmp"}
+        ) * 100 < 20
+      for: 10m
+      labels:
+        severity: warning
+        component: worker
+        team: operations
+      annotations:
+        summary: "Worker {{ $labels.instance }} disk space low: {{ $value | humanize }}% free"
+        description: |
+          Worker /tmp partition below 20% free space.
+          
+          **Available:** {{ with query "node_filesystem_avail_bytes{instance=\"" }}{{ . | first | value | humanize1024 }}B{{ end }}
+          
+          Workers reject jobs below 5% free.
+          
+          **Actions:**
+          1. Clean temp files: find /tmp -name "input_*" -mtime +1 -delete
+          2. Verify automatic cleanup enabled
+          3. Plan disk expansion if recurring
+    
+    # Master disk space warning  
+    - alert: FFmpegMasterDiskWarning
+      expr: |
+        (
+          node_filesystem_avail_bytes{job="ffmpeg-master",mountpoint="/"} / 
+          node_filesystem_size_bytes{job="ffmpeg-master",mountpoint="/"}
+        ) * 100 < 15
+      for: 10m
+      labels:
+        severity: warning
+        component: master
+        team: infrastructure
+      annotations:
+        summary: "Master disk space low: {{ $value | humanize }}% free"
+        description: |
+          Master node below 15% free disk space.
+          
+          **Available:** {{ with query "node_filesystem_avail_bytes{job=\"ffmpeg-master\",mountpoint=\"/\"}" }}{{ . | first | value | humanize1024 }}B{{ end }}
+          
+          **Actions:**
+          1. Clean old logs: journalctl --vacuum-time=30d
+          2. Archive old metrics
+          3. Remove old backups
+          4. Plan disk expansion
+
+  # ============================================================================
+  # PERFORMANCE ALERTS - Degraded performance
+  # ============================================================================
+  
+  - name: ffmpeg_performance_alerts
+    interval: 2m
+    rules:
+    
+    # Job execution significantly slower than baseline
+    - alert: FFmpegSlowJobExecution
+      expr: |
+        histogram_quantile(0.95,
+          rate(job_execution_duration_seconds_bucket{job="ffmpeg-worker"}[15m])
+        ) > 1.5 * histogram_quantile(0.95,
+          rate(job_execution_duration_seconds_bucket{job="ffmpeg-worker"}[1d] offset 1w)
+        )
+      for: 30m
+      labels:
+        severity: info
+        component: performance
+        team: operations
+      annotations:
+        summary: "Job execution 50% slower than baseline"
+        description: |
+          Current P95 execution time: {{ $value | humanizeDuration }}
+          
+          Performance degraded compared to last week's baseline.
+          
+          **Investigate:**
+          1. CPU/memory pressure on workers
+          2. Disk I/O bottlenecks
+          3. Network latency issues
+          4. Job complexity changes
+    
+    # Worker utilization consistently low
+    - alert: FFmpegLowWorkerUtilization
+      expr: |
+        (
+          avg_over_time(jobs_processing_total{job="ffmpeg-worker"}[1h]) / 
+          worker_max_concurrent_jobs{job="ffmpeg-worker"}
+        ) < 0.2
+      for: 2h
+      labels:
+        severity: info
+        component: capacity
+        team: operations
+      annotations:
+        summary: "Worker {{ $labels.instance }} underutilized: {{ $value | humanizePercentage }}"
+        description: |
+          Worker running at <20% capacity for 2+ hours.
+          
+          **Avg utilization:** {{ $value | humanizePercentage }}
+          
+          **Consider:**
+          - Reduce worker size (cost optimization)
+          - Increase max-concurrent-jobs
+          - Consolidate workers if multiple underutilized
+
+---
+# Configuration Notes:
+#
+# 1. These alerts require Prometheus metrics from:
+#    - Master: ffmpeg-master job (port 9090)
+#    - Workers: ffmpeg-worker job (port 9091)
+#    - Node exporter for disk metrics (optional)
+#
+# 2. Adjust thresholds based on your environment:
+#    - Queue thresholds (500/2000) depend on submission rate
+#    - Failure rate thresholds (10%/50%) depend on workload
+#    - Latency thresholds (300s) depend on job complexity
+#
+# 3. Alertmanager routing example:
+#    - severity=critical → Page on-call
+#    - severity=warning → Slack/Email
+#    - severity=info → Ticket system
+#
+# 4. For testing alerts:
+#    promtool check rules /etc/prometheus/rules/ffmpeg-rtmp-alerts.yml
+#
+# 5. Reload Prometheus:
+#    curl -X POST http://prometheus:9090/-/reload
