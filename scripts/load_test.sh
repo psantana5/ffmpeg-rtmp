@@ -258,30 +258,37 @@ submit_jobs() {
     local start_time=$(date +%s)
     local job_ids=()
     
-    # Calculate delay between submissions (in microseconds)
-    local delay_us=$((1000000 / SUBMIT_RATE))
+    # Calculate delay between submissions (in milliseconds for sleep)
+    local delay_sec=$(awk "BEGIN {printf \"%.3f\", 1.0 / $SUBMIT_RATE}")
     
     # Job scenarios (mix of different configurations)
     local scenarios=("1080p-h264" "720p-h264" "720p-vp8" "1080p-vp9" "480p-h264")
     local bitrates=("5M" "3M" "2M" "4M" "1M")
     local durations=(30 60 90 120)
     
+    # Create/clear submissions log
     echo -n "" > "$RESULTS_DIR/${TEST_NAME}_submissions.log"
     
+    local i
     for ((i=1; i<=NUM_JOBS; i++)); do
-        # Select random scenario
+        # Select random scenario  
         local idx=$((RANDOM % ${#scenarios[@]}))
         local scenario="${scenarios[$idx]}"
         local bitrate="${bitrates[$idx]}"
-        local duration="${durations[$((RANDOM % ${#durations[@]}))]}"
+        local duration_idx=$((RANDOM % ${#durations[@]}))
+        local duration="${durations[$duration_idx]}"
         
         # Submit job
         local submit_start=$(date +%s%N)
-        local http_code=$(curl -sk -X POST "$MASTER_URL/jobs" \
+        
+        # Use temporary file for response
+        local temp_resp="/tmp/load_test_resp_$$_$i"
+        local http_code
+        http_code=$(curl -sk -X POST "$MASTER_URL/jobs" \
             -H "Authorization: Bearer $MASTER_API_KEY" \
             -H "Content-Type: application/json" \
             -w "%{http_code}" \
-            -o "/tmp/load_test_resp_$$" \
+            -o "$temp_resp" \
             -d "{
                 \"scenario\": \"$scenario\",
                 \"confidence\": \"auto\",
@@ -291,16 +298,25 @@ submit_jobs() {
                 },
                 \"priority\": \"medium\",
                 \"queue\": \"default\"
-            }" 2>&1)
+            }" 2>/dev/null || echo "000")
+        
         local submit_end=$(date +%s%N)
         local submit_latency_ms=$(( (submit_end - submit_start) / 1000000 ))
         
-        # Read response body
-        local response=$(cat "/tmp/load_test_resp_$$" 2>/dev/null || echo "{}")
+        # Read response
+        local response
+        if [[ -f "$temp_resp" ]]; then
+            response=$(cat "$temp_resp" 2>/dev/null || echo "{}")
+            rm -f "$temp_resp"
+        else
+            response="{}"
+        fi
         
+        # Check success
         if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
-            if echo "$response" | jq -e '.id' &> /dev/null; then
-                local job_id=$(echo "$response" | jq -r '.id')
+            local job_id
+            job_id=$(echo "$response" | jq -r '.id' 2>/dev/null || echo "")
+            if [[ -n "$job_id" ]] && [[ "$job_id" != "null" ]]; then
                 job_ids+=("$job_id")
                 ((submitted++))
                 echo "$(date -Iseconds)|SUCCESS|$job_id|$submit_latency_ms|$scenario" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
@@ -310,22 +326,22 @@ submit_jobs() {
             fi
         else
             ((failed++))
-            local error_msg=$(echo "$response" | tr '\n' ' ' | head -c 100)
+            local error_msg=$(echo "$response" | tr '\n' ' ' | cut -c1-100)
             echo "$(date -Iseconds)|FAILED|N/A|$submit_latency_ms|$scenario|HTTP:$http_code|$error_msg" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
         fi
         
-        # Cleanup temp file
-        rm -f "/tmp/load_test_resp_$$"
-        
         # Progress indicator
-        if (( i % 10 == 0 )); then
+        if (( i % 10 == 0 )) || (( i == NUM_JOBS )); then
             local elapsed=$(($(date +%s) - start_time))
-            local rate=$(awk "BEGIN {printf \"%.2f\", $submitted / $elapsed}")
+            local rate=0
+            if [[ $elapsed -gt 0 ]]; then
+                rate=$(awk "BEGIN {printf \"%.2f\", $submitted / $elapsed}")
+            fi
             echo -ne "\rSubmitted: $submitted/$NUM_JOBS (Failed: $failed) | Rate: $rate jobs/sec | Elapsed: ${elapsed}s     "
         fi
         
         # Rate limiting
-        usleep $delay_us 2>/dev/null || sleep 0.1
+        sleep "$delay_sec" 2>/dev/null || sleep 0.2
     done
     
     echo ""
