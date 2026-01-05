@@ -231,28 +231,29 @@ Systematic hardening of the FFmpeg-RTMP distributed system for production deploy
 - ✅ Proper cleanup of process group
 - ✅ Timeout logged in execution logs
 
-### Worker Resource Reservation ⏳
+### Worker Resource Reservation (Optional)
 
-**Status**: ⏳ Not Started  
-**Priority**: MEDIUM  
-**Estimated Effort**: 1 day
+**Status**: ⏳ Deferred (Optional Enhancement)  
+**Priority**: LOW  
+**Estimated Effort**: 2 days
 
-**Tasks**:
-- [ ] Add `timeout` parameter to job schema
-- [ ] Implement timeout in worker job execution
-- [ ] Kill job process if timeout exceeded
-- [ ] Update job status to "failed" with timeout reason
-- [ ] Add timeout metrics (jobs_timed_out_total)
+**Current State**: 
+- Resource limits enforced per-job (CPU, memory, disk, timeout)
+- Worker capacity managed by max-concurrent-jobs setting
+- System-level limits prevent overcommit
 
-**Deliverables**:
-- Timeout implementation
-- Prometheus metric for timeouts
-- Documentation update
+**Enhancement Opportunity** (future improvement):
+- [ ] Track total reserved resources across all active jobs
+- [ ] Reject new jobs if resources unavailable
+- [ ] Implement resource reservation API
+- [ ] Add resource quota management per worker
 
-**Success Criteria**:
-- Job killed after timeout
-- Proper cleanup of resources
-- Timeout recorded in metrics
+**Deliverables** (if implemented):
+- Resource reservation tracking
+- Admission control logic
+- Quota management API
+
+**Decision**: Current per-job limits sufficient for production. This is a nice-to-have optimization.
 
 ---
 
