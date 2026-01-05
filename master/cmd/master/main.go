@@ -16,6 +16,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/cleanup"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
@@ -43,6 +44,8 @@ func main() {
 	schedulerInterval := flag.Duration("scheduler-interval", 5*time.Second, "Background scheduler check interval")
 	enableTracing := flag.Bool("tracing", false, "Enable distributed tracing")
 	tracingEndpoint := flag.String("tracing-endpoint", "localhost:4318", "OpenTelemetry OTLP endpoint")
+	enableCleanup := flag.Bool("cleanup", true, "Enable automatic cleanup of old jobs")
+	cleanupRetention := flag.Int("cleanup-retention", 7, "Job retention period in days")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -300,6 +303,22 @@ func main() {
 		}()
 	}
 
+	// Start automatic cleanup manager
+	var cleanupMgr *cleanup.CleanupManager
+	if *enableCleanup {
+		log.Println("Initializing cleanup manager...")
+		cleanupConfig := cleanup.CleanupConfig{
+			Enabled:          true,
+			JobRetentionDays: *cleanupRetention,
+			CleanupInterval:  24 * time.Hour,
+			VacuumInterval:   7 * 24 * time.Hour,
+			DeleteBatchSize:  100,
+		}
+		cleanupMgr = cleanup.NewCleanupManager(cleanupConfig, dataStore)
+		cleanupMgr.Start()
+		log.Printf("✓ Cleanup manager started (retention: %d days)", *cleanupRetention)
+	}
+
 	// Start background scheduler
 	sched := scheduler.New(dataStore, *schedulerInterval)
 	sched.Start()
@@ -378,6 +397,11 @@ func main() {
 	<-stop
 
 	log.Println("Shutting down gracefully...")
+
+	// Stop cleanup manager
+	if cleanupMgr != nil {
+		cleanupMgr.Stop()
+	}
 
 	// Stop scheduler first
 	sched.Stop()

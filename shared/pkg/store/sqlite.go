@@ -1179,6 +1179,100 @@ func (s *SQLiteStore) HealthCheck() error {
 	return s.db.Ping()
 }
 
+// DeleteJob permanently deletes a job from the database
+func (s *SQLiteStore) DeleteJob(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec("DELETE FROM jobs WHERE id = ?", id)
+	return err
+}
+
+// GetJobs retrieves all jobs with a specific status
+func (s *SQLiteStore) GetJobs(status string) ([]models.Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.Query("SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, created_at, started_at, last_activity_at, completed_at, retry_count, max_retries, retry_reason, error, failure_reason, tenant_id FROM jobs WHERE status = ?", status)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []models.Job
+	for rows.Next() {
+		var job models.Job
+		var parametersJSON, confidenceStr, failureReasonStr, tenantID []byte
+		var startedAt, lastActivityAt, completedAt sql.NullTime
+		var nodeID, retryReason, errorMsg sql.NullString
+
+		err := rows.Scan(
+			&job.ID,
+			&job.SequenceNumber,
+			&job.Scenario,
+			&confidenceStr,
+			&job.Engine,
+			&parametersJSON,
+			&job.Status,
+			&job.Queue,
+			&job.Priority,
+			&job.Progress,
+			&nodeID,
+			&job.CreatedAt,
+			&startedAt,
+			&lastActivityAt,
+			&completedAt,
+			&job.RetryCount,
+			&job.MaxRetries,
+			&retryReason,
+			&errorMsg,
+			&failureReasonStr,
+			&tenantID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if nodeID.Valid {
+			job.NodeID = nodeID.String
+		}
+		if startedAt.Valid {
+			job.StartedAt = &startedAt.Time
+		}
+		if lastActivityAt.Valid {
+			job.LastActivityAt = &lastActivityAt.Time
+		}
+		if completedAt.Valid {
+			job.CompletedAt = &completedAt.Time
+		}
+		if retryReason.Valid {
+			job.RetryReason = retryReason.String
+		}
+		if errorMsg.Valid {
+			job.Error = errorMsg.String
+		}
+
+		if len(parametersJSON) > 0 {
+			if err := unmarshalJSON(parametersJSON, &job.Parameters); err != nil {
+				return nil, err
+			}
+		}
+
+		jobs = append(jobs, job)
+	}
+
+	return jobs, rows.Err()
+}
+
+// Vacuum performs database maintenance to reclaim space and optimize performance
+func (s *SQLiteStore) Vacuum() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec("VACUUM")
+	return err
+}
+
 // TryQueuePendingJob atomically checks if a job is pending with no available workers and queues it
 // Returns true if job was queued, false if already queued or picked up
 func (s *SQLiteStore) TryQueuePendingJob(jobID string) (bool, error) {

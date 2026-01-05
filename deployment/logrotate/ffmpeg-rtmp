@@ -1,0 +1,76 @@
+# Logrotate configuration for FFmpeg-RTMP distributed transcoding system
+# Install to: /etc/logrotate.d/ffmpeg-rtmp
+# Test with: logrotate -d /etc/logrotate.d/ffmpeg-rtmp
+
+# Master node logs
+/var/log/ffmpeg-rtmp/master.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 ffmpeg-rtmp ffmpeg-rtmp
+    sharedscripts
+    postrotate
+        # Send HUP signal to master to reopen log file
+        if [ -f /var/run/ffmpeg-rtmp-master.pid ]; then
+            kill -HUP `cat /var/run/ffmpeg-rtmp-master.pid` 2>/dev/null || true
+        fi
+    endscript
+}
+
+# Worker node logs
+/var/log/ffmpeg-rtmp/worker-*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 ffmpeg-rtmp ffmpeg-rtmp
+    sharedscripts
+    postrotate
+        # Send HUP signal to workers to reopen log files
+        for pid in /var/run/ffmpeg-rtmp-worker-*.pid; do
+            if [ -f "$pid" ]; then
+                kill -HUP `cat $pid` 2>/dev/null || true
+            fi
+        done
+    endscript
+}
+
+# FFmpeg transcoding logs (individual job logs)
+/var/log/ffmpeg-rtmp/jobs/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 ffmpeg-rtmp ffmpeg-rtmp
+    # No reload needed for job logs as they're write-once
+}
+
+# Error logs
+/var/log/ffmpeg-rtmp/error.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 ffmpeg-rtmp ffmpeg-rtmp
+    sharedscripts
+}
+
+# Access logs (if using nginx/reverse proxy)
+/var/log/ffmpeg-rtmp/access.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 ffmpeg-rtmp ffmpeg-rtmp
+}

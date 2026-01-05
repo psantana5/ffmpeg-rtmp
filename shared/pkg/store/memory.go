@@ -17,11 +17,11 @@ var (
 // MemoryStore is an in-memory implementation of the data store
 // Uses a single RWMutex to prevent deadlock issues with nested locks
 type MemoryStore struct {
-	mu          sync.RWMutex // Single mutex for all operations
-	nodes       map[string]*models.Node
-	jobs        map[string]*models.Job
-	jobQueue    []string // FIFO queue of job IDs
-	nextSeqNum  int      // Auto-incrementing sequence number for jobs
+	mu         sync.RWMutex // Single mutex for all operations
+	nodes      map[string]*models.Node
+	jobs       map[string]*models.Job
+	jobQueue   []string // FIFO queue of job IDs
+	nextSeqNum int      // Auto-incrementing sequence number for jobs
 }
 
 // NewMemoryStore creates a new in-memory store
@@ -30,7 +30,7 @@ func NewMemoryStore() *MemoryStore {
 		nodes:      make(map[string]*models.Node),
 		jobs:       make(map[string]*models.Job),
 		nextSeqNum: 1,
-		jobQueue: make([]string, 0),
+		jobQueue:   make([]string, 0),
 	}
 }
 
@@ -422,33 +422,33 @@ func (s *MemoryStore) GetQueuedJobs(queue string, priority string) []*models.Job
 
 // TryQueuePendingJob atomically checks if a job is pending with no available workers and queues it
 func (s *MemoryStore) TryQueuePendingJob(jobID string) (bool, error) {
-s.mu.Lock()
-defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-job, ok := s.jobs[jobID]
-if !ok {
-return false, fmt.Errorf("job not found: %s", jobID)
-}
+	job, ok := s.jobs[jobID]
+	if !ok {
+		return false, fmt.Errorf("job not found: %s", jobID)
+	}
 
-if job.Status != models.JobStatusPending {
-return false, nil // Already processed
-}
+	if job.Status != models.JobStatusPending {
+		return false, nil // Already processed
+	}
 
-// Check if any workers are available
-availableCount := 0
-for _, node := range s.nodes {
-if node.Status == "available" {
-availableCount++
-}
-}
+	// Check if any workers are available
+	availableCount := 0
+	for _, node := range s.nodes {
+		if node.Status == "available" {
+			availableCount++
+		}
+	}
 
-if availableCount > 0 {
-return false, nil // Workers available
-}
+	if availableCount > 0 {
+		return false, nil // Workers available
+	}
 
-// No workers available, queue the job
-job.Status = models.JobStatusQueued
-return true, nil
+	// No workers available, queue the job
+	job.Status = models.JobStatusQueued
+	return true, nil
 }
 
 // RetryJob resets a failed job for retry by updating its status to pending,
@@ -464,16 +464,16 @@ func (s *MemoryStore) RetryJob(jobID string, errorMsg string) error {
 
 	// Increment retry count
 	job.RetryCount++
-	
+
 	// Reset job to pending
 	job.Status = models.JobStatusPending
 	job.Error = errorMsg
-	
+
 	// Clear node assignment
 	oldNodeID := job.NodeID
 	job.NodeID = ""
 	job.StartedAt = nil
-	
+
 	// Update the node that was running the job back to available
 	if oldNodeID != "" {
 		if node, ok := s.nodes[oldNodeID]; ok {
@@ -481,7 +481,7 @@ func (s *MemoryStore) RetryJob(jobID string, errorMsg string) error {
 			node.CurrentJobID = ""
 		}
 	}
-	
+
 	return nil
 }
 
@@ -724,55 +724,81 @@ func (s *MemoryStore) UpdateJobFailureReason(id string, reason models.FailureRea
 	return nil
 }
 
-
-
 // Close is a no-op for memory store
 func (s *MemoryStore) Close() error {
-return nil
+	return nil
 }
 
 // HealthCheck always returns nil for memory store
 func (s *MemoryStore) HealthCheck() error {
-return nil
+	return nil
 }
 
 // Tenant operations (multi-tenancy) - Stub implementations
 func (s *MemoryStore) CreateTenant(tenant *models.Tenant) error {
-return fmt.Errorf("multi-tenancy not supported in memory store")
+	return fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) GetTenant(id string) (*models.Tenant, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) GetTenantByName(name string) (*models.Tenant, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) ListTenants() ([]*models.Tenant, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) UpdateTenant(tenant *models.Tenant) error {
-return fmt.Errorf("multi-tenancy not supported in memory store")
+	return fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) DeleteTenant(id string) error {
-return fmt.Errorf("multi-tenancy not supported in memory store")
+	return fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) UpdateTenantUsage(id string, usage *models.TenantUsage) error {
-return fmt.Errorf("multi-tenancy not supported in memory store")
+	return fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) GetTenantStats(id string) (*models.TenantUsage, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) GetJobsByTenant(tenantID string) ([]*models.Job, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
 }
 
 func (s *MemoryStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
-return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+	return nil, fmt.Errorf("multi-tenancy not supported in memory store")
+}
+
+// DeleteJob permanently deletes a job from the store
+func (s *MemoryStore) DeleteJob(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.jobs, id)
+	return nil
+}
+
+// GetJobs retrieves all jobs with a specific status
+func (s *MemoryStore) GetJobs(status string) ([]models.Job, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var jobs []models.Job
+	for _, job := range s.jobs {
+		if string(job.Status) == status {
+			jobs = append(jobs, *job)
+		}
+	}
+	return jobs, nil
+}
+
+// Vacuum is a no-op for memory store
+func (s *MemoryStore) Vacuum() error {
+	return nil
 }

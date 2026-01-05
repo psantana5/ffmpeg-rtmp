@@ -29,6 +29,8 @@ type Store interface {
 	UpdateJobActivity(id string) error
 	UpdateJobFailureReason(id string, reason models.FailureReason, errorMsg string) error
 	UpdateJob(job *models.Job) error
+	DeleteJob(id string) error
+	GetJobs(status string) ([]models.Job, error)
 
 	// Job state management
 	AddStateTransition(id string, from, to models.JobStatus, reason string) error
@@ -65,6 +67,7 @@ type Store interface {
 	// Lifecycle
 	Close() error
 	HealthCheck() error
+	Vacuum() error
 }
 
 // ExtendedStore includes FSM operations for production scheduler
