@@ -140,16 +140,26 @@ if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [[ "$BATCH_SIZE" -lt 1 ]]; then
     exit 1
 fi
 
-# Scenario definitions (common transcoding scenarios)
+# Scenario definitions (CPU-friendly mix including h265, VP9, AV1)
 SCENARIOS=(
     "4K60-h264"
     "4K60-h265"
     "4K30-h264"
+    "4K30-h265"
     "1080p60-h264"
+    "1080p60-h265"
     "1080p30-h264"
+    "1080p30-h265"
     "720p60-h264"
+    "720p60-h265"
     "720p30-h264"
+    "720p30-h265"
     "480p30-h264"
+    "480p30-h265"
+    "480p60-h264"
+    "1080p60-vp9"
+    "720p30-vp9"
+    "480p30-av1"
 )
 
 PRIORITIES=("high" "medium" "low")

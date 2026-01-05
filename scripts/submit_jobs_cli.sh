@@ -13,8 +13,14 @@ echo "  Submitting $COUNT Jobs via CLI"
 echo "=================================================="
 echo ""
 
-# Scenarios to cycle through
-SCENARIOS=("4K60-h264" "4K60-h265" "4K30-h264" "1080p60-h264" "1080p30-h264" "720p60-h264" "720p30-h264" "480p30-h264")
+# Scenarios to cycle through (CPU-friendly mix)
+SCENARIOS=(
+    "4K60-h264" "4K60-h265" "4K30-h264" "4K30-h265"
+    "1080p60-h264" "1080p60-h265" "1080p30-h264" "1080p30-h265"
+    "720p60-h264" "720p60-h265" "720p30-h264" "720p30-h265"
+    "480p30-h264" "480p30-h265" "480p60-h264"
+    "1080p60-vp9" "720p30-vp9" "480p30-av1"
+)
 PRIORITIES=("high" "medium" "low")
 QUEUES=("live" "default" "batch")
 
