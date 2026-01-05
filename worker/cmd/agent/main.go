@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -36,6 +37,7 @@ func main() {
 	insecureSkipVerify := flag.Bool("insecure-skip-verify", false, "Skip TLS certificate verification (insecure, for development only)")
 	metricsPort := flag.String("metrics-port", "9091", "Prometheus metrics port")
 	generateInput := flag.Bool("generate-input", true, "Automatically generate input videos for jobs (default: true)")
+	maxConcurrentJobs := flag.Int("max-concurrent-jobs", 1, "Maximum number of concurrent jobs to process (default: 1)")
 	flag.Parse()
 
 	// Get API key from flag or environment variable
@@ -300,12 +302,27 @@ func main() {
 		}
 	}()
 
-	// Main job polling loop
-	log.Println("Starting job polling loop...")
+	// Main job polling loop with concurrent job processing
+	log.Printf("Starting job polling loop (max concurrent jobs: %d)...", *maxConcurrentJobs)
 	ticker := time.NewTicker(*pollInterval)
 	defer ticker.Stop()
 
+	// Semaphore to limit concurrent jobs
+	jobSemaphore := make(chan struct{}, *maxConcurrentJobs)
+	activeJobsCount := 0
+	var activeJobsMutex sync.Mutex
+
 	for range ticker.C {
+		// Check if we can accept more jobs
+		activeJobsMutex.Lock()
+		currentActive := activeJobsCount
+		activeJobsMutex.Unlock()
+
+		if currentActive >= *maxConcurrentJobs {
+			log.Printf("At max concurrent jobs (%d/%d), waiting...", currentActive, *maxConcurrentJobs)
+			continue
+		}
+
 		job, err := client.GetNextJob()
 		if err != nil {
 			log.Printf("Failed to get next job: %v", err)
@@ -313,24 +330,46 @@ func main() {
 		}
 
 		if job == nil {
-			log.Println("No jobs available")
+			// log.Println("No jobs available")  // Too verbose, comment out
 			continue
 		}
 
 		log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
 
-		// Execute job with hardware-optimized parameters
-		// Pass client to access master URL for RTMP streaming
-		metricsExporter.SetActiveJobs(1)
-		result := executeJob(job, client, ffmpegOpt, engineSelector, inputGenerator, *generateInput, metricsExporter)
-		metricsExporter.SetActiveJobs(0)
+		// Acquire semaphore slot
+		jobSemaphore <- struct{}{}
+		
+		// Increment active jobs counter
+		activeJobsMutex.Lock()
+		activeJobsCount++
+		currentActive = activeJobsCount
+		activeJobsMutex.Unlock()
+		metricsExporter.SetActiveJobs(currentActive)
 
-		// Send results
-		if err := client.SendResults(result); err != nil {
-			log.Printf("Failed to send results: %v", err)
-		} else {
-			log.Printf("Results sent for job %s (status: %s)", job.ID, result.Status)
-		}
+		// Execute job concurrently
+		go func(j *models.Job) {
+			defer func() {
+				// Release semaphore slot
+				<-jobSemaphore
+				
+				// Decrement active jobs counter
+				activeJobsMutex.Lock()
+				activeJobsCount--
+				currentActive := activeJobsCount
+				activeJobsMutex.Unlock()
+				metricsExporter.SetActiveJobs(currentActive)
+			}()
+
+			// Execute job with hardware-optimized parameters
+			result := executeJob(j, client, ffmpegOpt, engineSelector, inputGenerator, *generateInput, metricsExporter)
+
+			// Send results
+			if err := client.SendResults(result); err != nil {
+				log.Printf("Failed to send results: %v", err)
+			} else {
+				log.Printf("Results sent for job %s (status: %s)", j.ID, result.Status)
+			}
+		}(job)
 	}
 }
 
