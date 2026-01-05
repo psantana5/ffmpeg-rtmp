@@ -289,7 +289,7 @@ See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detai
 **NEW: [Complete Documentation Guide](docs/README.md)** - Comprehensive reference with architecture, configuration, API, security, and troubleshooting
 
 ### Quick Reference
-- **[Configuration Tool](docs/CONFIGURATION_TOOL.md)** - Hardware-aware worker configuration recommendations
+- **[Configuration Tool](docs/CONFIGURATION_TOOL.md)** - Hardware-aware worker configuration (CLI: `ffrtmp config recommend`)
 - **[Concurrent Jobs Guide](CONCURRENT_JOBS_IMPLEMENTATION.md)** - Parallel job processing implementation
 - **[Job Launcher Script](scripts/LAUNCH_JOBS_README.md)** - Production-grade batch job submission
 - **[Deployment Success Report](DEPLOYMENT_SUCCESS.md)** - Real-world production deployment results

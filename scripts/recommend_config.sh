@@ -272,7 +272,7 @@ if [ "$USE_MTLS" = true ]; then
 fi
 
 if [ "$ENVIRONMENT" = "production" ]; then
-    CMD_FLAGS+=("--api-key \${FFMPEG_RTMP_API_KEY}")
+    CMD_FLAGS+=("--api-key \${MASTER_API_KEY}")
 fi
 
 # Output recommendations

@@ -7,10 +7,13 @@ toolchain go1.24.11
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/olekukonko/tablewriter v1.1.2
+	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/common v0.66.1
 	github.com/psantana5/ffmpeg-rtmp/pkg v0.0.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -41,9 +44,7 @@ require (
 	github.com/olekukonko/ll v0.1.3 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect

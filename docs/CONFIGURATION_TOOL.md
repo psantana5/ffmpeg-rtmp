@@ -2,11 +2,16 @@
 
 ## Overview
 
-The Worker Configuration Recommender (`recommend_config.sh`) is a tool that analyzes system hardware and deployment context to generate optimal configuration parameters for the FFmpeg-RTMP worker agent.
+The Worker Configuration Recommender is available in two forms:
+
+1. **CLI Command** (Recommended): `ffrtmp config recommend` - Built into the ffrtmp CLI tool
+2. **Bash Script** (Legacy): `scripts/recommend_config.sh` - Standalone shell script
+
+Both analyze system hardware and deployment context to generate optimal configuration parameters for the FFmpeg-RTMP worker agent.
 
 ## Purpose
 
-Manual configuration of worker parameters can be error-prone and sub-optimal. This tool automates the process by:
+Manual configuration of worker parameters can be error-prone and sub-optimal. These tools automate the process by:
 
 1. Detecting available hardware (CPU, RAM, GPU)
 2. Analyzing deployment environment characteristics
@@ -15,46 +20,43 @@ Manual configuration of worker parameters can be error-prone and sub-optimal. Th
 
 ## Usage
 
-### Basic Usage
+### CLI Command (Recommended)
 
 ```bash
-./scripts/recommend_config.sh
+# Interactive text output with hardware details
+ffrtmp config recommend
+
+# Production environment with JSON output
+ffrtmp config recommend --environment production --output json
+
+# Generate bash exports for sourcing
+ffrtmp config recommend --environment production --output bash
+
+# YAML output for config files
+ffrtmp config recommend --environment production --output yaml
 ```
 
-This outputs a bash script with recommended configuration for production environment.
+**Output formats:**
+- `text` (default) - Human-readable output with example command
+- `json` - Machine-readable JSON with full hardware info
+- `yaml` - YAML format for configuration files
+- `bash` - Shell export statements for sourcing
 
-### Specify Environment
+### Bash Script (Legacy)
 
 ```bash
+# Basic usage (production environment, bash output)
+./scripts/recommend_config.sh
+
+# Specify environment
 ./scripts/recommend_config.sh --environment development
 ./scripts/recommend_config.sh --environment staging
 ./scripts/recommend_config.sh --environment production
-```
 
-### Output Formats
-
-```bash
-# Bash script (default)
+# Output formats
 ./scripts/recommend_config.sh --output bash
-
-# JSON format
 ./scripts/recommend_config.sh --output json
-
-# YAML format
 ./scripts/recommend_config.sh --output yaml
-```
-
-### Save Configuration
-
-```bash
-# Generate and save bash configuration
-./scripts/recommend_config.sh --environment production > worker-config.sh
-
-# Generate JSON configuration
-./scripts/recommend_config.sh --output json > worker-config.json
-
-# Generate YAML configuration
-./scripts/recommend_config.sh --output yaml > worker-config.yaml
 ```
 
 ## Hardware Detection
