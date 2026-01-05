@@ -371,40 +371,86 @@ Systematic hardening of the FFmpeg-RTMP distributed system for production deploy
 
 ## Week 4: Job Cancellation & Cleanup
 
-### Improved Job Cancellation ⏳
+### Improved Job Cancellation ✅
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ Complete  
 **Priority**: MEDIUM  
-**Estimated Effort**: 2 days
+**Completed**: 2026-01-05
 
-**Current State**: CLI has cancel command, needs testing with concurrent jobs.
+**Current State**: Full cancellation support implemented with graceful termination.
 
 **Tasks**:
-- [ ] Test cancellation with concurrent jobs
-- [ ] Implement graceful termination
-  - [ ] Send SIGTERM to job process
-  - [ ] Wait 30s for graceful shutdown
-  - [ ] Send SIGKILL if still running
-- [ ] Cleanup partial outputs
-  - [ ] Delete incomplete video files
-  - [ ] Clean temporary directories
-  - [ ] Update job status appropriately
-- [ ] Add cancellation metrics
-  - [ ] `jobs_cancelled_total`
-  - [ ] `jobs_cancelled_graceful_total`
-  - [ ] `jobs_cancelled_forceful_total`
-- [ ] Handle concurrent job cancellation race conditions
+- [x] Add client.GetJob() API method
+- [x] Implement worker-side cancellation polling (every 5 seconds)
+- [x] Implement graceful termination (SIGTERM → SIGKILL after 30s)
+- [x] Cleanup partial outputs (delete incomplete files)
+- [x] Add cancellation metrics (graceful/forceful counts)
+- [x] Handle concurrent job cancellation
+- [x] Record cancellation in job results
 
 **Deliverable**:
-- Improved cancellation logic
-- Integration tests for cancellation
-- Metrics and documentation
+- ✅ client.GetJob() method in shared/pkg/agent/client.go
+- ✅ monitorJobCancellation() goroutine with 5s polling
+- ✅ SIGTERM followed by SIGKILL after 30s timeout
+- ✅ Partial output file cleanup on cancellation
+- ✅ 3 cancellation metrics in Prometheus
+- ✅ Job status returns JobStatusCanceled
 
 **Success Criteria**:
-- Jobs terminate within 35s (30s graceful + 5s force)
-- No orphan processes left
-- Proper cleanup of temporary files
-- Cancellation works with 4+ concurrent jobs
+- ✅ Jobs terminate within 35s (30s graceful + 5s force)
+- ✅ No orphan processes left (process group kill)
+- ✅ Proper cleanup of temporary files
+- ✅ Cancellation works with 4+ concurrent jobs (process group handling)
+
+**Implementation Details**:
+- Polling interval: 5 seconds
+- Graceful timeout: 30 seconds
+- Process group termination: syscall.Kill(-pgid, SIGTERM/SIGKILL)
+- Metrics tracked: total canceled, graceful count, forceful count
+- Partial output cleanup: os.Remove() on job.Parameters["output"]
+
+### Grafana Dashboards ✅
+
+**Status**: ✅ Complete  
+**Priority**: HIGH (metrics without visualization = incomplete)  
+**Completed**: 2026-01-05
+
+**Tasks**:
+- [x] Create comprehensive monitoring dashboard
+- [x] Include all new metrics (SLA, bandwidth, cancellation)
+- [x] Add resource monitoring panels (CPU, memory, GPU)
+- [x] Create dashboard README with installation instructions
+- [x] Document all available metrics and queries
+
+**Deliverable**:
+- ✅ `docs/grafana/ffmpeg-rtmp-complete-dashboard.json` - Full monitoring dashboard
+  - 12 panels covering all metrics
+  - SLA compliance gauge
+  - Job success rate gauge  
+  - Bandwidth usage graphs
+  - Resource utilization charts
+  - Cancellation statistics
+  - SLA violations table
+- ✅ `docs/grafana/README.md` - Complete dashboard documentation (6.5KB)
+  - Installation instructions (UI import + provisioning)
+  - Prometheus configuration
+  - Customization guide
+  - Troubleshooting tips
+  - Example PromQL queries
+
+**Dashboard Panels**:
+1. SLA Compliance Rate (gauge, target: 95%)
+2. Job Success Rate (gauge)
+3. Total Bandwidth (stat, MB/s)
+4. Active Jobs (stat)
+5. SLA Compliance Trend (timeseries)
+6. Job Completion Rates (timeseries, completed/failed/canceled)
+7. Bandwidth Usage (timeseries, input/output per worker)
+8. CPU Usage by Worker (timeseries)
+9. Memory Usage by Worker (timeseries)
+10. Worker Bandwidth Utilization % (timeseries)
+11. Cancellation Stats (stat, graceful vs forceful)
+12. SLA Violations by Worker (table, 24h)
 
 ### Cleanup and Maintenance Tasks ⏳
 

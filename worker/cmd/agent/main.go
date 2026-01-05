@@ -551,7 +551,7 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		log.Printf("Input file size: %.2f MB", float64(inputFileSize)/(1024*1024))
 	}
 	
-	metrics, analyzerOutput, executionLogs, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt, limits)
+	metrics, analyzerOutput, executionLogs, cancelResult, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt, limits, metricsExporter)
 	
 	// Cleanup generated input if needed
 	log.Println("\n>>> CLEANUP PHASE <<<")
@@ -572,6 +572,34 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	// Determine SLA target for this job
 	slaTarget := prometheus.GetDefaultSLATarget()
 	// TODO: In future, allow per-scenario SLA targets from job.Parameters
+	
+	// Check if job was canceled
+	if cancelResult != nil && cancelResult.WasCanceled {
+		// Job was canceled - don't record for SLA, return canceled status
+		log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
+		log.Printf("║ 🛑 JOB CANCELED: %s", job.ID)
+		log.Printf("║ Duration before cancellation: %.2f seconds", duration)
+		terminationType := "gracefully (SIGTERM)"
+		if !cancelResult.Graceful {
+			terminationType = "forcefully (SIGKILL)"
+		}
+		log.Printf("║ Termination: %s", terminationType)
+		log.Printf("╚════════════════════════════════════════════════════════════════╝\n")
+		return &models.JobResult{
+			JobID:       job.ID,
+			NodeID:      client.GetNodeID(),
+			Status:      models.JobStatusCanceled,
+			Error:       "Job canceled by user",
+			Logs:        executionLogs,
+			CompletedAt: time.Now(),
+			Metrics: map[string]interface{}{
+				"duration": duration,
+				"engine":   selectedEngine.Name(),
+				"canceled": true,
+				"graceful_termination": cancelResult.Graceful,
+			},
+		}
+	}
 	
 	if err != nil {
 		// Record failed job for SLA tracking
@@ -674,12 +702,75 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 }
 
+// CancellationResult indicates how a job was canceled
+type CancellationResult struct {
+	WasCanceled bool
+	Graceful    bool // true if SIGTERM worked, false if SIGKILL was needed
+}
+
+// monitorJobCancellation periodically checks if a job has been canceled
+// If canceled, it gracefully terminates the process (SIGTERM, then SIGKILL after 30s)
+func monitorJobCancellation(jobID string, client *agent.Client, cmd *exec.Cmd, canceledChan chan CancellationResult, doneChan chan struct{}) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-doneChan:
+			// Job completed normally
+			return
+		case <-ticker.C:
+			// Check job status
+			job, err := client.GetJob(jobID)
+			if err != nil {
+				log.Printf("WARNING: Failed to check job status for cancellation: %v", err)
+				continue
+			}
+			
+			if job.Status == models.JobStatusCanceled {
+				log.Printf("🛑 Job %s has been canceled, terminating process...", jobID)
+				
+				// Try graceful termination first (SIGTERM)
+				if cmd.Process != nil {
+					pgid, err := syscall.Getpgid(cmd.Process.Pid)
+					if err == nil {
+						log.Printf("Sending SIGTERM to process group %d", pgid)
+						syscall.Kill(-pgid, syscall.SIGTERM)
+						
+						// Wait 30 seconds for graceful shutdown
+						gracefulTimer := time.NewTimer(30 * time.Second)
+						select {
+						case <-doneChan:
+							gracefulTimer.Stop()
+							log.Printf("✓ Process terminated gracefully with SIGTERM")
+							canceledChan <- CancellationResult{WasCanceled: true, Graceful: true}
+							return
+						case <-gracefulTimer.C:
+							// Force kill after timeout
+							log.Printf("⚠️  Process did not terminate gracefully, sending SIGKILL")
+							syscall.Kill(-pgid, syscall.SIGKILL)
+							canceledChan <- CancellationResult{WasCanceled: true, Graceful: false}
+							return
+						}
+					} else {
+						// Fallback: kill just the process
+						log.Printf("Could not get process group, killing process directly")
+						cmd.Process.Kill()
+						canceledChan <- CancellationResult{WasCanceled: true, Graceful: false}
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
 // executeEngineJob executes a job using the selected engine with resource limits
-func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization, limits *resources.ResourceLimits) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, err error) {
+func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine, ffmpegOpt *agent.FFmpegOptimization, limits *resources.ResourceLimits, metricsExporter *prometheus.WorkerExporter) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, cancelResult *CancellationResult, err error) {
 	// Build command using the selected engine
 	args, err := engine.BuildCommand(job, client.GetMasterURL())
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to build command: %w", err)
+		return nil, nil, "", nil, fmt.Errorf("failed to build command: %w", err)
 	}
 
 	// Determine the command to run based on engine
@@ -690,13 +781,13 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		cmdPath, err = exec.LookPath("gst-launch-1.0")
 		cmdName = "gst-launch-1.0"
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("gst-launch-1.0 not found in PATH: %w", err)
+			return nil, nil, "", nil, fmt.Errorf("gst-launch-1.0 not found in PATH: %w", err)
 		}
 	} else {
 		cmdPath, err = exec.LookPath("ffmpeg")
 		cmdName = "ffmpeg"
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("ffmpeg not found in PATH: %w", err)
+			return nil, nil, "", nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
 		}
 	}
 
@@ -751,7 +842,7 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	// Start the command
 	startTime := time.Now()
 	if err := cmd.Start(); err != nil {
-		return nil, nil, "", fmt.Errorf("failed to start %s: %w", cmdName, err)
+		return nil, nil, "", nil, fmt.Errorf("failed to start %s: %w", cmdName, err)
 	}
 	
 	pid := cmd.Process.Pid
@@ -785,12 +876,25 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	
 	// Monitor process for resource limits and timeout
 	doneChan := make(chan struct{})
+	canceledChan := make(chan CancellationResult, 1)
 	go resources.MonitorProcess(cmd, limits, doneChan)
+	
+	// Monitor for job cancellation (check every 5 seconds)
+	go monitorJobCancellation(job.ID, client, cmd, canceledChan, doneChan)
 	
 	// Wait for command to complete
 	execErr := cmd.Wait()
 	close(doneChan) // Stop monitoring
 	execDuration := time.Since(startTime).Seconds()
+	
+	// Check if job was canceled
+	var cancelResultData CancellationResult
+	select {
+	case cancelResultData = <-canceledChan:
+		// Job was canceled
+	default:
+		// Job completed normally or failed
+	}
 	
 	// Cleanup cgroup
 	if cgroupPath != "" && cgroupMgr != nil {
@@ -806,6 +910,30 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	logBuffer.WriteString(fmt.Sprintf("Duration: %.2f seconds\n", execDuration))
 	logBuffer.WriteString(fmt.Sprintf("\n=== STDOUT ===\n%s\n", stdout.String()))
 	logBuffer.WriteString(fmt.Sprintf("=== STDERR ===\n%s\n", stderr.String()))
+	// Check if job was canceled
+	if cancelResultData.WasCanceled {
+		terminationType := "gracefully (SIGTERM)"
+		if !cancelResultData.Graceful {
+			terminationType = "forcefully (SIGKILL)"
+		}
+		log.Printf("⚠️  Job was canceled and terminated %s", terminationType)
+		logBuffer.WriteString(fmt.Sprintf("\n=== CANCELED ===\nJob canceled by user, terminated %s\n", terminationType))
+		
+		// Record cancellation metrics
+		metricsExporter.RecordJobCancellation(cancelResultData.Graceful)
+		
+		// Clean up partial output files
+		if job.Parameters != nil {
+			if output, ok := job.Parameters["output"].(string); ok {
+				if output != "" {
+					log.Printf("Cleaning up partial output file: %s", output)
+					os.Remove(output)
+				}
+			}
+		}
+		
+		return nil, nil, logBuffer.String(), &cancelResultData, fmt.Errorf("job was canceled")
+	}
 	
 	if execErr != nil {
 		// Check if context deadline exceeded
@@ -819,7 +947,7 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 				// Not an error - continue to metrics
 			} else {
 				log.Printf("%s stderr: %s", cmdName, stderr.String())
-				return nil, nil, logBuffer.String(), fmt.Errorf("%s execution timeout: %w", cmdName, execErr)
+				return nil, nil, logBuffer.String(), nil, fmt.Errorf("%s execution timeout: %w", cmdName, execErr)
 			}
 		} else {
 			log.Printf("%s stderr: %s", cmdName, stderr.String())
@@ -828,16 +956,16 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 			stderrStr := stderr.String()
 			if engine.Name() == "gstreamer" {
 				if strings.Contains(stderrStr, "Resource not found") {
-					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: RTMP server not reachable or stream rejected")
+					return nil, nil, logBuffer.String(), nil, fmt.Errorf("GStreamer pipeline error: RTMP server not reachable or stream rejected")
 				}
 				if strings.Contains(stderrStr, "Could not connect") {
-					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: Failed to connect to RTMP server")
+					return nil, nil, logBuffer.String(), nil, fmt.Errorf("GStreamer pipeline error: Failed to connect to RTMP server")
 				}
 				if strings.Contains(stderrStr, "No such element") {
-					return nil, nil, logBuffer.String(), fmt.Errorf("GStreamer pipeline error: Missing GStreamer plugin (check gst-inspect-1.0)")
+					return nil, nil, logBuffer.String(), nil, fmt.Errorf("GStreamer pipeline error: Missing GStreamer plugin (check gst-inspect-1.0)")
 				}
 			}
-			return nil, nil, logBuffer.String(), fmt.Errorf("%s execution failed: %w", cmdName, execErr)
+			return nil, nil, logBuffer.String(), nil, fmt.Errorf("%s execution failed: %w", cmdName, execErr)
 		}
 	}
 
@@ -876,7 +1004,7 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		"status":        "success",
 	}
 
-	return metrics, analyzerOutput, logBuffer.String(), nil
+	return metrics, analyzerOutput, logBuffer.String(), nil, nil
 }
 
 // getFileSize safely gets the size of a file in bytes

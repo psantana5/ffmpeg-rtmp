@@ -1,0 +1,96 @@
+{
+  "title": "FFmpeg RTMP - Complete Monitoring",
+  "uid": "ffmpeg-rtmp-complete",
+  "version": 1,
+  "panels": [
+    {
+      "title": "SLA Compliance Rate",
+      "type": "gauge",
+      "targets": [{"expr": "avg(ffrtmp_worker_sla_compliance_rate)"}],
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "title": "Job Success Rate",
+      "type": "gauge",
+      "targets": [{"expr": "(sum(ffrtmp_worker_jobs_completed_total) / (sum(ffrtmp_worker_jobs_completed_total) + sum(ffrtmp_worker_jobs_failed_total))) * 100"}],
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+    },
+    {
+      "title": "Total Bandwidth (MB/s)",
+      "type": "stat",
+      "targets": [{"expr": "(sum(rate(ffrtmp_job_input_bytes_total[5m])) + sum(rate(ffrtmp_job_output_bytes_total[5m]))) / (1024*1024)"}],
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+    },
+    {
+      "title": "Active Jobs",
+      "type": "stat",
+      "targets": [{"expr": "sum(ffrtmp_worker_active_jobs)"}],
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+    },
+    {
+      "title": "SLA Compliance Trend",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "ffrtmp_worker_sla_compliance_rate", "legendFormat": "{{node_id}}"},
+        {"expr": "avg(ffrtmp_worker_sla_compliance_rate)", "legendFormat": "Average"}
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+    },
+    {
+      "title": "Job Completion Rates",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum(rate(ffrtmp_worker_jobs_completed_total[5m]))", "legendFormat": "Completed"},
+        {"expr": "sum(rate(ffrtmp_worker_jobs_failed_total[5m]))", "legendFormat": "Failed"},
+        {"expr": "sum(rate(ffrtmp_worker_jobs_canceled_total[5m]))", "legendFormat": "Canceled"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+    },
+    {
+      "title": "Bandwidth Usage (MB/s)",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum by (node_id) (rate(ffrtmp_job_input_bytes_total[5m])) / (1024*1024)", "legendFormat": "Input - {{node_id}}"},
+        {"expr": "sum by (node_id) (rate(ffrtmp_job_output_bytes_total[5m])) / (1024*1024)", "legendFormat": "Output - {{node_id}}"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+    },
+    {
+      "title": "CPU Usage by Worker",
+      "type": "timeseries",
+      "targets": [{"expr": "ffrtmp_worker_cpu_usage", "legendFormat": "{{node_id}}"}],
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24}
+    },
+    {
+      "title": "Memory Usage by Worker",
+      "type": "timeseries",
+      "targets": [{"expr": "ffrtmp_worker_memory_bytes", "legendFormat": "{{node_id}}"}],
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24}
+    },
+    {
+      "title": "Worker Bandwidth Utilization (%)",
+      "type": "timeseries",
+      "targets": [{"expr": "ffrtmp_worker_bandwidth_utilization", "legendFormat": "{{node_id}}"}],
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24}
+    },
+    {
+      "title": "Cancellation Stats",
+      "type": "stat",
+      "targets": [
+        {"expr": "sum(ffrtmp_worker_jobs_canceled_graceful_total)", "legendFormat": "Graceful (SIGTERM)"},
+        {"expr": "sum(ffrtmp_worker_jobs_canceled_forceful_total)", "legendFormat": "Forceful (SIGKILL)"}
+      ],
+      "gridPos": {"h": 4, "w": 12, "x": 0, "y": 32}
+    },
+    {
+      "title": "SLA Violations by Worker",
+      "type": "table",
+      "targets": [{"expr": "sum by (node_id) (increase(ffrtmp_worker_jobs_sla_violation_total[24h]))"}],
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 32}
+    }
+  ],
+  "refresh": "10s",
+  "time": {"from": "now-6h", "to": "now"},
+  "tags": ["ffmpeg-rtmp", "production"],
+  "timezone": "browser"
+}

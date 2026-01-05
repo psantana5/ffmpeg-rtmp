@@ -200,3 +200,32 @@ func (c *Client) GetNodeID() string {
 func (c *Client) GetMasterURL() string {
 	return c.masterURL
 }
+
+// GetJob retrieves a specific job by ID from the master
+func (c *Client) GetJob(jobID string) (*models.Job, error) {
+	req, err := http.NewRequest("GET", c.masterURL+"/api/v1/jobs/"+jobID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get job failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var job models.Job
+	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
+		return nil, fmt.Errorf("failed to decode job: %w", err)
+	}
+
+	return &job, nil
+}
