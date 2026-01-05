@@ -13,7 +13,7 @@ func main() {
 	
 	fmt.Println("\n======================================================================")
 	fmt.Println("  DYNAMIC INPUT GENERATION - Parameter Logging Verification")
-	fmt.Println("======================================================================\n")
+	fmt.Println("======================================================================")
 	
 	// Detect encoders first
 	fmt.Println(">>> HARDWARE ENCODER DETECTION <<<")
@@ -65,5 +65,5 @@ func main() {
 	
 	fmt.Println("\n======================================================================")
 	fmt.Println("  ✅ TEST PASSED - Parameters logged and applied correctly!")
-	fmt.Println("======================================================================\n")
+	fmt.Println("======================================================================")
 }

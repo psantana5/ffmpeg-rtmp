@@ -15,6 +15,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/master/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/api"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
@@ -226,6 +227,11 @@ func main() {
 		router.Use(tracing.HTTPMiddleware(tracerProvider, "ffrtmp-master"))
 		log.Println("✓ Tracing middleware enabled")
 	}
+
+	// Add bandwidth monitoring middleware
+	bandwidthMonitor := bandwidth.NewBandwidthMonitor()
+	router.Use(bandwidthMonitor.Middleware)
+	log.Println("✓ Bandwidth monitoring enabled")
 
 	// Add authentication middleware if API key is set
 	if apiKey != "" {

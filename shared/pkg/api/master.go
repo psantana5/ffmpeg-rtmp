@@ -93,9 +93,43 @@ func (h *MasterHandler) RegisterNode(w http.ResponseWriter, r *http.Request) {
 	// Check if a node with this address already exists
 	existingNode, err := h.store.GetNodeByAddress(reg.Address)
 	if err == nil && existingNode != nil {
-		// Node with this address already exists
-		log.Printf("Node registration rejected: address %s already registered as %s", reg.Address, existingNode.ID)
-		http.Error(w, fmt.Sprintf("Node with address %s is already registered", reg.Address), http.StatusConflict)
+		// Node with this address already exists - handle re-registration
+		// This handles cases where:
+		// 1. Agent restarted and tries to re-register
+		// 2. Network issues caused registration to fail but succeed server-side
+		// 3. Agent crashed without proper deregistration
+		
+		log.Printf("Node with address %s already exists (ID: %s), handling re-registration...", reg.Address, existingNode.ID)
+		
+		// Update existing node with new capabilities (hardware may have changed)
+		existingNode.Type = reg.Type
+		existingNode.CPUThreads = reg.CPUThreads
+		existingNode.CPUModel = reg.CPUModel
+		existingNode.HasGPU = reg.HasGPU
+		existingNode.GPUType = reg.GPUType
+		existingNode.GPUCapabilities = reg.GPUCapabilities
+		existingNode.RAMTotalBytes = reg.RAMTotalBytes
+		existingNode.Labels = reg.Labels
+		existingNode.Status = "available" // Reset to available
+		existingNode.LastHeartbeat = time.Now()
+		existingNode.CurrentJobID = "" // Clear any stale job assignment
+		
+		// Update in database
+		if err := h.store.UpdateNodeHeartbeat(existingNode.ID); err != nil {
+			log.Printf("Warning: failed to update heartbeat during re-registration: %v", err)
+		}
+		
+		// Update node status
+		if err := h.store.UpdateNodeStatus(existingNode.ID, "available"); err != nil {
+			log.Printf("Warning: failed to update status during re-registration: %v", err)
+		}
+		
+		log.Printf("Node re-registered: %s [%s] (%s, %d threads, %s)", existingNode.Name, existingNode.ID, existingNode.Type, existingNode.CPUThreads, existingNode.CPUModel)
+		
+		// Return the existing node (with updated info)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK) // 200 OK for re-registration (not 201 Created)
+		json.NewEncoder(w).Encode(existingNode)
 		return
 	}
 
