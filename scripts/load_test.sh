@@ -277,10 +277,11 @@ submit_jobs() {
         
         # Submit job
         local submit_start=$(date +%s%N)
-        local response=$(curl -sk -X POST "$MASTER_URL/jobs" \
+        local http_code=$(curl -sk -X POST "$MASTER_URL/jobs" \
             -H "Authorization: Bearer $MASTER_API_KEY" \
             -H "Content-Type: application/json" \
-            -w "\nHTTP_CODE:%{http_code}" \
+            -w "%{http_code}" \
+            -o "/tmp/load_test_resp_$$" \
             -d "{
                 \"scenario\": \"$scenario\",
                 \"confidence\": \"auto\",
@@ -294,20 +295,27 @@ submit_jobs() {
         local submit_end=$(date +%s%N)
         local submit_latency_ms=$(( (submit_end - submit_start) / 1000000 ))
         
-        # Extract HTTP code and body
-        local http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
-        local body=$(echo "$response" | grep -v "HTTP_CODE:")
+        # Read response body
+        local response=$(cat "/tmp/load_test_resp_$$" 2>/dev/null || echo "{}")
         
-        if echo "$body" | jq -e '.id' &> /dev/null 2>&1; then
-            local job_id=$(echo "$body" | jq -r '.id')
-            job_ids+=("$job_id")
-            ((submitted++))
-            echo "$(date -Iseconds)|SUCCESS|$job_id|$submit_latency_ms|$scenario" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
+        if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
+            if echo "$response" | jq -e '.id' &> /dev/null; then
+                local job_id=$(echo "$response" | jq -r '.id')
+                job_ids+=("$job_id")
+                ((submitted++))
+                echo "$(date -Iseconds)|SUCCESS|$job_id|$submit_latency_ms|$scenario" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
+            else
+                ((failed++))
+                echo "$(date -Iseconds)|FAILED|N/A|$submit_latency_ms|$scenario|HTTP:$http_code|NoJobID" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
+            fi
         else
             ((failed++))
-            local error_msg=$(echo "$body" | tr '\n' ' ' | head -c 100)
+            local error_msg=$(echo "$response" | tr '\n' ' ' | head -c 100)
             echo "$(date -Iseconds)|FAILED|N/A|$submit_latency_ms|$scenario|HTTP:$http_code|$error_msg" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
         fi
+        
+        # Cleanup temp file
+        rm -f "/tmp/load_test_resp_$$"
         
         # Progress indicator
         if (( i % 10 == 0 )); then
