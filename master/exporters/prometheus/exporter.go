@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 )
@@ -13,6 +14,7 @@ import (
 // MasterExporter exports Prometheus metrics for the master node
 type MasterExporter struct {
 	store             store.Store
+	bandwidthMonitor  *bandwidth.BandwidthMonitor
 	startTime         time.Time
 	mu                sync.RWMutex
 	scheduleAttempts  map[string]int64 // result -> count
@@ -21,9 +23,10 @@ type MasterExporter struct {
 }
 
 // NewMasterExporter creates a new Prometheus exporter for master
-func NewMasterExporter(s store.Store) *MasterExporter {
+func NewMasterExporter(s store.Store, bw *bandwidth.BandwidthMonitor) *MasterExporter {
 	return &MasterExporter{
 		store:            s,
+		bandwidthMonitor: bw,
 		startTime:        time.Now(),
 		scheduleAttempts: make(map[string]int64),
 		jobDurations:     make([]float64, 0),
@@ -208,6 +211,33 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# TYPE ffrtmp_jobs_completed_by_engine counter\n")
 	for _, engine := range []string{"ffmpeg", "gstreamer"} {
 		fmt.Fprintf(w, "ffrtmp_jobs_completed_by_engine{engine=\"%s\"} %d\n", engine, completedByEngine[engine])
+	}
+	
+	// Bandwidth metrics (if monitor is available)
+	if e.bandwidthMonitor != nil {
+		stats := e.bandwidthMonitor.GetStats()
+		
+		fmt.Fprintf(w, "\n# HELP scheduler_http_bandwidth_bytes_total Total bandwidth by direction\n")
+		fmt.Fprintf(w, "# TYPE scheduler_http_bandwidth_bytes_total counter\n")
+		fmt.Fprintf(w, "scheduler_http_bandwidth_bytes_total{direction=\"inbound\"} %d\n", stats.TotalBytesReceived)
+		fmt.Fprintf(w, "scheduler_http_bandwidth_bytes_total{direction=\"outbound\"} %d\n", stats.TotalBytesSent)
+		
+		fmt.Fprintf(w, "\n# HELP scheduler_http_requests_total Total HTTP requests processed\n")
+		fmt.Fprintf(w, "# TYPE scheduler_http_requests_total counter\n")
+		fmt.Fprintf(w, "scheduler_http_requests_total %d\n", stats.TotalRequests)
+		
+		if stats.TotalRequests > 0 {
+			avgReqSize := float64(stats.TotalBytesReceived) / float64(stats.TotalRequests)
+			avgRespSize := float64(stats.TotalBytesSent) / float64(stats.TotalRequests)
+			
+			fmt.Fprintf(w, "\n# HELP scheduler_http_request_size_bytes_avg Average request size in bytes\n")
+			fmt.Fprintf(w, "# TYPE scheduler_http_request_size_bytes_avg gauge\n")
+			fmt.Fprintf(w, "scheduler_http_request_size_bytes_avg %.2f\n", avgReqSize)
+			
+			fmt.Fprintf(w, "\n# HELP scheduler_http_response_size_bytes_avg Average response size in bytes\n")
+			fmt.Fprintf(w, "# TYPE scheduler_http_response_size_bytes_avg gauge\n")
+			fmt.Fprintf(w, "scheduler_http_response_size_bytes_avg %.2f\n", avgRespSize)
+		}
 	}
 }
 

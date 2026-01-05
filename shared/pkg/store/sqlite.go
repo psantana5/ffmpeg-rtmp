@@ -1374,3 +1374,4 @@ return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
 func (s *SQLiteStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
 return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
 }
+

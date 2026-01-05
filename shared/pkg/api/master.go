@@ -733,3 +733,36 @@ func (h *MasterHandler) Health(w http.ResponseWriter, r *http.Request) {
 		"status": "healthy",
 	})
 }
+
+// Tenant API stubs
+func (h *MasterHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) GetTenantStats(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) GetTenantJobs(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}
+
+func (h *MasterHandler) GetTenantNodes(w http.ResponseWriter, r *http.Request) {
+http.Error(w, "Tenant management not yet implemented", http.StatusNotImplemented)
+}

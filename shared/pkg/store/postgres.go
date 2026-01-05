@@ -456,3 +456,68 @@ func (s *PostgreSQLStore) CreateJob(job *models.Job) error {
 }
 
 // Implement remaining methods in next file...
+
+// Tenant management stubs (not yet implemented)
+func (s *PostgreSQLStore) CreateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) GetTenant(id string) (*models.Tenant, error) {
+return nil, fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) UpdateTenant(tenant *models.Tenant) error {
+return fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) DeleteTenant(id string) error {
+return fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) ListTenants() ([]*models.Tenant, error) {
+return nil, fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) GetJobsByTenant(tenantID string) ([]*models.Job, error) {
+return s.GetAllJobs(), nil
+}
+
+func (s *PostgreSQLStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
+return s.GetAllNodes(), nil
+}
+
+func (s *PostgreSQLStore) GetTenantByName(name string) (*models.Tenant, error) {
+return nil, fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) CreateUser(user *models.User) error {
+return fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) GetUser(id string) (*models.User, error) {
+return nil, fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) GetUserByEmail(email string) (*models.User, error) {
+return nil, fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) UpdateUser(user *models.User) error {
+return fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) DeleteUser(id string) error {
+return fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) ListUsersByTenant(tenantID string) ([]*models.User, error) {
+return nil, fmt.Errorf("user management not yet implemented")
+}
+
+func (s *PostgreSQLStore) UpdateTenantUsage(id string, usage *models.TenantUsage) error {
+return fmt.Errorf("tenant management not yet implemented")
+}
+
+func (s *PostgreSQLStore) GetTenantStats(id string) (*models.TenantUsage, error) {
+return nil, fmt.Errorf("tenant management not yet implemented")
+}

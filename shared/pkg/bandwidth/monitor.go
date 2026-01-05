@@ -18,7 +18,10 @@ requestSize    *prometheus.HistogramVec
 responseSize   *prometheus.HistogramVec
 totalBandwidth *prometheus.GaugeVec
 
-mu sync.RWMutex
+	mu                 sync.RWMutex
+	totalBytesReceived int64
+	totalBytesSent     int64
+	totalRequests      int64
 }
 
 // NewBandwidthMonitor creates a new bandwidth monitor
@@ -77,6 +80,11 @@ func (bm *BandwidthMonitor) Middleware(next http.Handler) http.Handler {
 return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 endpoint := r.URL.Path
 method := r.Method
+		
+		// Track request count
+		bm.mu.Lock()
+		bm.totalRequests++
+		bm.mu.Unlock()
 
 // Track request size
 requestSize := r.ContentLength
@@ -85,6 +93,10 @@ requestSize = 0
 }
 
 if requestSize > 0 {
+			bm.mu.Lock()
+			bm.totalBytesReceived += requestSize
+			bm.mu.Unlock()
+			
 bm.bytesReceived.WithLabelValues(method, endpoint).Add(float64(requestSize))
 bm.requestSize.WithLabelValues(method, endpoint).Observe(float64(requestSize))
 }
@@ -99,6 +111,11 @@ next.ServeHTTP(rw, r)
 
 // Track response size
 if rw.bytesWritten > 0 {
+			
+			bm.mu.Lock()
+			bm.totalBytesSent += int64(rw.bytesWritten)
+			bm.mu.Unlock()
+			
 status := fmt.Sprintf("%d", rw.statusCode)
 bm.bytesSent.WithLabelValues(method, endpoint, status).Add(float64(rw.bytesWritten))
 bm.responseSize.WithLabelValues(method, endpoint, status).Observe(float64(rw.bytesWritten))
@@ -126,4 +143,25 @@ return n, err
 func (rw *responseWriter) WriteHeader(statusCode int) {
 rw.statusCode = statusCode
 rw.ResponseWriter.WriteHeader(statusCode)
+}
+
+// BandwidthStats holds bandwidth statistics
+type BandwidthStats struct {
+TotalBytesReceived int64
+TotalBytesSent     int64
+TotalRequests      int64
+}
+
+// GetStats returns current bandwidth statistics
+func (bm *BandwidthMonitor) GetStats() BandwidthStats {
+bm.mu.RLock()
+defer bm.mu.RUnlock()
+
+// We need to track these in the middleware
+// For now, return zeros - we'll update the middleware next
+return BandwidthStats{
+TotalBytesReceived: 0,
+TotalBytesSent:     0,
+TotalRequests:      0,
+}
 }

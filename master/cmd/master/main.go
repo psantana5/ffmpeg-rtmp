@@ -268,7 +268,7 @@ func main() {
 	var metricsExporter *prometheus.MasterExporter
 	if *enableMetrics {
 		log.Println("✓ Prometheus metrics endpoint enabled")
-		metricsExporter = prometheus.NewMasterExporter(dataStore)
+		metricsExporter = prometheus.NewMasterExporter(dataStore, bandwidthMonitor)
 
 		// Set metrics recorder in handler
 		handler.SetMetricsRecorder(metricsExporter)

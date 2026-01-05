@@ -32,10 +32,9 @@ const (
 // Job represents a workload to be executed on a compute node
 type Job struct {
 	ID               string                 `json:"id"`
-	TenantID         string                 `json:"tenant_id"`              // Tenant/organization ID
+	TenantID         string                 `json:"tenant_id,omitempty"`    // Tenant/organization ID
 	UserID           string                 `json:"user_id,omitempty"`      // User who created the job
 	SequenceNumber   int                    `json:"sequence_number,omitempty"`   // Human-friendly job number
-	TenantID         string                 `json:"tenant_id,omitempty"`         // Tenant/organization ID
 	Scenario         string                 `json:"scenario"`   // e.g., "4K60-h264"
 	Confidence       string                 `json:"confidence"` // "auto", "high", "medium", "low"
 	Engine           string                 `json:"engine,omitempty"`      // "auto", "ffmpeg", "gstreamer"

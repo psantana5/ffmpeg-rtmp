@@ -55,7 +55,7 @@ var createTenantCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -108,7 +108,7 @@ var listTenantsCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -185,7 +185,7 @@ var getTenantCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -254,7 +254,7 @@ var tenantStatsCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -362,7 +362,7 @@ var updateTenantCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -397,7 +397,7 @@ var deleteTenantCmd = &cobra.Command{
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
 
-		resp, err := getHTTPClient().Do(req)
+		resp, err := GetHTTPClient().Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
