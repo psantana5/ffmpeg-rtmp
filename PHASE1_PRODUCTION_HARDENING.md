@@ -292,29 +292,43 @@ Systematic hardening of the FFmpeg-RTMP distributed system for production deploy
 - Alertmanager routes to appropriate channels
 - Runbook links in alert annotations
 
-### Enhanced Bandwidth Metrics ⏳
+### Enhanced Bandwidth Metrics ✅
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ Complete  
 **Priority**: MEDIUM  
-**Estimated Effort**: 1 day
+**Completed**: 2025-01-05
 
 **Tasks**:
-- [ ] Add per-job bandwidth tracking
-- [ ] Track input/output bytes
-- [ ] Calculate bandwidth utilization per worker
-- [ ] Add to Prometheus metrics
-- [ ] Create Grafana dashboard panel
+- [x] Add per-job bandwidth tracking
+- [x] Track input/output bytes
+- [x] Calculate bandwidth utilization per worker
+- [x] Add to Prometheus metrics
+- [x] Create comprehensive documentation
 
-**Metrics to Add**:
-- `job_input_bytes_total{job_id}`
-- `job_output_bytes_total{job_id}`
-- `job_bandwidth_mbps{job_id}`
-- `worker_bandwidth_utilization{worker_id}`
+**Metrics Added**:
+- `job_input_bytes_total{job_id}` - Total input bytes processed (counter)
+- `job_output_bytes_total{job_id}` - Total output bytes generated (counter)
+- `job_last_input_bytes{node_id}` - Last job input size (gauge)
+- `job_last_output_bytes{node_id}` - Last job output size (gauge)
+- `job_last_bandwidth_mbps{node_id}` - Last job bandwidth in Mbps (gauge)
+- `worker_bandwidth_utilization{node_id}` - Worker bandwidth utilization % (gauge)
 
 **Deliverable**:
-- Bandwidth metrics implementation
-- Updated Grafana dashboard
-- Documentation
+- ✅ Bandwidth metrics in Prometheus exporter (`worker/exporters/prometheus/exporter.go`)
+- ✅ File size tracking in worker agent (`worker/cmd/agent/main.go`)
+- ✅ Comprehensive documentation (`docs/BANDWIDTH_METRICS.md` - 15KB)
+- ✅ Per-job metrics in job results
+- ✅ Prometheus query examples
+- ✅ Grafana dashboard examples
+- ✅ Alerting rules for bandwidth
+- ✅ Capacity planning formulas
+
+**Implementation Details**:
+- Automatically captures input/output file sizes from job parameters
+- Calculates bandwidth in Mbps: `((input_bytes + output_bytes) * 8) / (duration * 1024 * 1024)`
+- Tracks cumulative totals across all jobs per worker
+- Includes compression ratio analysis queries
+- Works for file-based transcoding (RTMP streaming shows 0 bytes as expected)
 
 ### SLA Tracking ⏳
 

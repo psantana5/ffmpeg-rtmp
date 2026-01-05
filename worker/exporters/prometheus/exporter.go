@@ -42,6 +42,14 @@ type WorkerExporter struct {
 	nvencAvailable  bool
 	qsvAvailable    bool
 	vaapiAvailable  bool
+	
+	// Bandwidth metrics
+	totalInputBytesProcessed   int64
+	totalOutputBytesGenerated  int64
+	lastJobInputBytes          int64
+	lastJobOutputBytes         int64
+	lastJobBandwidthMbps       float64
+	workerBandwidthUtilization float64
 }
 
 // NewWorkerExporter creates a new Prometheus exporter for worker
@@ -151,6 +159,31 @@ func (e *WorkerExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		vaapiValue = 1
 	}
 	fmt.Fprintf(w, "ffrtmp_worker_vaapi_available{node_id=\"%s\"} %d\n", e.nodeID, vaapiValue)
+	
+	// Bandwidth metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_job_input_bytes_total Total bytes read from input files across all jobs\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_job_input_bytes_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_job_input_bytes_total{node_id=\"%s\"} %d\n", e.nodeID, e.totalInputBytesProcessed)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_job_output_bytes_total Total bytes written to output files across all jobs\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_job_output_bytes_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_job_output_bytes_total{node_id=\"%s\"} %d\n", e.nodeID, e.totalOutputBytesGenerated)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_job_last_input_bytes Size of input file from last completed job\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_job_last_input_bytes gauge\n")
+	fmt.Fprintf(w, "ffrtmp_job_last_input_bytes{node_id=\"%s\"} %d\n", e.nodeID, e.lastJobInputBytes)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_job_last_output_bytes Size of output file from last completed job\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_job_last_output_bytes gauge\n")
+	fmt.Fprintf(w, "ffrtmp_job_last_output_bytes{node_id=\"%s\"} %d\n", e.nodeID, e.lastJobOutputBytes)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_job_last_bandwidth_mbps Bandwidth utilization for last completed job in Mbps\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_job_last_bandwidth_mbps gauge\n")
+	fmt.Fprintf(w, "ffrtmp_job_last_bandwidth_mbps{node_id=\"%s\"} %.2f\n", e.nodeID, e.lastJobBandwidthMbps)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_bandwidth_utilization Worker overall bandwidth utilization as percentage (0-100)\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_bandwidth_utilization gauge\n")
+	fmt.Fprintf(w, "ffrtmp_worker_bandwidth_utilization{node_id=\"%s\"} %.2f\n", e.nodeID, e.workerBandwidthUtilization)
 }
 
 // updateMetrics updates hardware metrics
@@ -259,4 +292,46 @@ func (e *WorkerExporter) SetEncoderAvailability(nvenc, qsv, vaapi bool) {
 	e.nvencAvailable = nvenc
 	e.qsvAvailable = qsv
 	e.vaapiAvailable = vaapi
+}
+
+// RecordJobBandwidth records bandwidth metrics for a completed job
+// inputBytes: size of input file in bytes
+// outputBytes: size of output file in bytes
+// durationSeconds: job execution duration
+func (e *WorkerExporter) RecordJobBandwidth(inputBytes, outputBytes int64, durationSeconds float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	
+	// Update totals
+	e.totalInputBytesProcessed += inputBytes
+	e.totalOutputBytesGenerated += outputBytes
+	
+	// Update last job metrics
+	e.lastJobInputBytes = inputBytes
+	e.lastJobOutputBytes = outputBytes
+	
+	// Calculate bandwidth in Mbps (total bytes processed / duration)
+	if durationSeconds > 0 {
+		totalBytes := inputBytes + outputBytes
+		bytesPerSecond := float64(totalBytes) / durationSeconds
+		e.lastJobBandwidthMbps = (bytesPerSecond * 8) / (1024 * 1024) // Convert to Mbps
+	} else {
+		e.lastJobBandwidthMbps = 0
+	}
+	
+	// Update worker bandwidth utilization (simplified metric)
+	// This is a percentage based on recent activity
+	// For now, we'll use the last job bandwidth as an indicator
+	// In production, you might want to use a moving average
+	e.workerBandwidthUtilization = e.lastJobBandwidthMbps / 10.0 // Normalize to 0-100 scale (assuming 100Mbps baseline)
+	if e.workerBandwidthUtilization > 100 {
+		e.workerBandwidthUtilization = 100
+	}
+}
+
+// GetTotalBandwidthBytes returns total input + output bytes processed
+func (e *WorkerExporter) GetTotalBandwidthBytes() int64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.totalInputBytesProcessed + e.totalOutputBytesGenerated
 }

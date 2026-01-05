@@ -200,6 +200,43 @@ Every job supports configurable resource limits to ensure system stability:
 
 **3. Disk Space Monitoring**
 - Pre-job disk space validation
+- Reject jobs at 95% disk usage
+- Warn at 90% disk usage
+- Always enforced (no root required)
+
+**4. Timeout Enforcement**
+- Per-job timeout configuration
+- Context-based cancellation
+- SIGTERM → SIGKILL escalation
+- Process group cleanup
+
+**5. Process Priority**
+- Nice value = 10 (lower priority than system services)
+- Prevents worker from impacting other services
+- Always enforced (no root required)
+
+**6. Bandwidth Tracking** 🆕
+- Per-job input/output file size tracking
+- Real-time bandwidth utilization metrics (Mbps)
+- Cumulative bandwidth statistics per worker
+- Compression ratio analysis
+- Capacity planning support
+
+### Monitoring & Metrics
+
+**Prometheus Metrics Endpoint**: `http://worker:9091/metrics`
+
+Available metrics include:
+- **Resource Usage**: CPU, memory, GPU utilization
+- **Job Metrics**: Active jobs, completion rate, latency
+- **Hardware**: GPU power, temperature (NVIDIA)
+- **Encoder Availability**: NVENC, QSV, VAAPI runtime validation
+- **Bandwidth**: Input/output bytes, bandwidth utilization (Mbps) 🆕
+
+See [docs/BANDWIDTH_METRICS.md](docs/BANDWIDTH_METRICS.md) for bandwidth tracking details.
+
+**3. Disk Space Monitoring**
+- Pre-job disk space validation
 - Reject jobs if < 5% disk space available
 - Warning alerts at 90% disk usage
 - Automatic cleanup of temporary files

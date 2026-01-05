@@ -536,6 +536,21 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 
 	// Execute the actual job with the selected engine
 	log.Println("\n>>> TRANSCODING EXECUTION PHASE <<<")
+	
+	// Get input file path for bandwidth tracking
+	var inputFilePath string
+	if job.Parameters != nil {
+		if input, ok := job.Parameters["input"].(string); ok {
+			inputFilePath = input
+		}
+	}
+	
+	// Get input file size before execution
+	inputFileSize := getFileSize(inputFilePath)
+	if inputFileSize > 0 {
+		log.Printf("Input file size: %.2f MB", float64(inputFileSize)/(1024*1024))
+	}
+	
 	metrics, analyzerOutput, executionLogs, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt, limits)
 	
 	// Cleanup generated input if needed
@@ -587,6 +602,35 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		metrics["input_generation_duration_sec"] = inputGenResult.GenerationTime
 		metrics["input_file_size_bytes"] = inputGenResult.FileSizeBytes
 		metrics["input_encoder_used"] = inputGenResult.EncoderUsed
+	}
+	
+	// Track bandwidth metrics
+	var outputFilePath string
+	if job.Parameters != nil {
+		if output, ok := job.Parameters["output"].(string); ok {
+			outputFilePath = output
+		}
+	}
+	
+	// Get file sizes and record bandwidth
+	inputBandwidthSize := getFileSize(inputFilePath)
+	outputFileSize := getFileSize(outputFilePath)
+	
+	if inputBandwidthSize > 0 || outputFileSize > 0 {
+		// Record bandwidth metrics
+		metricsExporter.RecordJobBandwidth(inputBandwidthSize, outputFileSize, duration)
+		
+		// Add to job metrics
+		metrics["input_file_bytes"] = inputBandwidthSize
+		metrics["output_file_bytes"] = outputFileSize
+		if duration > 0 {
+			totalBytes := inputBandwidthSize + outputFileSize
+			bandwidthMbps := (float64(totalBytes) * 8) / (duration * 1024 * 1024)
+			metrics["bandwidth_mbps"] = bandwidthMbps
+		}
+		
+		log.Printf("Bandwidth tracking: input=%.2f MB, output=%.2f MB", 
+			float64(inputBandwidthSize)/(1024*1024), float64(outputFileSize)/(1024*1024))
 	}
 
 	log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
@@ -811,6 +855,18 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 	}
 
 	return metrics, analyzerOutput, logBuffer.String(), nil
+}
+
+// getFileSize safely gets the size of a file in bytes
+func getFileSize(filePath string) int64 {
+	if filePath == "" {
+		return 0
+	}
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return 0
+	}
+	return fileInfo.Size()
 }
 
 // executeFFmpegJob executes an FFmpeg transcoding job based on job parameters
