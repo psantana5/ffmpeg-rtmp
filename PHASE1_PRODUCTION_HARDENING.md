@@ -492,17 +492,42 @@ Systematic hardening of the FFmpeg-RTMP distributed system for production deploy
 - [ ] Test concurrent job execution
 - [ ] Test job cancellation during execution
 
-### Runbooks ⏳
+### Runbooks ✅
 
-**Status**: ⏳ Not Started  
-**Priority**: MEDIUM
+**Status**: ✅ Complete  
+**Priority**: MEDIUM  
+**Completed**: 2026-01-05
 
 **Tasks**:
-- [ ] Create `docs/RUNBOOKS.md`
-- [ ] Common issues and solutions
-- [ ] Performance troubleshooting
-- [ ] Database issues
-- [ ] Worker connectivity problems
+- [x] Create `docs/RUNBOOKS.md`
+- [x] Common issues and solutions
+- [x] Performance troubleshooting
+- [x] Database issues
+- [x] Worker connectivity problems
+- [x] Alert response procedures
+- [x] Network troubleshooting
+- [x] Capacity management
+
+**Deliverable**:
+- ✅ `docs/RUNBOOKS.md` (14KB) - Comprehensive operational runbook
+  - Quick reference commands
+  - Common issues (6 major categories)
+  - Alert response procedures (critical/warning)
+  - Performance troubleshooting (CPU, memory, I/O)
+  - Database troubleshooting (locks, size, queries)
+  - Worker problems (crashes, not picking up jobs)
+  - Network issues (latency, bandwidth)
+  - Capacity management (formulas, scaling guidelines)
+
+**Runbook Sections**:
+1. Quick Reference - Common commands and emergency procedures
+2. Common Issues - Master not responding, workers not registering, stuck jobs, high failure rate, SLA issues
+3. Alert Response - P1/P2 alert handling procedures
+4. Performance Troubleshooting - Slow execution, high CPU, memory issues
+5. Database Issues - Locks, size management, query performance
+6. Worker Problems - Crashes, job pickup issues
+7. Network Issues - Latency, bandwidth saturation
+8. Capacity Management - Prediction formulas, scaling guidelines
 
 ---
 
