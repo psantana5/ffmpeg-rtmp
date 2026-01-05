@@ -76,7 +76,8 @@ func (c *Client) Register(reg *models.NodeRegistration) (*models.Node, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	// Accept both 201 (new registration) and 200 (re-registration)
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("registration failed with status %d: %s", resp.StatusCode, string(body))
 	}
@@ -87,6 +88,13 @@ func (c *Client) Register(reg *models.NodeRegistration) (*models.Node, error) {
 	}
 
 	c.nodeID = node.ID
+	
+	// Log re-registration vs new registration
+	if resp.StatusCode == http.StatusOK {
+		// Re-registration (existing node)
+		return &node, nil
+	}
+	// New registration
 	return &node, nil
 }
 

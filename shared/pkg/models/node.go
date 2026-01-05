@@ -16,6 +16,7 @@ const (
 // Node represents a compute node in the distributed system
 type Node struct {
 	ID               string            `json:"id"`
+	TenantID         string            `json:"tenant_id"`        // Tenant/organization ID
 	Name             string            `json:"name"`             // Human-friendly node name (hostname)
 	TenantID         string            `json:"tenant_id,omitempty"` // Tenant/organization ID
 	Address          string            `json:"address"`

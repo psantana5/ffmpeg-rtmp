@@ -270,9 +270,15 @@ func main() {
 			log.Fatalf("Failed to register with master: %v", err)
 		}
 
+		// Check if this was a re-registration (node already existed)
 		log.Printf("✓ Registered successfully!")
 		log.Printf("  Node ID: %s", node.ID)
+		log.Printf("  Node Name: %s", node.Name)
 		log.Printf("  Status: %s", node.Status)
+		if node.RegisteredAt.Before(time.Now().Add(-1 * time.Minute)) {
+			// Node was registered more than 1 minute ago - this is a re-registration
+			log.Printf("  Note: Reconnected to existing registration (registered at: %s)", node.RegisteredAt.Format(time.RFC3339))
+		}
 	} else {
 		log.Println("Running in standalone mode (no registration)")
 		log.Println("Use --register flag to register with master node")
