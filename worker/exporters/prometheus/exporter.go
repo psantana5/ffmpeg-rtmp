@@ -50,14 +50,22 @@ type WorkerExporter struct {
 	lastJobOutputBytes         int64
 	lastJobBandwidthMbps       float64
 	workerBandwidthUtilization float64
+	
+	// SLA tracking metrics
+	jobsCompletedTotal         int64
+	jobsFailedTotal            int64
+	jobsSLACompliant           int64   // Jobs completed within SLA targets
+	jobsSLAViolation           int64   // Jobs that violated SLA
+	currentSLAComplianceRate   float64 // Percentage (0-100)
 }
 
 // NewWorkerExporter creates a new Prometheus exporter for worker
 func NewWorkerExporter(nodeID string, hasGPU bool) *WorkerExporter {
 	return &WorkerExporter{
-		nodeID:    nodeID,
-		startTime: time.Now(),
-		hasGPU:    hasGPU,
+		nodeID:                 nodeID,
+		startTime:              time.Now(),
+		hasGPU:                 hasGPU,
+		currentSLAComplianceRate: 100.0, // Start at 100% compliance
 	}
 }
 
@@ -184,6 +192,27 @@ func (e *WorkerExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_bandwidth_utilization Worker overall bandwidth utilization as percentage (0-100)\n")
 	fmt.Fprintf(w, "# TYPE ffrtmp_worker_bandwidth_utilization gauge\n")
 	fmt.Fprintf(w, "ffrtmp_worker_bandwidth_utilization{node_id=\"%s\"} %.2f\n", e.nodeID, e.workerBandwidthUtilization)
+	
+	// SLA tracking metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_completed_total Total number of jobs completed successfully\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_completed_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_completed_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsCompletedTotal)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_failed_total Total number of jobs that failed\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_failed_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_failed_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsFailedTotal)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_sla_compliant_total Total number of jobs completed within SLA targets\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_sla_compliant_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_sla_compliant_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsSLACompliant)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_sla_violation_total Total number of jobs that violated SLA targets\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_sla_violation_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_jobs_sla_violation_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsSLAViolation)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_sla_compliance_rate Current SLA compliance rate as percentage (0-100)\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_sla_compliance_rate gauge\n")
+	fmt.Fprintf(w, "ffrtmp_worker_sla_compliance_rate{node_id=\"%s\"} %.2f\n", e.nodeID, e.currentSLAComplianceRate)
 }
 
 // updateMetrics updates hardware metrics
@@ -334,4 +363,60 @@ func (e *WorkerExporter) GetTotalBandwidthBytes() int64 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.totalInputBytesProcessed + e.totalOutputBytesGenerated
+}
+
+// SLATarget defines SLA targets for job execution
+type SLATarget struct {
+	MaxDurationSeconds float64 // Maximum duration for job to be SLA-compliant
+	MaxFailureRate     float64 // Maximum failure rate (0-1) for SLA compliance
+}
+
+// GetDefaultSLATarget returns default SLA targets
+// These can be overridden per-scenario or configured globally
+func GetDefaultSLATarget() SLATarget {
+	return SLATarget{
+		MaxDurationSeconds: 600,  // 10 minutes default
+		MaxFailureRate:     0.05, // 5% failure rate
+	}
+}
+
+// RecordJobCompletion records a completed job and tracks SLA compliance
+func (e *WorkerExporter) RecordJobCompletion(durationSeconds float64, failed bool, slaTarget SLATarget) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	
+	if failed {
+		e.jobsFailedTotal++
+	} else {
+		e.jobsCompletedTotal++
+		
+		// Check SLA compliance (only for successful jobs)
+		if durationSeconds <= slaTarget.MaxDurationSeconds {
+			e.jobsSLACompliant++
+		} else {
+			e.jobsSLAViolation++
+		}
+	}
+	
+	// Calculate current SLA compliance rate
+	totalSLAEligibleJobs := e.jobsSLACompliant + e.jobsSLAViolation
+	if totalSLAEligibleJobs > 0 {
+		e.currentSLAComplianceRate = (float64(e.jobsSLACompliant) / float64(totalSLAEligibleJobs)) * 100
+	} else {
+		e.currentSLAComplianceRate = 100.0 // No jobs yet = 100% compliance
+	}
+}
+
+// GetSLAComplianceRate returns current SLA compliance rate
+func (e *WorkerExporter) GetSLAComplianceRate() float64 {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.currentSLAComplianceRate
+}
+
+// GetJobCompletionStats returns job completion statistics
+func (e *WorkerExporter) GetJobCompletionStats() (completed, failed, slaCompliant, slaViolation int64) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.jobsCompletedTotal, e.jobsFailedTotal, e.jobsSLACompliant, e.jobsSLAViolation
 }

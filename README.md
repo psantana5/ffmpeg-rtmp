@@ -222,18 +222,29 @@ Every job supports configurable resource limits to ensure system stability:
 - Compression ratio analysis
 - Capacity planning support
 
+**7. SLA Tracking** 🆕
+- Automatic SLA compliance monitoring (default: 10 min per job)
+- Success vs failure rate tracking
+- Per-worker SLA compliance percentage
+- Real-time SLA status in job logs
+- Trend analysis and alerting
+
 ### Monitoring & Metrics
 
 **Prometheus Metrics Endpoint**: `http://worker:9091/metrics`
 
 Available metrics include:
 - **Resource Usage**: CPU, memory, GPU utilization
-- **Job Metrics**: Active jobs, completion rate, latency
+- **Job Metrics**: Active jobs, completion rate, latency, success/failure counts
 - **Hardware**: GPU power, temperature (NVIDIA)
 - **Encoder Availability**: NVENC, QSV, VAAPI runtime validation
 - **Bandwidth**: Input/output bytes, bandwidth utilization (Mbps) 🆕
+- **SLA Tracking**: Compliance rate, SLA violations, job completion stats 🆕
 
-See [docs/BANDWIDTH_METRICS.md](docs/BANDWIDTH_METRICS.md) for bandwidth tracking details.
+**Documentation:**
+- [Bandwidth Metrics Guide](docs/BANDWIDTH_METRICS.md) - Bandwidth tracking and capacity planning
+- [SLA Tracking Guide](docs/SLA_TRACKING.md) - Service level agreement monitoring
+- [Alerting Guide](docs/ALERTING.md) - Prometheus alerts and notification setup
 
 **3. Disk Space Monitoring**
 - Pre-job disk space validation

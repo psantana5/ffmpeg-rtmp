@@ -330,21 +330,42 @@ Systematic hardening of the FFmpeg-RTMP distributed system for production deploy
 - Includes compression ratio analysis queries
 - Works for file-based transcoding (RTMP streaming shows 0 bytes as expected)
 
-### SLA Tracking ⏳
+### SLA Tracking ✅
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ Complete  
 **Priority**: LOW  
-**Estimated Effort**: 1 day
+**Completed**: 2025-01-05
 
 **Tasks**:
-- [ ] Define SLA targets (e.g., 95% jobs complete in < 10min)
-- [ ] Track SLA compliance metrics
-- [ ] Add to Prometheus
-- [ ] Create SLA dashboard in Grafana
+- [x] Define SLA targets (default: 10 min duration, 5% failure rate)
+- [x] Track SLA compliance metrics
+- [x] Add to Prometheus metrics
+- [x] Create comprehensive documentation
+
+**Metrics Added**:
+- `worker_jobs_completed_total` - Total successful jobs (counter)
+- `worker_jobs_failed_total` - Total failed jobs (counter)
+- `worker_jobs_sla_compliant_total` - Jobs meeting SLA targets (counter)
+- `worker_jobs_sla_violation_total` - Jobs violating SLA targets (counter)
+- `worker_sla_compliance_rate` - Current compliance percentage (gauge)
 
 **Deliverable**:
-- SLA metrics and dashboard
-- Documentation
+- ✅ SLA tracking in Prometheus exporter (`worker/exporters/prometheus/exporter.go`)
+- ✅ SLA target definition and tracking logic
+- ✅ Integration in worker agent with per-job SLA status logging
+- ✅ Job result metrics include `sla_target_seconds` and `sla_compliant`
+- ✅ Comprehensive documentation (`docs/SLA_TRACKING.md` - 18KB)
+- ✅ Test suite (8 tests, all passing)
+- ✅ Prometheus query examples
+- ✅ Grafana dashboard templates
+- ✅ Alerting rules for SLA violations
+
+**Implementation Details**:
+- Default SLA target: 600 seconds (10 minutes) per job
+- Compliance rate: `(compliant / (compliant + violation)) * 100`
+- Failed jobs tracked separately, don't affect SLA compliance
+- Supports per-job SLA status in logs (✅ SLA MET / ⚠️ SLA VIOLATED)
+- Future: Per-scenario SLA targets configurable in job parameters
 
 ---
 

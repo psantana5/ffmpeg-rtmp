@@ -569,7 +569,14 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	
 	duration := time.Since(startTime).Seconds()
 	
+	// Determine SLA target for this job
+	slaTarget := prometheus.GetDefaultSLATarget()
+	// TODO: In future, allow per-scenario SLA targets from job.Parameters
+	
 	if err != nil {
+		// Record failed job for SLA tracking
+		metricsExporter.RecordJobCompletion(duration, true, slaTarget)
+		
 		log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
 		log.Printf("║ ❌ JOB FAILED: %s", job.ID)
 		log.Printf("║ Error: %v", err)
@@ -596,6 +603,10 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	metrics["duration"] = duration
 	metrics["scenario"] = job.Scenario
 	metrics["engine"] = selectedEngine.Name()
+	
+	// Add SLA tracking to metrics
+	metrics["sla_target_seconds"] = slaTarget.MaxDurationSeconds
+	metrics["sla_compliant"] = duration <= slaTarget.MaxDurationSeconds
 	
 	// Add input generation metrics if applicable
 	if inputGenResult != nil {
@@ -632,10 +643,21 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		log.Printf("Bandwidth tracking: input=%.2f MB, output=%.2f MB", 
 			float64(inputBandwidthSize)/(1024*1024), float64(outputFileSize)/(1024*1024))
 	}
+	
+	// Record successful job completion for SLA tracking
+	metricsExporter.RecordJobCompletion(duration, false, slaTarget)
+	
+	// Check if job met SLA and log it
+	slaStatus := "✅ SLA MET"
+	if duration > slaTarget.MaxDurationSeconds {
+		slaStatus = "⚠️  SLA VIOLATED"
+	}
 
 	log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
 	log.Printf("║ ✅ JOB COMPLETED: %s", job.ID)
 	log.Printf("║ Total Duration: %.2f seconds", duration)
+	log.Printf("║ SLA Target: %.0f seconds", slaTarget.MaxDurationSeconds)
+	log.Printf("║ SLA Status: %s", slaStatus)
 	log.Printf("║ Engine Used: %s", selectedEngine.Name())
 	if inputGenResult != nil {
 		log.Printf("║ Input Generation: %.2f seconds", inputGenResult.GenerationTime)
