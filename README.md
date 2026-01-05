@@ -113,7 +113,7 @@ See [deployment/README.md](deployment/README.md) for systemd service templates a
 
 ---
 
-## 🔬 Quick Start (Development - Local Testing Mode)
+## Quick Start (Development - Local Testing Mode)
 
 For **development and local testing only**, you can use Docker Compose to run all components on a single machine.
 
@@ -286,10 +286,16 @@ See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detai
 
 ## Documentation
 
-Documentation organized by topic:
+**NEW: [Complete Documentation Guide](docs/README.md)** - Comprehensive reference with architecture, configuration, API, security, and troubleshooting
+
+### Quick Reference
+- **[Configuration Tool](docs/CONFIGURATION_TOOL.md)** - Hardware-aware worker configuration recommendations
+- **[Concurrent Jobs Guide](CONCURRENT_JOBS_IMPLEMENTATION.md)** - Parallel job processing implementation
+- **[Job Launcher Script](scripts/LAUNCH_JOBS_README.md)** - Production-grade batch job submission
+- **[Deployment Success Report](DEPLOYMENT_SUCCESS.md)** - Real-world production deployment results
 
 ### Deployment & Operations
-- **[Dual Engine Support](docs/DUAL_ENGINE_SUPPORT.md)** - ⚡ NEW: FFmpeg + GStreamer engine selection guide
+- **[Dual Engine Support](docs/DUAL_ENGINE_SUPPORT.md)** - FFmpeg + GStreamer engine selection guide
 - **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
 - **[Deployment Modes](shared/docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
 - **[Internal Architecture](shared/docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
@@ -304,7 +310,7 @@ Documentation organized by topic:
 
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
-- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - 🚀 Quick commands for deploying exporters without Docker
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Quick commands for deploying exporters without Docker
 - **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
 - **[Master Exporters Manual Deployment](master/exporters/README.md)** - Running master exporters without Docker
 - **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
