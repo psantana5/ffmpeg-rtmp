@@ -1051,9 +1051,10 @@
   "schemaVersion": 36,
   "style": "dark",
   "tags": [
-    "distributed",
-    "job-scheduling",
-    "master"
+    "jobs",
+    "scheduler",
+    "queue",
+    "production"
   ],
   "templating": {
     "list": []
@@ -1064,7 +1065,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Distributed Job Scheduler",
-  "uid": "distributed-scheduler",
+  "title": "Job Scheduler & Queue Management",
+  "uid": "job-scheduler",
   "version": 1
 }

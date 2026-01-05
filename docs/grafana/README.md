@@ -1,139 +1,246 @@
-# Grafana Dashboard - FFmpeg-RTMP Production Monitoring
+# Grafana Dashboards - FFmpeg-RTMP Monitoring
 
-**IMPORTANT: Dashboards are now automatically deployed!**  
-See [AUTOMATED_DEPLOYMENT.md](AUTOMATED_DEPLOYMENT.md) for complete guide.
+## Overview
+
+Consolidated Grafana dashboards for comprehensive system monitoring. Dashboards are **automatically provisioned** when starting the stack with docker-compose.
 
 ## Quick Start
 
 ```bash
-# Start stack (dashboards auto-load)
+# Start entire stack (Grafana + dashboards auto-load)
 docker-compose up -d
 
-# Verify deployment
-./scripts/deploy-grafana-dashboards.sh
+# Or use deployment script
+./full-stack-deploy.sh
 
 # Access Grafana
-open http://localhost:3000  # admin/admin
-
-# Production Dashboard:
-# http://localhost:3000/d/ffmpeg-rtmp-prod/ffmpeg-rtmp-production-monitoring
+http://localhost:3000  # admin/admin
 ```
 
-## Overview
+## Dashboard Structure (6 Dashboards)
 
-This directory contains Grafana dashboards that are **automatically provisioned** when you start the system with docker-compose.
+### 1. Production Monitoring (`ffmpeg-rtmp-prod`)
+**Primary operational dashboard** - Start here for system health overview
 
-### Available Dashboards
+**Panels (12):**
+- SLA Compliance Rate (95% target)
+- Job Success Rate (90% target) 
+- Bandwidth Usage (MB/s per worker)
+- Active Jobs count
+- Exporter Health Status ← NEW
+- SLA Compliance Trend
+- Job Completion Rates (success/fail/cancel)
+- CPU Usage by Worker
+- Memory Usage by Worker
+- Worker Bandwidth Utilization %
+- Cancellation Stats (graceful vs forceful)
+- Top 10 SLA Violations
 
-1. **Production Monitoring** (`production-monitoring.json`) - NEW!
-   - 11 comprehensive panels covering Phase 1 metrics
-   - SLA compliance, job success rate, bandwidth, resources
-   - Auto-loaded at: `/d/ffmpeg-rtmp-prod/`
+**URL:** http://localhost:3000/d/ffmpeg-rtmp-prod/
 
-2. **Worker Monitoring** (`worker-monitoring.json`)
-   - Worker-specific resource tracking
-   - CPU, memory, GPU utilization
+### 2. Job Scheduler & Queue Management (`job-scheduler`)
+**Detailed scheduler and queue monitoring** - Use for job flow analysis
 
-3. **Distributed Scheduler** (`distributed-scheduler.json`)
-   - Job queue and scheduling metrics
-   - Worker assignments and load balancing
+**Panels (16):**
+- Active Jobs, Queue Length
+- Jobs by State, Priority, Type
+- Job Duration distribution
+- Scheduling Attempts
+- Worker Node Status
+- Engine Preference vs Usage
+- Scheduler Bandwidth tracking
+- Request/Response Size distribution
 
-## No Manual Import Required!
+**URL:** http://localhost:3000/d/job-scheduler/
 
-❌ **OLD WAY** (manual import):
-- Download JSON
-- Open Grafana UI
-- Import > Upload JSON file
-- Configure datasource
-- Save
+### 3. Worker Node Monitoring (`worker-monitoring`)
+**Individual worker deep-dive** - Use for worker troubleshooting
 
-✅ **NEW WAY** (automatic):
-- `docker-compose up -d`
-- Dashboards appear automatically
-- Zero configuration needed
+**Panels (8):**
+- Worker CPU Usage
+- Worker GPU Usage
+- Worker Memory Usage
+- Active Jobs per Worker
+- GPU Temperature
+- GPU Power Consumption
+- Worker Heartbeat Rate
+- GPU Availability
+
+**URL:** http://localhost:3000/d/worker-monitoring/
+
+### 4. Quality & Performance Metrics (`quality-metrics`)
+**Quality scores and scenario results** - Consolidated QoE + Results
+
+**Panels (11):**
+- VMAF Quality Score
+- PSNR Quality Score
+- SSIM Quality Score
+- Quality per Watt Efficiency
+- QoE Efficiency Score
+- Frame Drop Rate
+- Total Scenarios
+- Scenario Duration
+- Average FPS
+- Frame Statistics
+- Quality Scores by Scenario
+
+**URL:** http://localhost:3000/d/quality-metrics/
+
+### 5. Cost Analysis (`cost-analysis`)
+**Financial tracking** - Cost per scenario, energy costs
+
+**Panels (5):**
+- Total Cost by Scenario
+- Current Cost by Scenario
+- Cost Breakdown: Energy vs Compute
+- Cost Efficiency: Cost per Pixel
+- Cost per Viewer Watch Hour
+
+**URL:** http://localhost:3000/d/cost-analysis/
+
+### 6. ML Predictions (`ml-predictions`)
+**Machine learning predictions** - Model predictions and confidence
+
+**Panels (12):**
+- Predicted VMAF, PSNR
+- Predicted Cost (USD)
+- Predicted CO2 Emissions
+- Prediction Confidence
+- Recommended Bitrate
+- Model Version, Status
+- Time Since Last Model Update
+- Prediction Summary Table
+- Historical vs Predicted VMAF
+- Training Drift Indicator
+
+**URL:** http://localhost:3000/d/ml-predictions/
 
 ## How It Works
 
-Grafana automatically loads dashboards from:
-```
-master/monitoring/grafana/provisioning/dashboards/*.json
-```
+Dashboards are automatically loaded via Grafana provisioning:
 
-This directory is mounted into the Grafana container via docker-compose:
 ```yaml
-volumes:
-  - ./master/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+# docker-compose.yml
+grafana:
+  volumes:
+    - ./master/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
 ```
 
-See [AUTOMATED_DEPLOYMENT.md](AUTOMATED_DEPLOYMENT.md) for full details on:
-- Architecture
-- Adding new dashboards
-- Updating existing dashboards
-- Troubleshooting
-- Production deployment
+Grafana scans `/etc/grafana/provisioning/dashboards/*.json` on startup and loads all dashboards automatically.
 
-## Dashboard Files
+## Datasource
 
-Dashboard JSON files are stored at:
-- `master/monitoring/grafana/provisioning/dashboards/production-monitoring.json`
-- Old location: `docs/grafana/ffmpeg-rtmp-complete-dashboard.json` (deprecated)
+**VictoriaMetrics** (Prometheus-compatible) - Auto-configured
+- **URL:** http://victoriametrics:8428
+- **UID:** DS_VICTORIAMETRICS
+- No manual setup required
 
-## Migration from Old Dashboard
+## Adding/Updating Dashboards
 
-If you previously manually imported the old dashboard:
+1. **Edit JSON file:**
+   ```bash
+   vim master/monitoring/grafana/provisioning/dashboards/production-monitoring.json
+   ```
 
-1. Delete old dashboard from Grafana UI
-2. Restart Grafana: `docker restart grafana`
-3. New production dashboard will auto-load
-4. Access at: http://localhost:3000/d/ffmpeg-rtmp-prod/
+2. **Validate JSON:**
+   ```bash
+   python3 -m json.tool production-monitoring.json > /dev/null && echo "Valid"
+   ```
 
-## Datasource Configuration
+3. **Reload Grafana:**
+   ```bash
+   docker restart grafana
+   ```
 
-VictoriaMetrics datasource is automatically configured:
-- **Name**: VictoriaMetrics
-- **UID**: DS_VICTORIAMETRICS
-- **URL**: http://victoriametrics:8428
-- **Default**: Yes
+## Dashboard Guidelines
 
-No manual datasource setup required.
+### When to Use Each Dashboard
 
-## Documentation
+- **Production Monitoring**: Daily operations, on-call monitoring, SLA tracking
+- **Job Scheduler**: Debugging queue issues, analyzing job distribution
+- **Worker Monitoring**: Worker performance issues, GPU problems
+- **Quality Metrics**: Quality analysis, scenario comparisons
+- **Cost Analysis**: Financial reporting, cost optimization
+- **ML Predictions**: Model performance, prediction accuracy
 
-- **[AUTOMATED_DEPLOYMENT.md](AUTOMATED_DEPLOYMENT.md)** - Complete deployment guide
-- **[Production Monitoring Dashboard](../../master/monitoring/grafana/provisioning/dashboards/production-monitoring.json)** - Dashboard JSON
+### Dashboard Organization
+
+**Operational (Daily Use):**
+- Production Monitoring ← Primary
+- Job Scheduler
+- Worker Monitoring
+
+**Analytical (Periodic Review):**
+- Quality Metrics
+- Cost Analysis
+- ML Predictions
 
 ## Troubleshooting
 
 **Dashboard not appearing?**
 ```bash
-# Run automated deployment script
-./scripts/deploy-grafana-dashboards.sh
+# Check container
+docker ps | grep grafana
+
+# Check logs
+docker logs grafana | grep -i dashboard
+
+# Restart stack
+docker-compose restart grafana
 ```
 
 **No data in panels?**
 ```bash
-# Check workers are exporting metrics
+# Check worker metrics
 curl http://localhost:9091/metrics
 
-# Check VictoriaMetrics receiving data
+# Check VictoriaMetrics
 curl http://localhost:8428/api/v1/query?query=up
 ```
 
-**Need to update dashboard?**
+**Dashboard changes not reflected?**
 ```bash
-# Edit JSON file
-vim master/monitoring/grafana/provisioning/dashboards/production-monitoring.json
-
-# Restart Grafana
-docker restart grafana
+# Hard restart
+docker-compose down
+docker-compose up -d
 ```
 
-For detailed troubleshooting, see [AUTOMATED_DEPLOYMENT.md](AUTOMATED_DEPLOYMENT.md#troubleshooting).
+## Consolidation Changes
 
-## Old Manual Import Instructions (Deprecated)
+**Removed (consolidated into other dashboards):**
+- ❌ scheduler-jobs → Merged into job-scheduler
+- ❌ qoe-metrics + results-overview → Merged into quality-metrics
+- ❌ exporter-health → Integrated into production-monitoring
+- ❌ production-scheduler → Deleted (empty)
 
-The old `ffmpeg-rtmp-complete-dashboard.json` in this directory is **deprecated**.  
-Use the automatically provisioned dashboards instead.
+**Before:** 10 dashboards with overlap  
+**After:** 6 dashboards, clear purpose, no duplication
 
-If you need the old dashboard for reference, it's still available at:
-`docs/grafana/ffmpeg-rtmp-complete-dashboard.json`
+## Files
+
+Dashboard JSON files:
+```
+master/monitoring/grafana/provisioning/dashboards/
+├── production-monitoring.json  (12 panels, 28K)
+├── job-scheduler.json          (16 panels, 24K)
+├── worker-monitoring.json      (8 panels, 16K)
+├── quality-metrics.json        (11 panels, 24K)
+├── cost-analysis.json          (5 panels, 12K)
+└── ml-predictions.json         (12 panels, 32K)
+```
+
+Provisioning config:
+```
+master/monitoring/grafana/provisioning/
+├── datasources/
+│   └── prometheus.yml          (VictoriaMetrics)
+└── dashboards/
+    ├── default.yml             (Dashboard provider)
+    └── *.json                  (Dashboard files)
+```
+
+## References
+
+- **docker-compose.yml** - Grafana service configuration
+- **full-stack-deploy.sh** - Complete deployment script
+- **VictoriaMetrics UI** - http://localhost:8428/vmui
