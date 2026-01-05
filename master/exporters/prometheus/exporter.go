@@ -1,11 +1,14 @@
 package prometheus
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
+	promclient "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
@@ -36,6 +39,7 @@ func NewMasterExporter(s store.Store, bw *bandwidth.BandwidthMonitor) *MasterExp
 
 // ServeHTTP serves Prometheus-compatible metrics at /metrics
 func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// First, write our custom metrics
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 
 	// Collect current state
@@ -213,7 +217,7 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ffrtmp_jobs_completed_by_engine{engine=\"%s\"} %d\n", engine, completedByEngine[engine])
 	}
 	
-	// Bandwidth metrics (if monitor is available)
+	// Bandwidth metrics (simple aggregated totals for backward compatibility)
 	if e.bandwidthMonitor != nil {
 		stats := e.bandwidthMonitor.GetStats()
 		
@@ -239,6 +243,40 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "scheduler_http_response_size_bytes_avg %.2f\n", avgRespSize)
 		}
 	}
+	
+	// Now append the Prometheus-registered metrics (from bandwidth monitor)
+	// This includes the detailed metrics with labels and histograms
+	fmt.Fprintf(w, "\n")
+	
+	// Gather metrics from Prometheus default registry
+	metricFamilies, err := promclient.DefaultGatherer.Gather()
+	if err != nil {
+		// Log error but don't fail the request
+		fmt.Fprintf(w, "# Error gathering Prometheus metrics: %v\n", err)
+		return
+	}
+	
+	// Write Prometheus metrics using text encoder
+	var buf bytes.Buffer
+	encoder := expfmt.NewEncoder(&buf, expfmt.FmtText)
+	for _, mf := range metricFamilies {
+		// Skip metrics we've already written manually (to avoid duplicates)
+		if mf.GetName() == "scheduler_http_bandwidth_bytes_total" || 
+		   mf.GetName() == "scheduler_http_requests_total" ||
+		   mf.GetName() == "scheduler_http_request_size_bytes_avg" ||
+		   mf.GetName() == "scheduler_http_response_size_bytes_avg" {
+			continue
+		}
+		
+		// Write metric family
+		if err := encoder.Encode(mf); err != nil {
+			// Log error but continue
+			fmt.Fprintf(w, "# Error encoding metric %s: %v\n", mf.GetName(), err)
+		}
+	}
+	
+	// Write the buffer to response
+	w.Write(buf.Bytes())
 }
 
 // RecordScheduleAttempt records a scheduling attempt

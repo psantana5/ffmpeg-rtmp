@@ -154,14 +154,12 @@ TotalRequests      int64
 
 // GetStats returns current bandwidth statistics
 func (bm *BandwidthMonitor) GetStats() BandwidthStats {
-bm.mu.RLock()
-defer bm.mu.RUnlock()
+	bm.mu.RLock()
+	defer bm.mu.RUnlock()
 
-// We need to track these in the middleware
-// For now, return zeros - we'll update the middleware next
-return BandwidthStats{
-TotalBytesReceived: 0,
-TotalBytesSent:     0,
-TotalRequests:      0,
-}
+	return BandwidthStats{
+		TotalBytesReceived: bm.totalBytesReceived,
+		TotalBytesSent:     bm.totalBytesSent,
+		TotalRequests:      bm.totalRequests,
+	}
 }
