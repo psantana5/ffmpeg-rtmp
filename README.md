@@ -37,31 +37,30 @@ The **recommended way** to deploy for production workloads is **Distributed Comp
 
 ### Prerequisites
 
-- **Go 1.21+** (for building binaries)
-- Python 3.10+ (for agent analysis scripts)
+- **Go 1.24+** (for building binaries)
+- Python 3.10+ (optional, for analysis scripts)
 - FFmpeg (for transcoding)
 - Linux with kernel 4.15+ (for RAPL power monitoring)
 
 ### Deploy Master Node
 
 ```bash
-# Clone, build and run the required parts of the stack
+# Clone and build
 git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
-docker compose up -d nginx-rtmp
 make build-master
 
-# Set API key (required for production)
+# Set API key (recommended for production)
 export MASTER_API_KEY=$(openssl rand -base64 32)
 
-# Start master service with production defaults
-# TLS enabled (auto-generates cert)
-# SQLite persistence (master.db)
-# Job retry (3 attempts)
-# Prometheus metrics (:9090)
-./bin/master --port 8080 &
+# Start master service
+# - TLS enabled by default (auto-generates self-signed cert)
+# - SQLite persistence (master.db)
+# - Job retry (3 attempts default)
+# - Prometheus metrics on port 9090
+./bin/master --port 8080 --api-key "$MASTER_API_KEY"
 
-# Start monitoring stack (VictoriaMetrics + Grafana)
+# Optional: Start monitoring stack (VictoriaMetrics + Grafana)
 make vm-up-build
 ```
 
@@ -76,36 +75,54 @@ make build-agent
 # Set same API key as master
 export MASTER_API_KEY="<same-key-as-master>"
 
-# Generate a test video file
-ffmpeg -y -f lavfi -i testsrc2=size=3840x2160:rate=60 -t 30 -c:v libx264 -preset veryfast -crf 18 /tmp/test_input.mp4
+# Get optimal configuration for this hardware
+./bin/ffrtmp config recommend --environment production
 
-# Register and start agent (uses HTTPS with TLS)
-./bin/agent --register --master https://MASTER_IP:8080 --api-key "$MASTER_API_KEY"
+# Register and start agent
+# Recommended: Use hardware-appropriate concurrency settings
+./bin/agent \
+  --register \
+  --master https://MASTER_IP:8080 \
+  --api-key "$MASTER_API_KEY" \
+  --max-concurrent-jobs 4 \
+  --poll-interval 3s \
+  --insecure-skip-verify
+  
+# Note: --insecure-skip-verify only needed for self-signed certs
+# For production with proper TLS, use --ca flag instead
 ```
 
-### Submit and Run Job
+### Submit and Run Jobs
 
 ```bash
-# Submit job to master (requires API key)
+# Using CLI tool (recommended)
+./bin/ffrtmp jobs submit \
+  --master https://MASTER_IP:8080 \
+  --scenario 1080p-h264 \
+  --bitrate 5M \
+  --duration 300
+
+# Using curl (for automation)
 curl -X POST https://MASTER_IP:8080/jobs \
   -H "Authorization: Bearer $MASTER_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "scenario": "1080p-test",
+    "scenario": "1080p-h264",
     "confidence": "auto",
-    "parameters": {"duration": 300, "bitrate": "5000k"}
+    "parameters": {"duration": 300, "bitrate": "5M"}
   }'
 
-# Agent automatically picks up and executes job
+# Agent automatically picks up and executes jobs
 # Failed jobs auto-retry up to 3 times
+# Monitor progress at https://MASTER_IP:8080/jobs
 ```
 
 ### Access Dashboards
 
-- **Grafana**: http://MASTER_IP:3000 (admin/admin)
-- **VictoriaMetrics**: http://MASTER_IP:8428
 - **Master API**: https://MASTER_IP:8080/nodes (view registered nodes)
 - **Prometheus Metrics**: http://MASTER_IP:9090/metrics
+- **Grafana** (if enabled): http://MASTER_IP:3000 (admin/admin)
+- **VictoriaMetrics** (if enabled): http://MASTER_IP:8428
 
 ### Production Deployment with Systemd
 
@@ -139,11 +156,13 @@ make up-build
 ### Run Local Test
 
 ```bash
-# Build the CLI tool first
-go build -o bin/ffrtmp ./cmd/ffrtmp
+# Build the CLI tool
+make build-cli
 
-# Run a simple transcoding job
-./bin/ffrtmp jobs submit --scenario "test1" --bitrate 2000k --duration 60
+# Submit jobs with different configurations
+./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120 --engine auto
+./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60 --engine ffmpeg
+./bin/ffrtmp jobs submit --scenario 720p30-h264 --bitrate 2M --duration 60 --engine gstreamer
 
 # View dashboards at http://localhost:3000
 ```
@@ -155,18 +174,21 @@ go build -o bin/ffrtmp ./cmd/ffrtmp
 - **[Master Exporters Guide](master/exporters/README.md)** - Detailed Python exporter deployment
 - **[Worker Exporters Guide](worker/exporters/DEPLOYMENT.md)** - Detailed Go exporter deployment
 
-## What's New: Production-Ready v2.2
+## What's New: Production-Ready v2.3
 
-**Distributed mode now production-ready with enterprise features:**
+**Latest enhancements for distributed transcoding:**
 
+- **Concurrent Job Processing** - Workers can process multiple jobs simultaneously with `--max-concurrent-jobs`
+- **Hardware-Aware Configuration** - Built-in tool recommends optimal settings: `ffrtmp config recommend`
+- **Production Job Launcher** - Batch submit 1000s of jobs with `scripts/launch_jobs.sh`
 - **TLS/HTTPS** - Enabled by default with auto-generated certificates
-- **API Authentication** - Required via `MASTER_API_KEY` environment variable
-- **SQLite Persistence** - Default storage, survives restarts
-- **Automatic Job Retry** - Failed jobs retry up to 3 times
+- **API Authentication** - Secure via `MASTER_API_KEY` environment variable
+- **SQLite Persistence** - Jobs survive restarts with master.db
+- **Automatic Job Retry** - Failed jobs retry up to 3 times with exponential backoff
 - **Prometheus Metrics** - Built-in metrics endpoint on port 9090
-- **Structured Logging** - Production-grade logging support
+- **Dual Engine Support** - Choose between FFmpeg and GStreamer based on workload
 
-See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for complete feature guide.
+See [docs/README.md](docs/README.md) for comprehensive documentation.
 
 ## NEW: Enterprise-Grade Fault Tolerance
 
@@ -202,16 +224,26 @@ See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for
     --scenario live-4k \
     --queue live \
     --priority high \
-    --duration 3600
+    --duration 3600 \
+    --engine gstreamer
 
-# Configure fault tolerance
+# Configure master with custom settings
 ./bin/master \
+    --port 8080 \
     --max-retries 5 \
     --scheduler-interval 10s \
+    --api-key "$MASTER_API_KEY"
+    
+# Configure agent with optimal concurrency
+./bin/ffrtmp config recommend --environment production
+./bin/agent \
+    --master https://MASTER_IP:8080 \
+    --max-concurrent-jobs 4 \
+    --poll-interval 3s \
     --heartbeat-interval 30s
 ```
 
-**See [docs/PRODUCTION.md](docs/PRODUCTION.md) for complete production deployment guide.**
+See [docs/README.md](docs/README.md) for complete production deployment guide.
 
 ## Dual Transcoding Engine Support
 
@@ -224,11 +256,11 @@ See [shared/docs/PRODUCTION_FEATURES.md](shared/docs/PRODUCTION_FEATURES.md) for
 
 ```bash
 # Auto-select best engine (default)
-ffrtmp jobs submit --scenario live-stream --engine auto
+./bin/ffrtmp jobs submit --scenario live-stream --engine auto
 
 # Force specific engine
-ffrtmp jobs submit --scenario transcode --engine ffmpeg
-ffrtmp jobs submit --scenario live-rtmp --engine gstreamer
+./bin/ffrtmp jobs submit --scenario transcode --engine ffmpeg
+./bin/ffrtmp jobs submit --scenario live-rtmp --engine gstreamer
 ```
 
 **Auto-selection logic:**
@@ -325,11 +357,23 @@ See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detai
 # Build binaries
 make build-master          # Build master node binary
 make build-agent           # Build compute agent binary
-make build-distributed     # Build both
+make build-cli             # Build ffrtmp CLI tool
+make build-distributed     # Build all
+
+# Get hardware-aware configuration recommendations
+./bin/ffrtmp config recommend --environment production --output text
 
 # Run services
-./bin/master --port 8080                        # Start master
-./bin/agent --register --master http://MASTER_IP:8080  # Start agent
+./bin/master --port 8080 --api-key "$MASTER_API_KEY"
+./bin/agent --register --master https://MASTER_IP:8080 \
+  --api-key "$MASTER_API_KEY" \
+  --max-concurrent-jobs 4 \
+  --insecure-skip-verify
+
+# Submit jobs using CLI
+./bin/ffrtmp jobs submit --scenario 1080p-h264 --bitrate 5M --duration 300
+./bin/ffrtmp jobs status <job-id>
+./bin/ffrtmp nodes list
 
 # Production with systemd
 sudo systemctl start ffmpeg-master    # Start master service
@@ -337,10 +381,11 @@ sudo systemctl start ffmpeg-agent     # Start agent service
 sudo systemctl status ffmpeg-master   # Check status
 
 # Monitor
-curl http://localhost:8080/nodes      # List registered agents
-curl http://localhost:8080/jobs       # List jobs
-journalctl -u ffmpeg-master -f        # View master logs
-journalctl -u ffmpeg-agent -f         # View agent logs
+curl -k https://localhost:8080/nodes      # List registered agents
+curl -k https://localhost:8080/jobs       # List jobs
+curl http://localhost:9090/metrics        # Prometheus metrics
+journalctl -u ffmpeg-master -f            # View master logs
+journalctl -u ffmpeg-agent -f             # View agent logs
 ```
 
 ### Local Testing Mode (Development)
@@ -370,13 +415,23 @@ make test                  # Run test suite
 Run long-duration benchmarks across multiple compute nodes:
 
 ```bash
-# Submit multiple jobs to master
-curl -X POST http://master:8080/jobs -H "Content-Type: application/json" -d '{
-  "scenario": "4K-h265", "confidence": "auto",
-  "parameters": {"duration": 3600, "bitrate": "15000k"}
-}'
+# Submit multiple jobs using CLI
+./bin/ffrtmp jobs submit --scenario 4K-h265 --bitrate 15M --duration 3600
+./bin/ffrtmp jobs submit --scenario 1080p-h264 --bitrate 5M --duration 1800
+./bin/ffrtmp jobs submit --scenario 720p-vp9 --bitrate 2M --duration 900
+
+# Or submit in batch using curl with authentication
+curl -X POST https://master:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario": "4K-h265",
+    "confidence": "auto",
+    "parameters": {"duration": 3600, "bitrate": "15M"}
+  }'
 
 # Agents automatically pick up and execute jobs in parallel
+# Monitor at https://master:8080/jobs
 # View results in Grafana at http://master:3000
 ```
 
@@ -388,10 +443,16 @@ Use local testing mode to iterate quickly:
 # Start local stack
 make up-build
 
+# Build CLI tool
+make build-cli
+
 # Submit multiple test jobs with different configurations
-ffrtmp jobs submit --scenario "4K60-h264" --bitrate 10M --duration 120
-ffrtmp jobs submit --scenario "1080p60-h265" --bitrate 5M --duration 60
-ffrtmp jobs submit --scenario "720p30-h264" --bitrate 2M --duration 60
+./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120 --engine auto
+./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60 --engine ffmpeg
+./bin/ffrtmp jobs submit --scenario 720p30-vp9 --bitrate 2M --duration 60 --engine gstreamer
+
+# Monitor job status
+./bin/ffrtmp jobs status <job-id>
 
 # Analyze results and get recommendations
 python3 scripts/analyze_results.py
@@ -405,14 +466,14 @@ Submit jobs to test different codecs:
 
 ```bash
 # H.264 tests
-ffrtmp jobs submit --scenario "4K60-h264" --bitrate 10M --duration 120
-ffrtmp jobs submit --scenario "1080p60-h264" --bitrate 5M --duration 60
+./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120
+./bin/ffrtmp jobs submit --scenario 1080p60-h264 --bitrate 5M --duration 60
 
 # H.265 tests
-ffrtmp jobs submit --scenario "4K60-h265" --bitrate 10M --duration 120
-ffrtmp jobs submit --scenario "1080p60-h265" --bitrate 5M --duration 60
+./bin/ffrtmp jobs submit --scenario 4K60-h265 --bitrate 10M --duration 120
+./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60
 
-# Compare results in Grafana dashboards
+# Compare results in Grafana dashboards at http://localhost:3000
 ```
 
 ### Production: Continuous CI/CD Benchmarking
@@ -421,7 +482,10 @@ Deploy distributed mode with agents on your build servers:
 
 ```bash
 # CI/CD pipeline submits jobs to master after each release
-curl -X POST http://master:8080/jobs -d @benchmark_config.json
+curl -X POST https://master:8080/jobs \
+  -H "Authorization: Bearer $MASTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @benchmark_config.json
 
 # Results automatically aggregated and visualized
 # Alerts fire if performance regressions detected
@@ -443,7 +507,7 @@ See [LICENSE](LICENSE) file for details.
 - [Full Documentation](shared/docs/)
 - [Scripts Documentation](shared/scripts/README.md)
 
-## 🧪 Testing
+## Testing
 
 The project includes comprehensive test coverage for critical components:
 
@@ -471,16 +535,17 @@ go tool cover -html=coverage.out
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for testing guidelines.
 
-## 📚 Documentation
+## Documentation
 
 Core documentation has been streamlined for clarity:
 
+- **[docs/README.md](docs/README.md)** - Complete system documentation (NEW)
+- **[docs/CONFIGURATION_TOOL.md](docs/CONFIGURATION_TOOL.md)** - Hardware-aware config tool
+- **[CONCURRENT_JOBS_IMPLEMENTATION.md](CONCURRENT_JOBS_IMPLEMENTATION.md)** - Parallel processing guide
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System design and architecture
-- **[docs/API.md](docs/API.md)** - Complete API reference
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
-- **[docs/SECURITY.md](docs/SECURITY.md)** - Security best practices
 - **[docs/LOCAL_STACK_GUIDE.md](docs/LOCAL_STACK_GUIDE.md)** - Local development setup
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
