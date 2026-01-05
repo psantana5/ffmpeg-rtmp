@@ -118,16 +118,14 @@ func (e *GStreamerEngine) BuildCommand(job *models.Job, hostURL string) ([]strin
 		
 		// Add duration limiter for file inputs
 		if duration > 0 {
-			//Calculate number of buffers based on framerate assumption (30fps default)
-			// This caps the video at specified duration
-			numBuffers := duration * 30
+			// Use videorate to control framerate and identity for buffer management
+			// Duration is controlled by timeout in main.go executor
 			pipeline = append(pipeline,
-				"identity", fmt.Sprintf("drop-allocation=true"), "!",
+				"identity", "drop-allocation=true", "!",
 				"videorate", "!",
 				"video/x-raw,framerate=30/1", "!",
-				"identity", fmt.Sprintf("num-buffers=%d", numBuffers), "!",
 			)
-			log.Printf("→ File input: limiting to %d buffers (%d seconds at 30fps)", numBuffers, duration)
+			log.Printf("→ File input: framerate set to 30fps, duration %d seconds (controlled by timeout)", duration)
 		} else {
 			log.Printf("→ File input: no duration limit, will process entire file")
 		}
