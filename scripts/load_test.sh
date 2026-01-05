@@ -280,6 +280,7 @@ submit_jobs() {
         local response=$(curl -sk -X POST "$MASTER_URL/jobs" \
             -H "Authorization: Bearer $MASTER_API_KEY" \
             -H "Content-Type: application/json" \
+            -w "\nHTTP_CODE:%{http_code}" \
             -d "{
                 \"scenario\": \"$scenario\",
                 \"confidence\": \"auto\",
@@ -293,14 +294,19 @@ submit_jobs() {
         local submit_end=$(date +%s%N)
         local submit_latency_ms=$(( (submit_end - submit_start) / 1000000 ))
         
-        if echo "$response" | jq -e '.id' &> /dev/null; then
-            local job_id=$(echo "$response" | jq -r '.id')
+        # Extract HTTP code and body
+        local http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
+        local body=$(echo "$response" | grep -v "HTTP_CODE:")
+        
+        if echo "$body" | jq -e '.id' &> /dev/null 2>&1; then
+            local job_id=$(echo "$body" | jq -r '.id')
             job_ids+=("$job_id")
             ((submitted++))
             echo "$(date -Iseconds)|SUCCESS|$job_id|$submit_latency_ms|$scenario" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
         else
             ((failed++))
-            echo "$(date -Iseconds)|FAILED|N/A|$submit_latency_ms|$scenario|$response" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
+            local error_msg=$(echo "$body" | tr '\n' ' ' | head -c 100)
+            echo "$(date -Iseconds)|FAILED|N/A|$submit_latency_ms|$scenario|HTTP:$http_code|$error_msg" >> "$RESULTS_DIR/${TEST_NAME}_submissions.log"
         fi
         
         # Progress indicator
@@ -326,65 +332,58 @@ submit_jobs() {
     
     # Save job IDs
     printf '%s\n' "${job_ids[@]}" > "$RESULTS_DIR/${TEST_NAME}_job_ids.txt"
-    
-    echo "$submitted|$failed|$total_time|$actual_rate"
 }
 
 # Monitor progress
 monitor_progress() {
     local total_jobs=$1
     local start_time=$(date +%s)
-    local monitoring_pid=""
     
-    log_info "Monitoring job completion (press Ctrl+C to stop monitoring)..."
+    log_info "Monitoring job completion (checking every ${MONITOR_INTERVAL}s)..."
     
-    # Start background monitoring
-    (
-        while true; do
-            local completed=0
-            local processing=0
-            local queued=0
-            local failed=0
-            
-            if [[ -n "$MASTER_API_KEY" ]]; then
-                local metrics=$(curl -sk "$MASTER_URL/jobs" \
-                    -H "Authorization: Bearer $MASTER_API_KEY" 2>/dev/null | \
-                    jq -r '
-                        group_by(.status) | 
-                        map({status: .[0].status, count: length}) | 
-                        from_entries
-                    ' 2>/dev/null || echo "{}")
-                
-                completed=$(echo "$metrics" | jq -r '.completed // 0')
-                processing=$(echo "$metrics" | jq -r '.processing // 0')
-                queued=$(echo "$metrics" | jq -r '.queued // 0')
-                failed=$(echo "$metrics" | jq -r '.failed // 0')
-            fi
-            
-            local elapsed=$(($(date +%s) - start_time))
-            local completion_rate=0
-            if [[ $elapsed -gt 0 ]]; then
-                completion_rate=$(awk "BEGIN {printf \"%.2f\", $completed / $elapsed}")
-            fi
-            
-            echo "$(date -Iseconds)|$completed|$processing|$queued|$failed|$elapsed|$completion_rate" \
-                >> "$RESULTS_DIR/${TEST_NAME}_progress.log"
-            
-            echo -ne "\rCompleted: $completed/$total_jobs | Processing: $processing | Queued: $queued | Failed: $failed | Rate: $completion_rate jobs/sec     "
-            
-            # Check if all jobs are done
-            local total_done=$((completed + failed))
-            if [[ $total_done -ge $total_jobs ]]; then
-                break
-            fi
-            
-            sleep $MONITOR_INTERVAL
-        done
-    ) &
-    monitoring_pid=$!
+    # Initial delay to let jobs start
+    sleep 5
     
-    # Wait for monitoring to complete or user interrupt
-    wait $monitoring_pid 2>/dev/null || true
+    while true; do
+        local completed=0
+        local processing=0
+        local queued=0
+        local failed=0
+        
+        if [[ -n "$MASTER_API_KEY" ]]; then
+            local metrics=$(curl -sk "$MASTER_URL/jobs" \
+                -H "Authorization: Bearer $MASTER_API_KEY" 2>/dev/null | \
+                jq -r '
+                    group_by(.status) | 
+                    map({status: .[0].status, count: length}) | 
+                    from_entries
+                ' 2>/dev/null || echo "{}")
+            
+            completed=$(echo "$metrics" | jq -r '.completed // 0' 2>/dev/null || echo "0")
+            processing=$(echo "$metrics" | jq -r '.processing // 0' 2>/dev/null || echo "0")
+            queued=$(echo "$metrics" | jq -r '.queued // 0' 2>/dev/null || echo "0")
+            failed=$(echo "$metrics" | jq -r '.failed // 0' 2>/dev/null || echo "0")
+        fi
+        
+        local elapsed=$(($(date +%s) - start_time))
+        local completion_rate=0
+        if [[ $elapsed -gt 0 && $completed -gt 0 ]]; then
+            completion_rate=$(awk "BEGIN {printf \"%.2f\", $completed / $elapsed}")
+        fi
+        
+        echo "$(date -Iseconds)|$completed|$processing|$queued|$failed|$elapsed|$completion_rate" \
+            >> "$RESULTS_DIR/${TEST_NAME}_progress.log"
+        
+        echo -ne "\rCompleted: $completed/$total_jobs | Processing: $processing | Queued: $queued | Failed: $failed | Rate: $completion_rate jobs/sec     "
+        
+        # Check if all jobs are done - use proper integer comparison
+        local total_done=$((completed + failed))
+        if [[ $total_done -ge $total_jobs ]]; then
+            break
+        fi
+        
+        sleep $MONITOR_INTERVAL
+    done
     
     echo ""
     log_success "Monitoring complete"
@@ -581,12 +580,19 @@ main() {
     get_system_info
     get_baseline_metrics
     
-    # Submit jobs and capture results
-    local submit_results=$(submit_jobs)
-    local submitted=$(echo "$submit_results" | cut -d'|' -f1)
+    # Submit jobs
+    submit_jobs
+    
+    # Get number of submitted jobs from log
+    local submitted=$(grep -c "SUCCESS" "$RESULTS_DIR/${TEST_NAME}_submissions.log" 2>/dev/null || echo "0")
     
     # Monitor progress
-    monitor_progress "$submitted"
+    if [[ $submitted -gt 0 ]]; then
+        monitor_progress "$submitted"
+    else
+        log_error "No jobs were successfully submitted"
+        exit 1
+    fi
     
     # Collect final metrics
     collect_metrics
