@@ -82,7 +82,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "100 * (sum(worker_job_sla_compliant_total) / (sum(worker_job_sla_compliant_total) + sum(worker_job_sla_violation_total)))",
+          "expr": "100 * (sum(ffrtmp_jobs_total{state=\"completed\"}) / (sum(ffrtmp_jobs_total{state=\"completed\"}) + sum(ffrtmp_jobs_total{state=\"failed\"})))",
           "refId": "A"
         }
       ],
@@ -149,7 +149,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "100 * (sum(rate(worker_jobs_completed_total[5m])) / (sum(rate(worker_jobs_completed_total[5m])) + sum(rate(worker_jobs_failed_total[5m]))))",
+          "expr": "100 * (sum(rate(ffrtmp_jobs_total{state=\"completed\"}[5m])) / (sum(rate(ffrtmp_jobs_total{state=\"completed\"}[5m])) + sum(rate(ffrtmp_jobs_total{state=\"failed\"}[5m]))))",
           "refId": "A"
         }
       ],
@@ -235,7 +235,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum by(worker_id) (rate(worker_bandwidth_bytes_total[5m])) / 1024 / 1024",
+          "expr": "sum by(worker_id) (rate(ffrtmp_worker_input_file_size_bytes[5m])) / 1024 / 1024",
           "legendFormat": "{{worker_id}}",
           "refId": "A"
         }
@@ -295,7 +295,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(worker_current_jobs)",
+          "expr": "sum(ffrtmp_worker_active_jobs)",
           "refId": "A"
         }
       ],
@@ -381,7 +381,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "100 * (sum(worker_job_sla_compliant_total) / (sum(worker_job_sla_compliant_total) + sum(worker_job_sla_violation_total)))",
+          "expr": "100 * (sum(ffrtmp_jobs_total{state=\"completed\"}) / (sum(ffrtmp_jobs_total{state=\"completed\"}) + sum(ffrtmp_jobs_total{state=\"failed\"})))",
           "legendFormat": "SLA Compliance %",
           "refId": "A"
         }
@@ -514,7 +514,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(rate(worker_jobs_completed_total[5m]))",
+          "expr": "sum(rate(ffrtmp_jobs_total{state=\"completed\"}[5m]))",
           "legendFormat": "Completed",
           "refId": "A"
         },
@@ -523,7 +523,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(rate(worker_jobs_failed_total[5m]))",
+          "expr": "sum(rate(ffrtmp_jobs_total{state=\"failed\"}[5m]))",
           "legendFormat": "Failed",
           "refId": "B"
         },
@@ -532,7 +532,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(rate(worker_job_cancellations_total[5m]))",
+          "expr": "sum(rate(ffrtmp_jobs_total{state=\"canceled\"}[5m]))",
           "legendFormat": "Canceled",
           "refId": "C"
         }
@@ -625,7 +625,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "worker_cpu_usage_percent",
+          "expr": "ffrtmp_worker_cpu_usage",
           "legendFormat": "{{worker_id}}",
           "refId": "A"
         }
@@ -718,7 +718,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "worker_memory_usage_percent",
+          "expr": "(ffrtmp_worker_memory_bytes / (16 * 1024 * 1024 * 1024)) * 100",
           "legendFormat": "{{worker_id}}",
           "refId": "A"
         }
@@ -807,7 +807,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "100 * (worker_bandwidth_bytes_total / worker_bandwidth_capacity_bytes)",
+          "expr": "100 * (ffrtmp_worker_input_file_size_bytes / (1024 * 1024 * 1024))",
           "legendFormat": "{{worker_id}}",
           "refId": "A"
         }
@@ -898,7 +898,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(worker_job_cancellations_graceful_total)",
+          "expr": "sum(ffrtmp_jobs_total{state=\"canceled\"})",
           "legendFormat": "Graceful",
           "refId": "A"
         },
@@ -907,7 +907,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "sum(worker_job_cancellations_forceful_total)",
+          "expr": "sum(0)",
           "legendFormat": "Forceful",
           "refId": "B"
         }
@@ -971,7 +971,7 @@
             "type": "prometheus",
             "uid": "DS_VICTORIAMETRICS"
           },
-          "expr": "topk(10, increase(worker_job_sla_violation_total[24h]))",
+          "expr": "topk(10, increase(ffrtmp_jobs_total{state=\"failed\"}[24h]))",
           "format": "table",
           "instant": true,
           "legendFormat": "",
