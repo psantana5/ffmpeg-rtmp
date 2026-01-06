@@ -391,6 +391,107 @@
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
+            "axisLabel": "SLA %",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 3,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 95,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 12,
+        "y": 4
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "last",
+            "min",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "DS_VICTORIAMETRICS"
+          },
+          "expr": "100 * sum(ffrtmp_jobs_total{state=\"completed\"}) / (sum(ffrtmp_jobs_total{state=\"completed\"}) + sum(ffrtmp_jobs_total{state=\"failed\"}))",
+          "legendFormat": "SLA Compliance Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "SLA Compliance Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "DS_VICTORIAMETRICS"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -435,9 +536,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 12
       },
-      "id": 7,
+      "id": 8,
       "options": {
         "legend": {
           "calcs": [
@@ -551,9 +652,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 12
       },
-      "id": 8,
+      "id": 9,
       "options": {
         "legend": {
           "calcs": [
@@ -659,7 +760,7 @@
         "x": 0,
         "y": 12
       },
-      "id": 9,
+      "id": 10,
       "options": {
         "legend": {
           "calcs": [
@@ -758,7 +859,7 @@
         "x": 12,
         "y": 12
       },
-      "id": 10,
+      "id": 11,
       "options": {
         "legend": {
           "calcs": [
@@ -870,7 +971,7 @@
         "x": 0,
         "y": 20
       },
-      "id": 11,
+      "id": 12,
       "options": {
         "legend": {
           "calcs": [
@@ -960,7 +1061,7 @@
         "x": 12,
         "y": 20
       },
-      "id": 12,
+      "id": 13,
       "options": {
         "legend": {
           "calcs": [
@@ -1017,7 +1118,7 @@
         "x": 0,
         "y": 28
       },
-      "id": 13,
+      "id": 14,
       "options": {
         "displayLabels": [
           "percent"
@@ -1084,7 +1185,7 @@
         "x": 8,
         "y": 28
       },
-      "id": 14,
+      "id": 15,
       "options": {
         "displayLabels": [
           "percent"
@@ -1176,7 +1277,7 @@
         "x": 16,
         "y": 28
       },
-      "id": 15,
+      "id": 16,
       "options": {
         "cellHeight": "sm",
         "footer": {
