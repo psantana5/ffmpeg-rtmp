@@ -378,7 +378,13 @@ func (s *ProductionScheduler) findOrphanedJobsManually() ([]*models.Job, error) 
 
 // checkTimedOutJobs finds and handles jobs that exceeded their timeout
 func (s *ProductionScheduler) checkTimedOutJobs() {
-	timedOutJobs, err := s.storeExt().GetTimedOutJobs()
+	ext, err := s.storeExt()
+	if err != nil {
+		log.Printf("[Health] Store does not support extended operations: %v", err)
+		return
+	}
+	
+	timedOutJobs, err := ext.GetTimedOutJobs()
 	if err != nil {
 		log.Printf("[Health] Error checking timeouts: %v", err)
 		return
@@ -391,7 +397,7 @@ func (s *ProductionScheduler) checkTimedOutJobs() {
 		s.metrics.TimeoutCount++
 
 		// Transition to TIMED_OUT state
-		_, err := s.storeExt().TransitionJobState(
+		_, err := ext.TransitionJobState(
 			job.ID,
 			models.JobStatusTimedOut,
 			fmt.Sprintf("Exceeded timeout threshold (last activity: %v)", job.LastActivityAt),
@@ -407,7 +413,7 @@ func (s *ProductionScheduler) checkTimedOutJobs() {
 			s.scheduleRetry(job, "timeout")
 		} else {
 			// Max retries exceeded - mark as failed
-			s.storeExt().TransitionJobState(
+			ext.TransitionJobState(
 				job.ID,
 				models.JobStatusFailed,
 				fmt.Sprintf("Max retries exceeded after timeout (%d/%d)",
@@ -422,8 +428,14 @@ func (s *ProductionScheduler) recoverOrphanedJob(job *models.Job) {
 	log.Printf("[Cleanup] Recovering orphaned job %d from dead worker %s",
 		job.SequenceNumber, job.NodeID)
 
+	ext, err := s.storeExt()
+	if err != nil {
+		log.Printf("[Cleanup] Cannot recover job - store does not support extended operations: %v", err)
+		return
+	}
+
 	// First transition to RETRYING state
-	_, err := s.storeExt().TransitionJobState(
+	_, err = ext.TransitionJobState(
 		job.ID,
 		models.JobStatusRetrying,
 		fmt.Sprintf("Worker %s died mid-execution", job.NodeID),
@@ -440,12 +452,18 @@ func (s *ProductionScheduler) recoverOrphanedJob(job *models.Job) {
 
 // scheduleRetry schedules a job for retry with exponential backoff
 func (s *ProductionScheduler) scheduleRetry(job *models.Job, reason string) {
+	ext, err := s.storeExt()
+	if err != nil {
+		log.Printf("[Cleanup] Cannot schedule retry - store does not support extended operations: %v", err)
+		return
+	}
+	
 	// Check retry limit
 	if job.RetryCount >= s.config.RetryPolicy.MaxRetries {
 		log.Printf("[Cleanup] Job %d exceeded max retries (%d/%d)",
 			job.SequenceNumber, job.RetryCount, s.config.RetryPolicy.MaxRetries)
 
-		s.storeExt().TransitionJobState(
+		ext.TransitionJobState(
 			job.ID,
 			models.JobStatusFailed,
 			fmt.Sprintf("Max retries exceeded (%d/%d)", job.RetryCount, s.config.RetryPolicy.MaxRetries),
@@ -464,8 +482,7 @@ func (s *ProductionScheduler) scheduleRetry(job *models.Job, reason string) {
 
 	// Increment retry count and transition to QUEUED
 	// Use RetryJob if available, otherwise manual transition
-	err := s.store.RetryJob(job.ID, reason)
-	if err != nil {
+	if err = s.store.RetryJob(job.ID, reason); err != nil {
 		log.Printf("[Cleanup] Failed to retry job %s: %v", job.ID, err)
 		return
 	}
@@ -476,7 +493,13 @@ func (s *ProductionScheduler) scheduleRetry(job *models.Job, reason string) {
 
 // processRetryingJobs handles jobs in RETRYING state
 func (s *ProductionScheduler) processRetryingJobs() {
-	retryingJobs, err := s.storeExt().GetJobsInState(models.JobStatusRetrying)
+	ext, err := s.storeExt()
+	if err != nil {
+		log.Printf("[Cleanup] Store does not support extended operations: %v", err)
+		return
+	}
+	
+	retryingJobs, err := ext.GetJobsInState(models.JobStatusRetrying)
 	if err != nil {
 		log.Printf("[Cleanup] Error getting retrying jobs: %v", err)
 		return
@@ -484,7 +507,7 @@ func (s *ProductionScheduler) processRetryingJobs() {
 
 	for _, job := range retryingJobs {
 		// Transition from RETRYING → QUEUED
-		_, err := s.storeExt().TransitionJobState(
+		_, err := ext.TransitionJobState(
 			job.ID,
 			models.JobStatusQueued,
 			fmt.Sprintf("Retry attempt %d/%d", job.RetryCount, s.config.RetryPolicy.MaxRetries),
@@ -498,7 +521,12 @@ func (s *ProductionScheduler) processRetryingJobs() {
 
 // getQueuedJobsPrioritized returns queued jobs with priority+fairness ordering
 func (s *ProductionScheduler) getQueuedJobsPrioritized() ([]*models.Job, error) {
-	queuedJobs, err := s.storeExt().GetJobsInState(models.JobStatusQueued)
+	ext, err := s.storeExt()
+	if err != nil {
+		return nil, fmt.Errorf("store does not support extended operations: %w", err)
+	}
+	
+	queuedJobs, err := ext.GetJobsInState(models.JobStatusQueued)
 	if err != nil {
 		return nil, err
 	}
@@ -539,18 +567,24 @@ func (s *ProductionScheduler) GetMetrics() *SchedulerMetrics {
 	return s.metrics
 }
 
-// storeExt returns the store as ExtendedStore or panics
-func (s *ProductionScheduler) storeExt() ExtendedStore {
+// storeExt returns the store as ExtendedStore or returns an error
+func (s *ProductionScheduler) storeExt() (ExtendedStore, error) {
 	ext, ok := s.store.(ExtendedStore)
 	if !ok {
-		panic("Store does not implement ExtendedStore interface")
+		return nil, fmt.Errorf("store does not implement ExtendedStore interface")
 	}
-	return ext
+	return ext, nil
 }
 
 // rejectJob marks a job as rejected due to capability mismatch
 func (s *ProductionScheduler) rejectJob(job *models.Job, reason string) {
-	_, err := s.storeExt().TransitionJobState(
+	ext, err := s.storeExt()
+	if err != nil {
+		log.Printf("[Scheduler] Cannot reject job - store does not support extended operations: %v", err)
+		return
+	}
+	
+	_, err = ext.TransitionJobState(
 		job.ID,
 		models.JobStatusRejected,
 		reason,
