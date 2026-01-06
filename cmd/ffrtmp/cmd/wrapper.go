@@ -8,28 +8,25 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/psantana5/ffmpeg-rtmp/pkg/wrapper"
+	"github.com/psantana5/ffmpeg-rtmp/internal/cgroups"
+	"github.com/psantana5/ffmpeg-rtmp/internal/wrapper"
 	"github.com/spf13/cobra"
 )
 
 var (
-	// Common flags for run/attach
+	// Metadata
 	jobID       string
-	slaEligible bool
-	intent      string
 	
-	// Constraint flags
-	cpuQuota    int
+	// Constraints
+	cpuMax      string
 	cpuWeight   int
-	nicePriority int
-	memoryLimit int64
-	ioWeight    int
-	oomScore    int
+	memoryMax   int64
+	ioMax       string
 	
-	// Run mode specific
+	// Run mode
 	workDir string
 	
-	// Attach mode specific
+	// Attach mode
 	attachPID int
 	
 	// Output
@@ -38,39 +35,30 @@ var (
 
 var runCmd = &cobra.Command{
 	Use:   "run [flags] -- <command> [args...]",
-	Short: "Wrap and run a workload with OS-level constraints",
-	Long: `Run mode spawns a new workload process with OS-level governance applied.
+	Short: "Spawn workload with governance (non-owning)",
+	Long: `Run mode spawns a workload in its own process group.
+The workload continues running even if wrapper crashes.
 
-The workload process is started in its own process group and will continue
-running even if the wrapper crashes. This is a non-owning wrapper - it only
-governs HOW the OS executes the workload.
+This is governance, not execution.
 
 Example:
-  ffrtmp run --job-id job123 --sla-eligible --cpu-quota 200 -- ffmpeg -i input.mp4 output.mp4
-  ffrtmp run --intent test --nice 10 -- ./my-benchmark.sh
-  ffrtmp run --memory-limit 2048 -- python train.py`,
+  ffrtmp run --job-id job-001 -- ffmpeg -i input.mp4 output.mp4
+  ffrtmp run --job-id job-002 --cpu-max "200000 100000" -- python train.py`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runWorkload,
 }
 
 var attachCmd = &cobra.Command{
 	Use:   "attach --pid <PID>",
-	Short: "Attach to an already-running process",
-	Long: `Attach mode attaches to a process that is ALREADY running and applies
-OS-level governance. This is CRITICAL for adoption in edge environments where
-workloads already exist and cannot be restarted.
+	Short: "Attach to running process (passive observation)",
+	Long: `Attach mode attaches to an already-running process.
+CRITICAL for edge nodes receiving signals/streams from clients.
 
-The wrapper:
-- Moves the PID into a managed cgroup
-- Applies resource constraints
-- Starts passive observation
-- Does NOT restart or modify execution flow
-- Does NOT inject code
+No restart. No signals. Just observe.
 
 Example:
-  ffrtmp attach --pid 12345 --job-id job123 --sla-eligible
-  ffrtmp attach --pid 12345 --cpu-weight 50 --nice 10
-  ffrtmp attach --pid 12345 --memory-limit 4096`,
+  ffrtmp attach --pid 12345 --job-id job-001
+  ffrtmp attach --pid 12345 --cpu-weight 50`,
 	RunE: attachToWorkload,
 }
 
@@ -81,31 +69,22 @@ func init() {
 	// Common flags
 	for _, cmd := range []*cobra.Command{runCmd, attachCmd} {
 		cmd.Flags().StringVar(&jobID, "job-id", "", "Job identifier")
-		cmd.Flags().BoolVar(&slaEligible, "sla-eligible", false, "Mark workload as SLA-eligible")
-		cmd.Flags().StringVar(&intent, "intent", "production", "Workload intent (production|test|experiment|soak)")
-		
-		// Constraint flags
-		cmd.Flags().IntVar(&cpuQuota, "cpu-quota", 0, "CPU quota percentage (100=1 core, 200=2 cores, 0=unlimited)")
-		cmd.Flags().IntVar(&cpuWeight, "cpu-weight", 100, "CPU weight for proportional sharing (1-10000)")
-		cmd.Flags().IntVar(&nicePriority, "nice", 0, "Process nice priority (-20 to 19)")
-		cmd.Flags().Int64Var(&memoryLimit, "memory-limit", 0, "Memory limit in MB (0=unlimited)")
-		cmd.Flags().IntVar(&ioWeight, "io-weight", 0, "IO weight percentage (0-100, 0=no constraint)")
-		cmd.Flags().IntVar(&oomScore, "oom-score", 0, "OOM score adjustment (-1000 to 1000)")
-		
-		// Output
-		cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output report as JSON")
+		cmd.Flags().StringVar(&cpuMax, "cpu-max", "", "CPU max (quota period format, e.g. '200000 100000')")
+		cmd.Flags().IntVar(&cpuWeight, "cpu-weight", 100, "CPU weight (1-10000)")
+		cmd.Flags().Int64Var(&memoryMax, "memory-max", 0, "Memory limit in bytes (0=unlimited)")
+		cmd.Flags().StringVar(&ioMax, "io-max", "", "IO max (major:minor rbps=X wbps=Y)")
+		cmd.Flags().BoolVar(&jsonOutput, "json", false, "JSON output")
 	}
 	
-	// Run mode specific flags
-	runCmd.Flags().StringVar(&workDir, "workdir", "", "Working directory for the workload")
+	// Run mode flags
+	runCmd.Flags().StringVar(&workDir, "workdir", "", "Working directory")
 	
-	// Attach mode specific flags
-	attachCmd.Flags().IntVar(&attachPID, "pid", 0, "PID of the process to attach to")
+	// Attach mode flags
+	attachCmd.Flags().IntVar(&attachPID, "pid", 0, "PID to attach to")
 	attachCmd.MarkFlagRequired("pid")
 }
 
 func runWorkload(cmd *cobra.Command, args []string) error {
-	// Parse command and args
 	if len(args) == 0 {
 		return fmt.Errorf("no command specified")
 	}
@@ -113,27 +92,15 @@ func runWorkload(cmd *cobra.Command, args []string) error {
 	command := args[0]
 	cmdArgs := args[1:]
 	
-	// Build metadata
-	metadata := &wrapper.WorkloadMetadata{
-		JobID:       jobID,
-		SLAEligible: slaEligible,
-		Intent:      intent,
+	// Build limits
+	limits := &cgroups.Limits{
+		CPUMax:      cpuMax,
+		CPUWeight:   cpuWeight,
+		MemoryMax:   memoryMax,
+		IOMax:       ioMax,
 	}
 	
-	// Build constraints
-	constraints := &wrapper.Constraints{
-		CPUQuotaPercent: cpuQuota,
-		CPUWeight:       cpuWeight,
-		NicePriority:    nicePriority,
-		MemoryLimitMB:   memoryLimit,
-		IOWeightPercent: ioWeight,
-		OOMScoreAdj:     oomScore,
-	}
-	
-	// Create wrapper
-	w := wrapper.New(metadata, constraints)
-	
-	// Setup context with signal handling
+	// Setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	
@@ -142,20 +109,30 @@ func runWorkload(cmd *cobra.Command, args []string) error {
 	
 	go func() {
 		<-sigChan
-		fmt.Fprintf(os.Stderr, "\n[wrapper] Received signal, wrapper exiting (workload continues)...\n")
+		fmt.Fprintf(os.Stderr, "\nWrapper exiting (workload continues)...\n")
 		cancel()
 	}()
 	
-	// Run the workload
-	if err := w.Run(ctx, command, cmdArgs...); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running workload: %v\n", err)
+	// Run workload
+	result, err := wrapper.Run(ctx, jobID, limits, command, cmdArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 	
-	// Output report
+	// Output result
 	if jsonOutput {
-		return outputJSON(w)
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(result)
 	}
-	return w.WriteReport(os.Stdout)
+	
+	fmt.Printf("Job: %s\n", result.JobID)
+	fmt.Printf("PID: %d\n", result.PID)
+	fmt.Printf("Exit Code: %d\n", result.ExitCode)
+	fmt.Printf("Duration: %.2fs\n", result.Duration.Seconds())
+	fmt.Printf("Platform SLA: %v (%s)\n", result.PlatformSLA, result.PlatformSLAReason)
+	
+	return nil
 }
 
 func attachToWorkload(cmd *cobra.Command, args []string) error {
@@ -163,27 +140,15 @@ func attachToWorkload(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid PID: %d", attachPID)
 	}
 	
-	// Build metadata
-	metadata := &wrapper.WorkloadMetadata{
-		JobID:       jobID,
-		SLAEligible: slaEligible,
-		Intent:      intent,
+	// Build limits
+	limits := &cgroups.Limits{
+		CPUMax:      cpuMax,
+		CPUWeight:   cpuWeight,
+		MemoryMax:   memoryMax,
+		IOMax:       ioMax,
 	}
 	
-	// Build constraints
-	constraints := &wrapper.Constraints{
-		CPUQuotaPercent: cpuQuota,
-		CPUWeight:       cpuWeight,
-		NicePriority:    nicePriority,
-		MemoryLimitMB:   memoryLimit,
-		IOWeightPercent: ioWeight,
-		OOMScoreAdj:     oomScore,
-	}
-	
-	// Create wrapper
-	w := wrapper.New(metadata, constraints)
-	
-	// Setup context with signal handling
+	// Setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	
@@ -192,33 +157,28 @@ func attachToWorkload(cmd *cobra.Command, args []string) error {
 	
 	go func() {
 		<-sigChan
-		fmt.Fprintf(os.Stderr, "\n[wrapper] Received signal, detaching from workload...\n")
+		fmt.Fprintf(os.Stderr, "\nDetaching (workload continues)...\n")
 		cancel()
 	}()
 	
-	// Attach to the workload
-	fmt.Printf("[wrapper] Attaching to PID %d...\n", attachPID)
-	if err := w.Attach(ctx, attachPID); err != nil {
+	// Attach to workload
+	fmt.Printf("Attaching to PID %d...\n", attachPID)
+	result, err := wrapper.Attach(ctx, jobID, attachPID, limits)
+	if err != nil && err != context.Canceled {
 		return fmt.Errorf("failed to attach: %w", err)
 	}
 	
-	// Output report
+	// Output result
 	if jsonOutput {
-		return outputJSON(w)
-	}
-	return w.WriteReport(os.Stdout)
-}
-
-func outputJSON(w *wrapper.Wrapper) error {
-	report := map[string]interface{}{
-		"job_id":       w.GetEvents()[0].PID, // Simplified
-		"exit_code":    w.GetExitCode(),
-		"exit_reason":  string(w.GetExitReason()),
-		"duration_sec": w.GetDuration().Seconds(),
-		"events":       w.GetEvents(),
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(result)
 	}
 	
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(report)
+	fmt.Printf("Job: %s\n", result.JobID)
+	fmt.Printf("PID: %d\n", result.PID)
+	fmt.Printf("Duration: %.2fs\n", result.Duration.Seconds())
+	fmt.Printf("Platform SLA: %v (%s)\n", result.PlatformSLA, result.PlatformSLAReason)
+	
+	return nil
 }
