@@ -1,0 +1,47 @@
+[Unit]
+Description=FFmpeg-RTMP Edge Worker with Wrapper
+Documentation=https://github.com/yourusername/ffmpeg-rtmp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ffrtmp
+Group=ffrtmp
+WorkingDirectory=/opt/ffrtmp
+
+# Environment
+EnvironmentFile=/etc/ffrtmp/worker.env
+
+# Binary
+ExecStart=/opt/ffrtmp/bin/ffrtmp-worker \
+    --master-url=${MASTER_URL} \
+    --worker-id=${WORKER_ID} \
+    --capabilities=${CAPABILITIES} \
+    --max-jobs=${MAX_JOBS:-4} \
+    --heartbeat-interval=${HEARTBEAT_INTERVAL:-30s}
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/ffrtmp/streams /opt/ffrtmp/logs /var/log/ffrtmp
+
+# Resource limits (host-level defaults, wrapper provides per-job control)
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Cgroup delegation (CRITICAL for wrapper to work)
+# This allows the ffrtmp user to create sub-cgroups
+Delegate=yes
+
+[Install]
+WantedBy=multi-user.target
