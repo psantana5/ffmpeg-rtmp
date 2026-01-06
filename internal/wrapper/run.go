@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 	
 	"github.com/psantana5/ffmpeg-rtmp/internal/cgroups"
 	"github.com/psantana5/ffmpeg-rtmp/internal/observe"
@@ -55,23 +56,31 @@ func Run(ctx context.Context, jobID string, limits *cgroups.Limits, command stri
 	}()
 	
 	// Wait for completion
+	startTime := timing.Start
 	err := cmd.Wait()
-	timing.Complete()
+	endTime := time.Now()
 	
 	exitCode := 0
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			exitCode = exitErr.ExitCode()
-			report.Global().IncrFailed()
 		}
-	} else {
-		report.Global().IncrCompleted()
 	}
 	
-	result := report.NewResult(jobID, pid, exitCode, timing.Duration(), "run")
+	// Create immutable result (Layer 1 truth)
+	result := report.NewResult(jobID, pid, exitCode, startTime, endTime, "run")
 	
-	// Calculate SLA ONCE
+	// Calculate SLA ONCE (never update after this)
 	calculatePlatformSLA(result, exitCode)
+	
+	// Update all metrics from this single result (Layer 2)
+	report.Global().RecordResult(result)
+	
+	// Record violation if needed (killer feature)
+	report.GlobalViolations().Record(result)
+	
+	// Human-readable summary (Layer 3)
+	result.LogSummary()
 	
 	return result, nil
 }

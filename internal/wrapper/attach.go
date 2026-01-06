@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"time"
 	
 	"github.com/psantana5/ffmpeg-rtmp/internal/cgroups"
 	"github.com/psantana5/ffmpeg-rtmp/internal/observe"
@@ -19,7 +20,7 @@ import (
 // Attach attaches to an already-running process.
 // CRITICAL: No restart. No signals. Just observe.
 func Attach(ctx context.Context, jobID string, pid int, limits *cgroups.Limits) (*report.Result, error) {
-	report.Global().IncrAttached()
+	report.Global().IncrStarted()
 	
 	// Validate PID exists
 	if !pidExists(pid) {
@@ -44,6 +45,7 @@ func Attach(ctx context.Context, jobID string, pid int, limits *cgroups.Limits) 
 	
 	// Wait for process to exit (or context cancel)
 	done := make(chan struct{})
+	startTime := timing.Start
 	
 	go func() {
 		watcher.Wait()
@@ -54,16 +56,28 @@ func Attach(ctx context.Context, jobID string, pid int, limits *cgroups.Limits) 
 	select {
 	case <-ctx.Done():
 		// Wrapper told to stop, workload continues
-		timing.Complete()
-		result := report.NewResult(jobID, pid, -1, timing.Duration(), "attach")
+		endTime := time.Now()
+		result := report.NewResult(jobID, pid, -1, startTime, endTime, "attach")
 		result.SetPlatformSLA(true, "detached_workload_continues")
+		
+		// Record all visibility layers
+		report.Global().RecordResult(result)
+		report.GlobalViolations().Record(result)
+		result.LogSummary()
+		
 		return result, ctx.Err()
 		
 	case <-done:
 		// Process exited naturally
-		timing.Complete()
-		result := report.NewResult(jobID, pid, -1, timing.Duration(), "attach")
+		endTime := time.Now()
+		result := report.NewResult(jobID, pid, -1, startTime, endTime, "attach")
 		result.SetPlatformSLA(true, "observed_to_completion")
+		
+		// Record all visibility layers
+		report.Global().RecordResult(result)
+		report.GlobalViolations().Record(result)
+		result.LogSummary()
+		
 		return result, nil
 	}
 }

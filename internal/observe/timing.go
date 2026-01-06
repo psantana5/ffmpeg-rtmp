@@ -9,26 +9,26 @@ import "time"
 
 // Timing records start/end timestamps only
 type Timing struct {
-	StartedAt  time.Time
-	CompletedAt time.Time
+	Start time.Time // Exported for immutable result creation
+	End   time.Time // Exported for immutable result creation
 }
 
 // New creates timing with current start time
 func NewTiming() *Timing {
 	return &Timing{
-		StartedAt: time.Now(),
+		Start: time.Now(),
 	}
 }
 
 // Complete records completion time
 func (t *Timing) Complete() {
-	t.CompletedAt = time.Now()
+	t.End = time.Now()
 }
 
 // Duration returns execution duration
 func (t *Timing) Duration() time.Duration {
-	if t.CompletedAt.IsZero() {
-		return time.Since(t.StartedAt)
+	if t.End.IsZero() {
+		return time.Since(t.Start)
 	}
-	return t.CompletedAt.Sub(t.StartedAt)
+	return t.End.Sub(t.Start)
 }
