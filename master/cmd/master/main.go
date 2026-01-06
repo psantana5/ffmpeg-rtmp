@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -75,19 +76,19 @@ func main() {
 		apiKeySource = "command-line flag"
 	}
 
-	log.Println("Starting FFmpeg RTMP Distributed Master Node (Production Mode)")
-	log.Printf("Port: %s", *port)
-	log.Printf("Max Retries: %d", *maxRetries)
-	log.Printf("Metrics Enabled: %v", *enableMetrics)
+	logger.Info("Starting FFmpeg RTMP Distributed Master Node (Production Mode)")
+	logger.Info(fmt.Sprintf("Port: %s", *port))
+	logger.Info(fmt.Sprintf("Max Retries: %d", *maxRetries))
+	logger.Info(fmt.Sprintf("Metrics Enabled: %v", *enableMetrics))
 	if *enableMetrics {
-		log.Printf("Metrics Port: %s", *metricsPort)
+		logger.Info(fmt.Sprintf("Metrics Port: %s", *metricsPort))
 	}
 
 	// Generate self-signed certificate if requested
 	if *generateCert {
-		log.Println("Generating self-signed certificate...")
+		logger.Info("Generating self-signed certificate...")
 		if err := os.MkdirAll("certs", 0755); err != nil {
-			log.Fatalf("Failed to create certs directory: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to create certs directory: %v", err))
 		}
 
 		// Parse IP addresses and hostnames from comma-separated strings
@@ -112,13 +113,13 @@ func main() {
 		}
 
 		if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master", sans...); err != nil {
-			log.Fatalf("Failed to generate certificate: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to generate certificate: %v", err))
 		}
-		log.Println("Certificate generated successfully")
-		log.Printf("  Certificate: %s", *certFile)
-		log.Printf("  Key: %s", *keyFile)
+		logger.Info("Certificate generated successfully")
+		logger.Info(fmt.Sprintf("  Certificate: %s", *certFile))
+		logger.Info(fmt.Sprintf("  Key: %s", *keyFile))
 		if len(sans) > 0 {
-			log.Printf("  Additional SANs: %v", sans)
+			logger.Info(fmt.Sprintf("  Additional SANs: %v", sans))
 		}
 		return // Exit after generating certificate
 	}
@@ -152,10 +153,10 @@ func main() {
 	// Create appropriate store
 	if *dbType == "postgres" || *dbType == "postgresql" {
 		if *dbDSN == "" {
-			log.Fatal("PostgreSQL requires --db-dsn or DATABASE_DSN environment variable")
+			logger.Fatal("PostgreSQL requires --db-dsn or DATABASE_DSN environment variable")
 		}
-		log.Printf("Using PostgreSQL database")
-		log.Printf("DSN: %s", maskPassword(*dbDSN))
+		logger.Info(fmt.Sprintf("Using PostgreSQL database"))
+		logger.Info(fmt.Sprintf("DSN: %s", maskPassword(*dbDSN)))
 		
 		pgStore, err := store.NewStore(store.Config{
 			Type:            "postgres",
@@ -166,23 +167,23 @@ func main() {
 			ConnMaxIdleTime: 1 * time.Minute,
 		})
 		if err != nil {
-			log.Fatalf("Failed to create PostgreSQL store: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to create PostgreSQL store: %v", err))
 		}
 		dataStore = pgStore
-		log.Println("✓ PostgreSQL connected successfully")
-		log.Println("✓ Persistent storage enabled with production-grade database")
+		logger.Info("✓ PostgreSQL connected successfully")
+		logger.Info("✓ Persistent storage enabled with production-grade database")
 	} else if *dbPath != "" {
-		log.Printf("Using SQLite database: %s", *dbPath)
+		logger.Info(fmt.Sprintf("Using SQLite database: %s", *dbPath))
 		sqliteStore, sErr := store.NewSQLiteStore(*dbPath)
 		if sErr != nil {
-			log.Fatalf("Failed to create SQLite store: %v", sErr)
+			logger.Fatal(fmt.Sprintf("Failed to create SQLite store: %v", sErr))
 		}
 		dataStore = sqliteStore
 		defer sqliteStore.Close()
-		log.Println("✓ Persistent storage enabled (data will survive restarts)")
+		logger.Info("✓ Persistent storage enabled (data will survive restarts)")
 	} else {
-		log.Println("WARNING: Using in-memory store (data will not persist)")
-		log.Println("Consider using --db flag with a database path for production")
+		logger.Info("WARNING: Using in-memory store (data will not persist)")
+		logger.Info("Consider using --db flag with a database path for production")
 		dataStore = store.NewMemoryStore()
 	}
 
@@ -193,14 +194,14 @@ func main() {
 
 	// Setup authentication if API key provided
 	if apiKey != "" {
-		log.Printf("✓ API authentication enabled (source: %s)", apiKeySource)
+		logger.Info(fmt.Sprintf("✓ API authentication enabled (source: %s)", apiKeySource))
 	} else {
-		log.Println("WARNING: No API key provided - API is open!")
-		log.Println("For production, you must provide an API key:")
-		log.Println("  1. Set environment variable: export MASTER_API_KEY=your-secure-key")
-		log.Println("  2. Or use flag: --api-key=your-secure-key")
-		log.Println("To generate a secure key:")
-		log.Println("  openssl rand -base64 32")
+		logger.Info("WARNING: No API key provided - API is open!")
+		logger.Info("For production, you must provide an API key:")
+		logger.Info("  1. Set environment variable: export MASTER_API_KEY=your-secure-key")
+		logger.Info("  2. Or use flag: --api-key=your-secure-key")
+		logger.Info("To generate a secure key:")
+		logger.Info("  openssl rand -base64 32")
 	}
 
 	// Create API handler with retry support
@@ -209,7 +210,7 @@ func main() {
 	// Initialize distributed tracing if enabled
 	var tracerProvider *tracing.Provider
 	if *enableTracing {
-		log.Println("Initializing distributed tracing...")
+		logger.Info("Initializing distributed tracing...")
 		var err error
 		tracerProvider, err = tracing.InitTracer(tracing.Config{
 			ServiceName:    "ffrtmp-master",
@@ -219,16 +220,16 @@ func main() {
 			Enabled:        true,
 		})
 		if err != nil {
-			log.Fatalf("Failed to initialize tracing: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to initialize tracing: %v", err))
 		}
-		log.Printf("✓ Distributed tracing enabled (endpoint: %s)", *tracingEndpoint)
+		logger.Info(fmt.Sprintf("✓ Distributed tracing enabled (endpoint: %s)", *tracingEndpoint))
 		
 		// Ensure graceful shutdown of tracer
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := tracerProvider.Shutdown(ctx); err != nil {
-				log.Printf("Error shutting down tracer: %v", err)
+				logger.Info(fmt.Sprintf("Error shutting down tracer: %v", err))
 			}
 		}()
 	}
@@ -239,13 +240,13 @@ func main() {
 	// Add tracing middleware first (before auth) if enabled
 	if *enableTracing && tracerProvider != nil {
 		router.Use(tracing.HTTPMiddleware(tracerProvider, "ffrtmp-master"))
-		log.Println("✓ Tracing middleware enabled")
+		logger.Info("✓ Tracing middleware enabled")
 	}
 
 	// Add bandwidth monitoring middleware
 	bandwidthMonitor := bandwidth.NewBandwidthMonitor()
 	router.Use(bandwidthMonitor.Middleware)
-	log.Println("✓ Bandwidth monitoring enabled")
+	logger.Info("✓ Bandwidth monitoring enabled")
 
 	// Add authentication middleware if API key is set
 	if apiKey != "" {
@@ -282,7 +283,7 @@ func main() {
 	var metricsExporter *prometheus.MasterExporter
 	var metricsSrv *http.Server
 	if *enableMetrics {
-		log.Println("✓ Prometheus metrics endpoint enabled")
+		logger.Info("✓ Prometheus metrics endpoint enabled")
 		metricsExporter = prometheus.NewMasterExporter(dataStore, bandwidthMonitor)
 
 		// Set metrics recorder in handler
@@ -306,11 +307,11 @@ func main() {
 
 		// Start metrics server in background
 		go func() {
-			log.Printf("Metrics server listening on :%s", *metricsPort)
-			log.Println("  GET  /metrics (Prometheus format)")
-			log.Println("  GET  /health")
+			logger.Info(fmt.Sprintf("Metrics server listening on :%s", *metricsPort))
+			logger.Info("  GET  /metrics (Prometheus format)")
+			logger.Info("  GET  /health")
 			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("Metrics server error: %v", err)
+				logger.Info(fmt.Sprintf("Metrics server error: %v", err))
 			}
 		}()
 	}
@@ -318,7 +319,7 @@ func main() {
 	// Start automatic cleanup manager
 	var cleanupMgr *cleanup.CleanupManager
 	if *enableCleanup {
-		log.Println("Initializing cleanup manager...")
+		logger.Info("Initializing cleanup manager...")
 		cleanupConfig := cleanup.CleanupConfig{
 			Enabled:          true,
 			JobRetentionDays: *cleanupRetention,
@@ -328,13 +329,13 @@ func main() {
 		}
 		cleanupMgr = cleanup.NewCleanupManager(cleanupConfig, dataStore)
 		cleanupMgr.Start()
-		log.Printf("✓ Cleanup manager started (retention: %d days)", *cleanupRetention)
+		logger.Info(fmt.Sprintf("✓ Cleanup manager started (retention: %d days)", *cleanupRetention))
 	}
 
 	// Start background scheduler
 	sched := scheduler.New(dataStore, *schedulerInterval)
 	sched.Start()
-	log.Printf("Background scheduler started (interval: %v)", *schedulerInterval)
+	logger.Info(fmt.Sprintf("Background scheduler started (interval: %v)", *schedulerInterval))
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -347,33 +348,33 @@ func main() {
 
 	// Setup TLS if enabled
 	if *useTLS {
-		log.Println("TLS enabled")
+		logger.Info("TLS enabled")
 		if *requireClientCert {
-			log.Println("mTLS enabled - requiring client certificates")
+			logger.Info("mTLS enabled - requiring client certificates")
 		}
 
 		// Check if certificates exist
 		if _, err := os.Stat(*certFile); os.IsNotExist(err) {
-			log.Printf("Certificate file not found: %s", *certFile)
-			log.Println("Generating self-signed certificate...")
+			logger.Info(fmt.Sprintf("Certificate file not found: %s", *certFile))
+			logger.Info("Generating self-signed certificate...")
 			if err := os.MkdirAll("certs", 0755); err != nil {
-				log.Fatalf("Failed to create certs directory: %v", err)
+				logger.Fatal(fmt.Sprintf("Failed to create certs directory: %v", err))
 			}
 			if err := tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master"); err != nil {
-				log.Fatalf("Failed to generate certificate: %v", err)
+				logger.Fatal(fmt.Sprintf("Failed to generate certificate: %v", err))
 			}
-			log.Println("✓ Self-signed certificate generated")
+			logger.Info("✓ Self-signed certificate generated")
 		}
 
 		tlsConfig, err := tlsutil.LoadTLSConfig(*certFile, *keyFile, *caFile, *requireClientCert)
 		if err != nil {
-			log.Fatalf("Failed to load TLS config: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to load TLS config: %v", err))
 		}
 		srv.TLSConfig = tlsConfig
 	} else {
-		log.Println("WARNING: TLS disabled")
-		log.Println("This is NOT recommended for production!")
-		log.Println("Enable with --tls flag or set --tls=false explicitly to suppress this warning")
+		logger.Info("WARNING: TLS disabled")
+		logger.Info("This is NOT recommended for production!")
+		logger.Info("Enable with --tls flag or set --tls=false explicitly to suppress this warning")
 	}
 
 	// Initialize graceful shutdown manager
@@ -422,16 +423,16 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Master node listening on :%s", *port)
-		log.Println("API endpoints:")
-		log.Println("  POST   /nodes/register")
-		log.Println("  GET    /nodes")
-		log.Println("  POST   /nodes/{id}/heartbeat")
-		log.Println("  POST   /jobs")
-		log.Println("  GET    /jobs")
-		log.Println("  GET    /jobs/next?node_id=<id>")
-		log.Println("  POST   /results")
-		log.Println("  GET    /health")
+		logger.Info(fmt.Sprintf("Master node listening on :%s", *port))
+		logger.Info("API endpoints:")
+		logger.Info("  POST   /nodes/register")
+		logger.Info("  GET    /nodes")
+		logger.Info("  POST   /nodes/{id}/heartbeat")
+		logger.Info("  POST   /jobs")
+		logger.Info("  GET    /jobs")
+		logger.Info("  GET    /jobs/next?node_id=<id>")
+		logger.Info("  POST   /results")
+		logger.Info("  GET    /health")
 
 		var err error
 		if *useTLS {
@@ -441,7 +442,7 @@ func main() {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal(fmt.Sprintf("Failed to start server: %v", err))
 		}
 	}()
 
