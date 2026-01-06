@@ -68,12 +68,12 @@ When no explicit classification is provided, the system uses intelligent heurist
 
 **Scenario Name Analysis:**
 ```
-❌ NOT SLA-worthy if scenario starts with:
+NOT SLA-worthy if scenario starts with:
    - "test"       (e.g., "test-1080p", "test-scenario")
    - "debug"      (e.g., "debug-encoder", "debug-pipeline")
    - "benchmark"  (e.g., "benchmark-h265", "benchmark-comparison")
 
-✅ SLA-worthy otherwise:
+SLA-worthy otherwise:
    - "1080p30-h264"
    - "4K60-h265"
    - "live-streaming"
@@ -81,24 +81,24 @@ When no explicit classification is provided, the system uses intelligent heurist
 
 **Duration Analysis:**
 ```
-❌ NOT SLA-worthy if duration < 10 seconds
+NOT SLA-worthy if duration < 10 seconds
    - Likely a quick test
    - Not representative of production workloads
    - Insufficient time for accurate SLA assessment
 
-✅ SLA-worthy if duration >= 10 seconds
+SLA-worthy if duration >= 10 seconds
    - Represents actual production workload
    - Sufficient duration for meaningful metrics
 ```
 
 **Queue and Priority Analysis:**
 ```
-❌ NOT SLA-worthy if:
+NOT SLA-worthy if:
    - queue="batch" AND priority="low"
    - Best-effort processing
    - No guaranteed turnaround time
 
-✅ SLA-worthy if:
+SLA-worthy if:
    - queue="live" (always SLA-worthy regardless of priority)
    - queue="default" with any priority
    - queue="batch" with medium/high priority
@@ -488,4 +488,4 @@ For questions about SLA classification:
 
 ---
 
-**Status:** ✅ Production-Ready | **SLA Compliance:** 99.8% (45K+ jobs) | **Target:** 99.9%
+**Status:** Production-Ready | **SLA Compliance:** 99.8% (45K+ jobs) | **Target:** 99.9%
