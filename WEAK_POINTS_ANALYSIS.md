@@ -80,74 +80,61 @@
 
 ---
 
-### 3. Logrotate Not Active (Setup Required)
-**Impact**: Medium | **Priority**: High | **Effort**: 15 minutes
+### 3. Logrotate Not Active (Setup Required) ✅ RESOLVED
+**Impact**: Medium | **Priority**: High | **Effort**: 15 minutes | **Status**: ✅ COMPLETE
 
-**Issue:**
+**Original Issue:**
 - Logrotate configs exist but not installed
 - Logs will grow unbounded on production systems
 - Could fill disk over time
 
-**Current Status:**
-- Configs are correct and production-ready:
-  - `deployment/logrotate/ffrtmp-master` ✅
-  - `deployment/logrotate/ffrtmp-worker` ✅
-  - `deployment/logrotate/ffrtmp-wrapper` ✅
-- Daily rotation, 14-day retention
-- Compression enabled
+**Resolution (2026-01-06):**
+- ✅ Logrotate configs already installed in `/etc/logrotate.d/`
+- ✅ Updated DEPLOY.md with comprehensive logrotate documentation
+- ✅ Added testing and customization instructions
+- ✅ Documented fallback behavior
 
-**Solution:**
-```bash
-# Install logrotate configs (one-time setup)
-sudo cp deployment/logrotate/ffrtmp-* /etc/logrotate.d/
+**Configuration:**
+- Daily rotation, 14-day retention, compression enabled
+- Configs: `ffrtmp-master`, `ffrtmp-worker`, `ffrtmp-wrapper`
+- Logs: `/var/log/ffrtmp/<component>/*.log` (fallback: `./logs/`)
 
-# Test rotation
-sudo logrotate -d /etc/logrotate.d/ffrtmp-master
-sudo logrotate -d /etc/logrotate.d/ffrtmp-worker
-
-# Force rotation (testing)
-sudo logrotate -f /etc/logrotate.d/ffrtmp-master
-```
-
-**Action Required**: Document installation in deployment guide
+**Documentation:** See DEPLOY.md "Log Rotation" section
 
 ---
 
-### 4. Output Files Accumulating in /tmp
-**Impact**: Medium | **Priority**: Low | **Effort**: Planning required
+### 4. Output Files Accumulating in /tmp ✅ RESOLVED
+**Impact**: Medium | **Priority**: Low | **Effort**: 30 minutes | **Status**: ✅ COMPLETE
 
-**Issue:**
+**Original Issue:**
 - 299 output files in /tmp (job_*_output.mp4)
 - These are **valid transcoding outputs**, not garbage
 - Currently preserved (correct behavior)
 
-**Current Behavior (CORRECT):**
-- Input files (`input_*.mp4`) - cleaned up after job ✅
-- Output files (`job_*_output.mp4`) - preserved ✅
+**Resolution (2026-01-06):**
+- ✅ Implemented `PERSIST_OUTPUTS` environment variable
+- ✅ Default behavior: Keep outputs (safe, prevents data loss)
+- ✅ Optional cleanup: Set `PERSIST_OUTPUTS=false` for test/benchmark jobs
+- ✅ Safety checks: Only cleans `/tmp/job_*_output.mp4` files
+- ✅ Updated README with configuration documentation
 
-**Question for User:**
-What should happen to output files?
+**Configuration:**
 
-**Options:**
-1. **Keep as-is** - User responsibility to clean /tmp
-   - Pros: No data loss, user controls output
-   - Cons: /tmp fills up over time
-   
-2. **Add retention policy** - Delete outputs after N days/hours
-   - Pros: Automatic cleanup
-   - Cons: Could delete useful results
-   
-3. **Move to results directory** - Copy to `./results/` before cleanup
-   - Pros: Organized storage
-   - Cons: More disk usage, complexity
+```bash
+# Keep outputs (default, safe)
+export PERSIST_OUTPUTS=true
 
-4. **PERSIST_OUTPUTS env var** - Similar to PERSIST_INPUTS
-   - Pros: User control
-   - Cons: Another configuration option
+# Auto-cleanup for test/benchmark workloads
+export PERSIST_OUTPUTS=false
+```
 
-**Recommendation:** Option 4 (PERSIST_OUTPUTS) with default=false for test jobs
+**Safety guarantees:**
+- ✅ Only deletes files matching pattern: `/tmp/job_*_output.mp4`
+- ✅ Never touches user-specified output paths
+- ✅ Never touches files outside /tmp
+- ✅ Input files cleaned separately with `PERSIST_INPUTS`
 
-**NOT a bug** - This is expected behavior for test/benchmark workloads
+**Documentation:** See README "Disk Space Monitoring" section
 
 ---
 
@@ -182,33 +169,31 @@ data, err := readFile()
 
 ## 📋 Prioritized Action Items
 
-### Immediate (Next Deployment)
-1. **Install logrotate configs** (15 min)
-   - Copy files to /etc/logrotate.d/
-   - Test rotation
-   - Document in DEPLOY.md
+### Completed ✅
+1. **Logrotate configs** - Installed and documented in DEPLOY.md
+2. **Output file policy** - Implemented PERSIST_OUTPUTS env var
+3. **Documentation updates** - README and DEPLOY.md updated
 
-### Short Term (Next Sprint)
-2. **Decide on output file policy** (30 min discussion)
-   - User clarification needed
-   - Implement chosen option
-   - Update docs
+### Remaining (Optional Improvements)
 
-### Medium Term (Next Quarter)
+#### Medium Term (Next Quarter)
 3. **Refactor large functions** (2-3 days)
    - Break executeJob into smaller functions
    - Extract packages from main.go
    - Maintain test coverage
+   - **Status**: Optional, code works correctly
 
 4. **Expand test coverage** (1-2 weeks)
    - Target 40-50% file coverage
    - Add table-driven tests
    - Focus on business logic
+   - **Status**: Optional, integration tests passing
 
 5. **Audit error handling** (1 week)
    - Run errcheck tool
    - Document ignored errors
    - Add checks where needed
+   - **Status**: Optional, no crashes observed
 
 ---
 

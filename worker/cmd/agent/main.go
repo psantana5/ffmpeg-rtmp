@@ -718,9 +718,19 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	
 	metrics, analyzerOutput, executionLogs, cancelResult, err := executeEngineJob(job, client, selectedEngine, ffmpegOpt, limits, metricsExporter)
 	
+	// Extract output file path for cleanup (if present in job parameters)
+	var outputFilePath string
+	if job.Parameters != nil {
+		if output, ok := job.Parameters["output"].(string); ok {
+			outputFilePath = output
+		}
+	}
+	
 	// Cleanup generated input if needed
 	log.Println("\n>>> CLEANUP PHASE <<<")
 	persistInputs := os.Getenv("PERSIST_INPUTS") == "true"
+	persistOutputs := os.Getenv("PERSIST_OUTPUTS") == "true"
+	
 	if generatedInputPath != "" && !persistInputs {
 		log.Printf("PERSIST_INPUTS=false, cleaning up generated input...")
 		if cleanupErr := inputGenerator.CleanupInput(generatedInputPath); cleanupErr != nil {
@@ -730,6 +740,26 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		log.Printf("PERSIST_INPUTS=true, keeping input file: %s", generatedInputPath)
 	} else {
 		log.Printf("No generated input to cleanup")
+	}
+	
+	// Cleanup temporary output files (test artifacts) if configured
+	if outputFilePath != "" && !persistOutputs {
+		// Only cleanup files in /tmp with job_*_output.mp4 pattern (test artifacts)
+		// NEVER delete user-specified output paths or files outside /tmp
+		if strings.HasPrefix(outputFilePath, os.TempDir()) && 
+		   strings.Contains(filepath.Base(outputFilePath), "_output.mp4") &&
+		   strings.HasPrefix(filepath.Base(outputFilePath), "job_") {
+			log.Printf("PERSIST_OUTPUTS=false, cleaning up temporary output: %s", outputFilePath)
+			if cleanupErr := os.Remove(outputFilePath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+				log.Printf("⚠️  Warning: failed to cleanup output file: %v", cleanupErr)
+			} else if cleanupErr == nil {
+				log.Printf("✓ Cleaned up temporary output file")
+			}
+		} else {
+			log.Printf("Keeping output file (not a temporary test artifact): %s", outputFilePath)
+		}
+	} else if outputFilePath != "" && persistOutputs {
+		log.Printf("PERSIST_OUTPUTS=true, keeping output file: %s", outputFilePath)
 	}
 	
 	duration := time.Since(startTime).Seconds()
@@ -855,11 +885,12 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 		metrics["input_encoder_used"] = inputGenResult.EncoderUsed
 	}
 	
-	// Track bandwidth metrics
-	var outputFilePath string
+	// Track bandwidth metrics (reuse outputFilePath from cleanup section)
 	if job.Parameters != nil {
 		if output, ok := job.Parameters["output"].(string); ok {
-			outputFilePath = output
+			if outputFilePath == "" {
+				outputFilePath = output
+			}
 		}
 	}
 	

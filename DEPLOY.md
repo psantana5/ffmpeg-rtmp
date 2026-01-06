@@ -309,23 +309,54 @@ tail -f logs/agent.log
 
 ### Log Rotation
 
-```bash
-# Manual rotation
-gzip logs/master.log
-mv logs/master.log.gz logs/master.log.$(date +%Y%m%d).gz
+**Production-ready logrotate configs are included and installed:**
 
-# Automated with logrotate
-cat > /etc/logrotate.d/ffrtmp << EOF
-/path/to/ffmpeg-rtmp/logs/*.log {
-    daily
-    rotate 7
-    compress
-    delaycompress
-    missingok
-    notifempty
-}
-EOF
+```bash
+# Verify logrotate configs are installed
+ls -la /etc/logrotate.d/ffrtmp-*
+
+# Expected output:
+# /etc/logrotate.d/ffrtmp-master
+# /etc/logrotate.d/ffrtmp-worker  
+# /etc/logrotate.d/ffrtmp-wrapper
 ```
+
+**Configuration details:**
+- **Rotation**: Daily
+- **Retention**: 14 days
+- **Compression**: Enabled (gzip)
+- **Location**: `/var/log/ffrtmp/<component>/*.log`
+- **Fallback**: `./logs/` if `/var/log` not writable
+
+**Testing logrotate:**
+
+```bash
+# Dry-run test (shows what would happen)
+sudo logrotate -d /etc/logrotate.d/ffrtmp-master
+sudo logrotate -d /etc/logrotate.d/ffrtmp-worker
+
+# Force rotation (for testing)
+sudo logrotate -f /etc/logrotate.d/ffrtmp-master
+sudo logrotate -f /etc/logrotate.d/ffrtmp-worker
+```
+
+**Manual installation (if needed):**
+
+```bash
+# Copy logrotate configs (usually done automatically)
+sudo cp deployment/logrotate/ffrtmp-* /etc/logrotate.d/
+
+# Set proper permissions
+sudo chmod 644 /etc/logrotate.d/ffrtmp-*
+sudo chown root:root /etc/logrotate.d/ffrtmp-*
+```
+
+**Customization:**
+
+Edit `/etc/logrotate.d/ffrtmp-master` to adjust:
+- `rotate 14` - Number of days to keep logs
+- `daily` - Change to `weekly` or `monthly`  
+- `compress` - Remove to disable compression
 
 ### Database Maintenance
 

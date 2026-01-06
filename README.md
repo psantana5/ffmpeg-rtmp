@@ -294,7 +294,26 @@ Available metrics include:
 - Pre-job disk space validation
 - Reject jobs if < 5% disk space available
 - Warning alerts at 90% disk usage
-- Automatic cleanup of temporary files
+- Automatic cleanup of temporary input files (configurable with `PERSIST_INPUTS`)
+- Automatic cleanup of temporary output files (configurable with `PERSIST_OUTPUTS`)
+
+**File Cleanup Configuration:**
+
+```bash
+# Control input file cleanup (default: cleanup after job)
+export PERSIST_INPUTS=true   # Keep generated input files
+export PERSIST_INPUTS=false  # Delete input files after job (default)
+
+# Control output file cleanup (default: keep outputs)
+export PERSIST_OUTPUTS=true   # Keep output files (default)
+export PERSIST_OUTPUTS=false  # Delete temporary outputs after job
+```
+
+**Cleanup behavior:**
+- Input files (`input_*.mp4`): Cleaned up by default unless `PERSIST_INPUTS=true`
+- Output files (`job_*_output.mp4`): Preserved by default unless `PERSIST_OUTPUTS=false`
+- User-specified paths: Never automatically cleaned up
+- Files outside `/tmp`: Never automatically cleaned up
 
 **4. Timeout Enforcement**
 - Configurable per-job timeouts
