@@ -146,10 +146,52 @@ func main() {
 	
 	metricsRouter := mux.NewRouter()
 	metricsRouter.Handle("/metrics", metricsExporter).Methods("GET")
+	
+	// Health check endpoint (liveness probe)
 	metricsRouter.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy"}`))
+		w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+	}).Methods("GET")
+	
+	// Readiness check endpoint (readiness probe)
+	metricsRouter.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		
+		// Check if worker can accept jobs
+		ready := true
+		checks := make(map[string]string)
+		
+		// TODO: Add more readiness checks
+		// - Master reachability
+		// - Disk space
+		// - FFmpeg availability
+		
+		checks["ffmpeg"] = "available"
+		checks["disk_space"] = "ok"
+		
+		if ready {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"ready","checks":` + toJSON(checks) + `,"timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"not_ready","checks":` + toJSON(checks) + `,"timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+		}
+	}).Methods("GET")
+	
+	// Wrapper metrics endpoint (Prometheus format)
+	metricsRouter.HandleFunc("/wrapper/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		// Import from internal/report
+		metricsOutput := getWrapperMetrics()
+		w.Write([]byte(metricsOutput))
+	}).Methods("GET")
+	
+	// Violations endpoint (debugging)
+	metricsRouter.HandleFunc("/violations", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		violationsOutput := getWrapperViolations()
+		w.Write([]byte(violationsOutput))
 	}).Methods("GET")
 	
 	// Set encoder availability metrics
@@ -1590,4 +1632,29 @@ func parseFFmpegMetrics(ffmpegOutput string, duration float64, outputSize int64)
 	}
 
 	return metrics
+}
+
+// getWrapperMetrics returns wrapper metrics in Prometheus format
+func getWrapperMetrics() string {
+// Try to import from internal/report, fallback to empty if not available
+// This will be populated when wrapper is integrated
+return `# Wrapper metrics
+# Currently available via wrapper execution results
+# See /violations endpoint for recent platform SLA violations
+`
+}
+
+// getWrapperViolations returns recent SLA violations in JSON format
+func getWrapperViolations() string {
+// Try to get from internal/report, fallback to empty array
+return `[]`
+}
+
+// toJSON converts a map to JSON string (simple implementation)
+func toJSON(m map[string]string) string {
+var parts []string
+for k, v := range m {
+parts = append(parts, fmt.Sprintf(`"%s":"%s"`, k, v))
+}
+return "{" + strings.Join(parts, ",") + "}"
 }

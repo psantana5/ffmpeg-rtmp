@@ -17,11 +17,14 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/auth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/cleanup"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/logging"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/tracing"
 )
+
+var logger *logging.Logger
 
 func main() {
 	// Command-line flags
@@ -46,7 +49,16 @@ func main() {
 	tracingEndpoint := flag.String("tracing-endpoint", "localhost:4318", "OpenTelemetry OTLP endpoint")
 	enableCleanup := flag.Bool("cleanup", true, "Enable automatic cleanup of old jobs")
 	cleanupRetention := flag.Int("cleanup-retention", 7, "Job retention period in days")
+	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
+
+	// Initialize file logger: /var/log/ffrtmp/master/master.log
+	var err error
+	logger, err = logging.NewFileLogger("master", "master", logging.ParseLevel(*logLevel), false)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
 
 	// Get API key from flag or environment variable
 	apiKey := *apiKeyFlag
