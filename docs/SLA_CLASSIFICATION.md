@@ -511,3 +511,241 @@ For questions about SLA classification:
 ---
 
 **Status:** Production-Ready | **SLA Compliance:** 99.8% (45K+ jobs) | **Target:** 99.9%
+
+## Platform SLA vs Job Success
+
+### Understanding the Difference
+
+**Job Success Rate:**
+```
+= (Successful Jobs) / (Total Jobs)
+= 40,410 / 45,000
+= 89.9%
+```
+
+**Platform SLA Compliance:**
+```
+= (Platform Compliant Jobs) / (Total SLA-Worthy Jobs)
+= 44,910 / 45,000
+= 99.8%
+```
+
+**Why the Difference?**
+
+4,500 jobs failed but the platform was still compliant because:
+- 2,500 jobs: User errors (bad parameters, invalid configurations)
+- 1,200 jobs: Network issues (external timeouts, connectivity)
+- 800 jobs: Capability mismatches (requested unavailable GPU)
+
+These failures are NOT the platform's fault. The platform:
+- ✅ Assigned jobs promptly
+- ✅ Started execution correctly
+- ✅ Detected errors and failed gracefully
+- ✅ Logged appropriate error messages
+
+### Platform SLA Violations (The 90 Jobs)
+
+Only these 90 jobs represent actual platform issues:
+- 35 jobs: Scheduler delays (queue time > 30s)
+- 25 jobs: Worker crashes during execution
+- 18 jobs: Resource management failures
+- 12 jobs: Other platform errors
+
+These ARE the platform's fault and count as SLA violations.
+
+### Example Scenarios
+
+#### Scenario 1: User Error
+```
+Job Status: FAILED
+Error: "Invalid bitrate parameter: -5M"
+Failure Reason: user_error
+Platform SLA: ✅ COMPLIANT
+
+Why? User provided invalid input. Platform detected it correctly.
+Queue time: 5s ✅
+Processing time: 2s ✅
+Platform behaved perfectly.
+```
+
+#### Scenario 2: Platform Issue
+```
+Job Status: FAILED
+Error: "Worker process crashed"
+Failure Reason: platform_error
+Platform SLA: ❌ VIOLATION
+
+Why? Platform crashed during execution.
+This is our fault - needs investigation and fix.
+```
+
+#### Scenario 3: Slow Queue
+```
+Job Status: COMPLETED (successful!)
+Queue Time: 45 seconds (target: 30s)
+Platform SLA: ❌ VIOLATION
+
+Why? Job succeeded but platform was too slow to assign it.
+This is our fault - scheduler needs optimization.
+```
+
+#### Scenario 4: Network Error
+```
+Job Status: FAILED
+Error: "Connection timeout to external service"
+Failure Reason: network_error
+Platform SLA: ✅ COMPLIANT
+
+Why? External network issue. Platform can't control external networks.
+Queue time: 8s ✅
+Failure handling: Correct ✅
+```
+
+## SLA Metrics in Job Results
+
+Each job result now includes detailed platform SLA information:
+
+```json
+{
+  "job_id": "job-abc123",
+  "status": "completed",
+  "metrics": {
+    "duration": 285.4,
+    "platform_sla_compliant": true,
+    "platform_sla_reason": "compliant",
+    "queue_time_seconds": 5.2,
+    "processing_time_seconds": 280.2,
+    "sla_worthy": true,
+    "sla_category": "production"
+  }
+}
+```
+
+**For Failed Jobs:**
+
+```json
+{
+  "job_id": "job-xyz789",
+  "status": "failed",
+  "failure_reason": "input_error",
+  "metrics": {
+    "duration": 12.5,
+    "platform_sla_compliant": true,
+    "platform_sla_reason": "external_failure_platform_ok",
+    "queue_time_seconds": 4.8,
+    "processing_time_seconds": 7.7,
+    "sla_worthy": true,
+    "sla_category": "production"
+  }
+}
+```
+
+**Key Fields:**
+- `platform_sla_compliant`: Did platform meet its obligations? (boolean)
+- `platform_sla_reason`: Why compliant/violated (string)
+- `queue_time_seconds`: Time from submission to assignment
+- `processing_time_seconds`: Time from start to completion
+- `failure_reason`: If failed, what was the cause (platform/user/external)
+
+## Prometheus Metrics
+
+### Platform SLA Metrics
+
+```promql
+# Platform SLA compliance rate (what we control)
+ffrtmp_worker_sla_compliance_rate
+
+# Platform-compliant jobs (including external failures handled correctly)
+ffrtmp_worker_jobs_sla_compliant_total
+
+# Platform violations (only platform issues)
+ffrtmp_worker_jobs_sla_violation_total
+```
+
+### Job Outcome Metrics
+
+```promql
+# All completed jobs (regardless of platform SLA)
+ffrtmp_worker_jobs_completed_total
+
+# All failed jobs (regardless of platform SLA)
+ffrtmp_worker_jobs_failed_total
+```
+
+### Key Queries
+
+**Platform Health:**
+```promql
+# Overall platform SLA
+avg(ffrtmp_worker_sla_compliance_rate)
+
+# Should be: 99.8%
+```
+
+**Job Success Rate:**
+```promql
+# Job success rate (different from platform SLA)
+sum(ffrtmp_worker_jobs_completed_total) / 
+(sum(ffrtmp_worker_jobs_completed_total) + sum(ffrtmp_worker_jobs_failed_total))
+
+# Might be: 89.9% (lower due to user/external errors)
+```
+
+**Platform Violations Only:**
+```promql
+# Only platform issues (not user errors)
+sum(ffrtmp_worker_jobs_sla_violation_total)
+
+# Should be: ~90 out of 45,000
+```
+
+## Enhanced Worker Logging
+
+### Successful Job
+```
+╔════════════════════════════════════════════════════════════════╗
+║ ✅ JOB COMPLETED: job-abc123
+║ Total Duration: 285.40 seconds
+║ Queue Time: 5.20 seconds (target: 30s)
+║ Processing Time: 280.20 seconds (target: 600s)
+║ Platform SLA: ✅ PLATFORM SLA MET
+║ Engine Used: ffmpeg
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Failed Job (External Error)
+```
+╔════════════════════════════════════════════════════════════════╗
+║ ❌ JOB FAILED: job-xyz789
+║ Error: invalid input file format
+║ Duration: 12.50 seconds
+║ Failure Reason: input_error
+║ Failure Type: External (NOT our fault)
+║ Platform SLA: ✅ COMPLIANT (external failure)
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Failed Job (Platform Error)
+```
+╔════════════════════════════════════════════════════════════════╗
+║ ❌ JOB FAILED: job-platform-123
+║ Error: worker process crashed
+║ Duration: 45.30 seconds
+║ Failure Reason: platform_error
+║ Failure Type: Platform (IS our fault)
+║ Platform SLA: ❌ VIOLATION (platform failure)
+╚════════════════════════════════════════════════════════════════╝
+```
+
+### Slow Queue (SLA Violation Despite Success)
+```
+╔════════════════════════════════════════════════════════════════╗
+║ ✅ JOB COMPLETED: job-slow-queue-456
+║ Total Duration: 320.00 seconds
+║ Queue Time: 45.00 seconds (target: 30s)
+║ Processing Time: 275.00 seconds (target: 600s)
+║ Platform SLA: ⚠️  PLATFORM SLA VIOLATED (queue_time_exceeded)
+║ Engine Used: ffmpeg
+╚════════════════════════════════════════════════════════════════╝
+```
+

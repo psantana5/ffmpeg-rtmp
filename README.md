@@ -6,7 +6,7 @@
 [![Code Quality](https://img.shields.io/badge/code%20quality-A-success.svg)](#)
 [![SLA Compliance](https://img.shields.io/badge/SLA%20compliance-99.8%25-brightgreen.svg)](docs/SLA_CLASSIFICATION.md)
 
-A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, and **distributed compute capabilities** for scaling workloads across multiple nodes. **Achieved 99.8% SLA compliance** tested with **45,000+ mixed workload jobs**.
+A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, **distributed compute capabilities** for scaling workloads across multiple nodes, and **edge workload wrapper** for production governance. **Achieved 99.8% SLA compliance** tested with **45,000+ mixed workload jobs**.
 <img width="1658" height="1020" alt="image" src="https://github.com/user-attachments/assets/12e560b2-1d60-407d-b856-f7a80dcfd02c" />
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
@@ -128,6 +128,46 @@ curl -X POST https://MASTER_IP:8080/jobs \
 ### Production Deployment with Systemd
 
 See [deployment/README.md](deployment/README.md) for systemd service templates and production setup.
+
+---
+
+## Edge Workload Wrapper 🆕
+
+The **Edge Workload Wrapper** provides production-grade governance for workloads on edge nodes. This thin control-plane wrapper applies OS-level constraints without owning the workload.
+
+### Key Features
+
+- **Non-owning design**: Workloads survive wrapper crashes
+- **Run mode**: Spawn new processes with constraints
+- **Attach mode**: Govern already-running processes (zero-downtime)
+- **OS-level constraints**: CPU, memory, IO, nice priority, OOM score
+- **Lifecycle tracking**: Exit codes, reasons, duration
+- **Graceful degradation**: Works even without cgroups/root
+
+### Quick Examples
+
+```bash
+# Run FFmpeg with resource constraints
+ffrtmp run \
+  --job-id transcode-001 \
+  --sla-eligible \
+  --cpu-quota 200 \
+  --memory-limit 4096 \
+  -- ffmpeg -i input.mp4 -c:v h264_nvenc output.mp4
+
+# Attach to already-running process (critical for adoption!)
+ffrtmp attach \
+  --pid 12345 \
+  --job-id existing-job-042 \
+  --cpu-weight 150 \
+  --nice -5
+```
+
+### Documentation
+
+- **[Wrapper Architecture](docs/WRAPPER_ARCHITECTURE.md)** - Core design and philosophy
+- **[Wrapper Examples](docs/WRAPPER_EXAMPLES.md)** - Comprehensive usage examples
+- See [WRAPPER_ARCHITECTURE.md](docs/WRAPPER_ARCHITECTURE.md) for complete documentation
 
 ---
 
