@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -37,12 +38,14 @@ func (l Level) String() string {
 	}
 }
 
-// Logger provides structured logging
+// Logger provides structured logging with file output support
 type Logger struct {
 	level      Level
 	jsonFormat bool
 	output     io.Writer
 	fields     map[string]interface{}
+	logFile    *os.File
+	component  string
 }
 
 // NewLogger creates a new logger
@@ -53,6 +56,52 @@ func NewLogger(level Level, jsonFormat bool) *Logger {
 		output:     os.Stdout,
 		fields:     make(map[string]interface{}),
 	}
+}
+
+// NewFileLogger creates a logger that writes to /var/log/ffrtmp/<component>/<subcomponent>.log
+// Falls back to ./logs/<component>/ if /var/log is not writable
+func NewFileLogger(component, subComponent string, level Level, jsonFormat bool) (*Logger, error) {
+	// Try /var/log/ffrtmp first
+	baseDir := "/var/log/ffrtmp"
+	if !isWritable(baseDir) {
+		// Fallback to local logs directory
+		baseDir = "./logs"
+	}
+	
+	// Create directory structure: /var/log/ffrtmp/<component>/
+	logDir := filepath.Join(baseDir, component)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory %s: %w", logDir, err)
+	}
+	
+	// Determine log file name
+	logFileName := component + ".log"
+	if subComponent != "" {
+		logFileName = subComponent + ".log"
+	}
+	logPath := filepath.Join(logDir, logFileName)
+	
+	// Open log file (create or append)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file %s: %w", logPath, err)
+	}
+	
+	// Create multi-writer (both file and stdout)
+	multiWriter := io.MultiWriter(logFile, os.Stdout)
+	
+	logger := &Logger{
+		level:      level,
+		jsonFormat: jsonFormat,
+		output:     multiWriter,
+		fields:     make(map[string]interface{}),
+		logFile:    logFile,
+		component:  component + "/" + subComponent,
+	}
+	
+	logger.Info(fmt.Sprintf("Logger initialized: %s -> %s", logger.component, logPath))
+	
+	return logger, nil
 }
 
 // SetOutput sets the output writer
@@ -187,4 +236,90 @@ func ParseLevel(level string) Level {
 	default:
 		return INFO
 	}
+}
+
+// Close closes the log file if opened
+func (l *Logger) Close() error {
+	if l.logFile != nil {
+		l.Info("Logger closing")
+		return l.logFile.Close()
+	}
+	return nil
+}
+
+// RotateIfNeeded rotates log file if it exceeds maxSize (in bytes)
+func (l *Logger) RotateIfNeeded(maxSize int64) error {
+	if l.logFile == nil {
+		return nil
+	}
+	
+	info, err := l.logFile.Stat()
+	if err != nil {
+		return err
+	}
+	
+	if info.Size() > maxSize {
+		// Close current file
+		l.logFile.Close()
+		
+		// Rename to timestamped backup
+		oldPath := l.logFile.Name()
+		timestamp := time.Now().Format("20060102-150405")
+		backupPath := oldPath + "." + timestamp
+		
+		if err := os.Rename(oldPath, backupPath); err != nil {
+			return err
+		}
+		
+		// Reopen
+		newFile, err := os.OpenFile(oldPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return err
+		}
+		
+		l.logFile = newFile
+		
+		// Update output to multi-writer
+		multiWriter := io.MultiWriter(l.logFile, os.Stdout)
+		l.output = multiWriter
+		
+		l.Info(fmt.Sprintf("Log rotated: %s -> %s", oldPath, backupPath))
+	}
+	
+	return nil
+}
+
+// isWritable checks if directory is writable
+func isWritable(path string) bool {
+	// Try to create directory if it doesn't exist
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return false
+	}
+	
+	// Test write permissions
+	testFile := filepath.Join(path, ".write_test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		return false
+	}
+	f.Close()
+	os.Remove(testFile)
+	return true
+}
+
+// GetLogPath returns the expected log path for a component
+func GetLogPath(component, subComponent string) string {
+	baseDir := "/var/log/ffrtmp"
+	if !isWritable(baseDir) {
+		baseDir = "./logs"
+	}
+	
+	logDir := filepath.Join(baseDir, component)
+	
+	logFileName := component + ".log"
+	if subComponent != "" {
+		logFileName = subComponent + ".log"
+	}
+	
+	return filepath.Join(logDir, logFileName)
 }

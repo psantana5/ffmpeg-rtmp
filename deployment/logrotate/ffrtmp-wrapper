@@ -1,0 +1,29 @@
+# Logrotate configuration for FFmpeg-RTMP wrapper
+# Install: sudo cp deployment/logrotate/ffrtmp-wrapper to /etc/logrotate.d/ffrtmp-wrapper
+
+/var/log/ffrtmp/wrapper/*.log {
+    # Rotate daily
+    daily
+    
+    # Keep 14 days of logs
+    rotate 14
+    
+    # Compress old logs
+    compress
+    delaycompress
+    
+    # Don't error if log is missing
+    missingok
+    
+    # Don't rotate empty logs
+    notifempty
+    
+    # Create new log with these permissions
+    create 0644 ffrtmp ffrtmp
+    
+    # Run postrotate script only once for all logs
+    sharedscripts
+    
+    # Note: Wrapper logs are typically from ffrtmp CLI, not a service
+    # No postrotate reload needed
+}

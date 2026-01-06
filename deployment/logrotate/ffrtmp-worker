@@ -1,0 +1,31 @@
+# Logrotate configuration for FFmpeg-RTMP worker
+# Install: sudo cp deployment/logrotate/ffrtmp-worker to /etc/logrotate.d/ffrtmp-worker
+
+/var/log/ffrtmp/worker/*.log {
+    # Rotate daily
+    daily
+    
+    # Keep 14 days of logs
+    rotate 14
+    
+    # Compress old logs
+    compress
+    delaycompress
+    
+    # Don't error if log is missing
+    missingok
+    
+    # Don't rotate empty logs
+    notifempty
+    
+    # Create new log with these permissions
+    create 0644 ffrtmp ffrtmp
+    
+    # Run postrotate script only once for all logs
+    sharedscripts
+    
+    # Reload service after rotation
+    postrotate
+        systemctl reload ffrtmp-worker 2>/dev/null || true
+    endscript
+}

@@ -19,11 +19,14 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/agent"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/logging"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 	"github.com/psantana5/ffmpeg-rtmp/worker/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/worker/pkg/resources"
 )
+
+var logger *logging.Logger
 
 func main() {
 	masterURL := flag.String("master", "http://localhost:8080", "Master node URL")
@@ -40,7 +43,16 @@ func main() {
 	metricsPort := flag.String("metrics-port", "9091", "Prometheus metrics port")
 	generateInput := flag.Bool("generate-input", true, "Automatically generate input videos for jobs (default: true)")
 	maxConcurrentJobs := flag.Int("max-concurrent-jobs", 1, "Maximum number of concurrent jobs to process (default: 1)")
+	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	flag.Parse()
+
+	// Initialize file logger: /var/log/ffrtmp/worker/agent.log
+	var err error
+	logger, err = logging.NewFileLogger("worker", "agent", logging.ParseLevel(*logLevel), false)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
 
 	// Get API key from flag or environment variable
 	apiKey := *apiKeyFlag
@@ -54,8 +66,8 @@ func main() {
 		apiKeySource = "command-line flag"
 	}
 
-	log.Println("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
-	log.Printf("Master URL: %s", *masterURL)
+	logger.Info("Starting FFmpeg RTMP Distributed Compute Agent (Production Mode)")
+	logger.Info(fmt.Sprintf("Master URL: %s", *masterURL))
 
 	// Detect hardware capabilities
 	log.Println("Detecting hardware capabilities...")
