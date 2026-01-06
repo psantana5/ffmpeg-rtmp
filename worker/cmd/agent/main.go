@@ -569,10 +569,6 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	
 	duration := time.Since(startTime).Seconds()
 	
-	// Determine SLA target for this job
-	slaTarget := prometheus.GetDefaultSLATarget()
-	// TODO: In future, allow per-scenario SLA targets from job.Parameters
-	
 	// Check if job was canceled
 	if cancelResult != nil && cancelResult.WasCanceled {
 		// Job was canceled - don't record for SLA, return canceled status
@@ -602,14 +598,48 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 	
 	if err != nil {
-		// Record failed job for SLA tracking (check if SLA-worthy)
-		isSLAWorthy := job.IsSLAWorthy()
-		metricsExporter.RecordJobCompletion(duration, true, slaTarget, isSLAWorthy)
+		// Set completion time and failure reason
+		now := time.Now()
+		job.CompletedAt = &now
+		
+		// Determine failure reason based on error type
+		// This is critical for platform SLA calculation
+		errorStr := err.Error()
+		if strings.Contains(errorStr, "invalid") || strings.Contains(errorStr, "bad parameter") {
+			job.FailureReason = models.FailureReasonUserError
+		} else if strings.Contains(errorStr, "network") || strings.Contains(errorStr, "connection") {
+			job.FailureReason = models.FailureReasonNetworkError
+		} else if strings.Contains(errorStr, "input") || strings.Contains(errorStr, "corrupt") {
+			job.FailureReason = models.FailureReasonInputError
+		} else if strings.Contains(errorStr, "resource") || strings.Contains(errorStr, "out of memory") {
+			job.FailureReason = models.FailureReasonResourceError
+		} else if strings.Contains(errorStr, "timeout") {
+			job.FailureReason = models.FailureReasonTimeout
+		} else {
+			// Default to runtime error - will be treated as external by SLA logic
+			job.FailureReason = models.FailureReasonRuntimeError
+		}
+		
+		job.Status = models.JobStatusFailed
+		
+		// Record for platform SLA tracking
+		slaTargets := models.GetDefaultSLATimingTargets()
+		metricsExporter.RecordJobCompletion(job, slaTargets)
+		
+		// Check if this was a platform failure
+		isPlatformFailure := job.IsPlatformFailure()
+		failureType := "External"
+		if isPlatformFailure {
+			failureType = "Platform"
+		}
 		
 		log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
 		log.Printf("║ ❌ JOB FAILED: %s", job.ID)
 		log.Printf("║ Error: %v", err)
 		log.Printf("║ Duration: %.2f seconds", duration)
+		log.Printf("║ Failure Reason: %s", job.FailureReason)
+		log.Printf("║ Failure Type: %s (%s our fault)", failureType, 
+			map[bool]string{true: "IS", false: "NOT"}[isPlatformFailure])
 		log.Printf("╚════════════════════════════════════════════════════════════════╝\n")
 		return &models.JobResult{
 			JobID:       job.ID,
@@ -634,12 +664,24 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	metrics["engine"] = selectedEngine.Name()
 	
 	// Add SLA tracking to metrics
-	isSLAWorthy := job.IsSLAWorthy()
-	slaCategory := job.GetSLACategory()
-	metrics["sla_target_seconds"] = slaTarget.MaxDurationSeconds
-	metrics["sla_compliant"] = duration <= slaTarget.MaxDurationSeconds
-	metrics["sla_worthy"] = isSLAWorthy
-	metrics["sla_category"] = slaCategory
+	slaTargets := models.GetDefaultSLATimingTargets()
+	platformCompliant, slaReason := job.CalculatePlatformSLACompliance(slaTargets)
+	
+	// Calculate timing metrics
+	var queueTime, processingTime float64
+	if job.StartedAt != nil {
+		queueTime = job.StartedAt.Sub(job.CreatedAt).Seconds()
+		if job.CompletedAt != nil {
+			processingTime = job.CompletedAt.Sub(*job.StartedAt).Seconds()
+		}
+	}
+	
+	metrics["platform_sla_compliant"] = platformCompliant
+	metrics["platform_sla_reason"] = slaReason
+	metrics["sla_worthy"] = job.IsSLAWorthy()
+	metrics["sla_category"] = job.GetSLACategory()
+	metrics["queue_time_seconds"] = queueTime
+	metrics["processing_time_seconds"] = processingTime
 	
 	// Add input generation metrics if applicable
 	if inputGenResult != nil {
@@ -677,23 +719,40 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 			float64(inputBandwidthSize)/(1024*1024), float64(outputFileSize)/(1024*1024))
 	}
 	
-	// Record successful job completion for SLA tracking
-	metricsExporter.RecordJobCompletion(duration, false, slaTarget, isSLAWorthy)
+	// Set completion time
+	now := time.Now()
+	job.CompletedAt = &now
+	job.Status = models.JobStatusCompleted
+	
+	// Record successful job completion for platform SLA tracking
+	slaTargets2 := models.GetDefaultSLATimingTargets()
+	metricsExporter.RecordJobCompletion(job, slaTargets2)
 
-	// Check if job met SLA and log it
-	slaStatus := "✅ SLA MET"
-	if duration > slaTarget.MaxDurationSeconds {
-		slaStatus = "⚠️  SLA VIOLATED"
+	// Check if platform met SLA obligations
+	platformCompliant2, slaReason2 := job.CalculatePlatformSLACompliance(slaTargets2)
+	
+	slaStatus := "✅ PLATFORM SLA MET"
+	if !platformCompliant2 {
+		slaStatus = fmt.Sprintf("⚠️  PLATFORM SLA VIOLATED (%s)", slaReason2)
 	}
-	if !isSLAWorthy {
+	if !job.IsSLAWorthy() {
+		slaCategory := job.GetSLACategory()
 		slaStatus = fmt.Sprintf("ℹ️  NOT SLA-WORTHY (%s)", slaCategory)
+	}
+
+	// Calculate timing metrics
+	var queueTime2, processingTime2 float64
+	if job.StartedAt != nil {
+		queueTime2 = job.StartedAt.Sub(job.CreatedAt).Seconds()
+		processingTime2 = job.CompletedAt.Sub(*job.StartedAt).Seconds()
 	}
 
 	log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
 	log.Printf("║ ✅ JOB COMPLETED: %s", job.ID)
 	log.Printf("║ Total Duration: %.2f seconds", duration)
-	log.Printf("║ SLA Target: %.0f seconds", slaTarget.MaxDurationSeconds)
-	log.Printf("║ SLA Status: %s", slaStatus)
+	log.Printf("║ Queue Time: %.2f seconds (target: %.0fs)", queueTime2, slaTargets2.MaxQueueTimeSeconds)
+	log.Printf("║ Processing Time: %.2f seconds (target: %.0fs)", processingTime2, slaTargets2.MaxProcessingSeconds)
+	log.Printf("║ Platform SLA: %s", slaStatus)
 	log.Printf("║ Engine Used: %s", selectedEngine.Name())
 	if inputGenResult != nil {
 		log.Printf("║ Input Generation: %.2f seconds", inputGenResult.GenerationTime)

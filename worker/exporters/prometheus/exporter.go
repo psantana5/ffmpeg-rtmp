@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 )
@@ -398,26 +399,38 @@ func GetDefaultSLATarget() SLATarget {
 	}
 }
 
-// RecordJobCompletion records a completed job and tracks SLA compliance
+// RecordJobCompletion records a completed job and tracks SLA compliance based on PLATFORM behavior
 // Only counts SLA-worthy jobs (production workloads) toward SLA metrics
-func (e *WorkerExporter) RecordJobCompletion(durationSeconds float64, failed bool, slaTarget SLATarget, isSLAWorthy bool) {
+// 
+// CRITICAL: SLA is about platform performance, NOT job success
+// - Job failed due to bad input? → Platform compliant (not our fault)
+// - Job failed due to user error? → Platform compliant (not our fault)
+// - Job failed due to scheduler crash? → Platform violation (our fault)
+// - Job stuck in queue too long? → Platform violation (our fault)
+func (e *WorkerExporter) RecordJobCompletion(job *models.Job, targets models.SLATimingTargets) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if failed {
+	// Track all job completions/failures
+	if job.Status == models.JobStatusFailed || job.Status == models.JobStatusTimedOut {
 		e.jobsFailedTotal++
 	} else {
 		e.jobsCompletedTotal++
+	}
 
-		// Only track SLA compliance for SLA-worthy jobs (production workloads)
-		// Test, benchmark, and debug jobs are excluded from SLA metrics
-		if isSLAWorthy {
-			if durationSeconds <= slaTarget.MaxDurationSeconds {
-				e.jobsSLACompliant++
-			} else {
-				e.jobsSLAViolation++
-			}
-		}
+	// Only track SLA compliance for SLA-worthy jobs (production workloads)
+	// Test, benchmark, and debug jobs are excluded from SLA metrics
+	if !job.IsSLAWorthy() {
+		return
+	}
+
+	// Check if PLATFORM met its SLA obligations
+	compliant, _ := job.CalculatePlatformSLACompliance(targets)
+	
+	if compliant {
+		e.jobsSLACompliant++
+	} else {
+		e.jobsSLAViolation++
 	}
 
 	// Calculate current SLA compliance rate (only from SLA-worthy jobs)

@@ -24,10 +24,14 @@ const (
 type FailureReason string
 
 const (
-	FailureReasonCapabilityMismatch FailureReason = "capability_mismatch" // Missing GPU/encoder/engine
-	FailureReasonRuntimeError       FailureReason = "runtime_error"       // Execution error
-	FailureReasonTimeout            FailureReason = "timeout"             // Job exceeded timeout
-	FailureReasonUserError          FailureReason = "user_error"          // Invalid parameters/config
+	FailureReasonCapabilityMismatch FailureReason = "capability_mismatch" // Missing GPU/encoder/engine (USER ERROR - not SLA violation)
+	FailureReasonRuntimeError       FailureReason = "runtime_error"       // Execution error (NEEDS INSPECTION)
+	FailureReasonTimeout            FailureReason = "timeout"             // Job exceeded timeout (PLATFORM - SLA violation)
+	FailureReasonUserError          FailureReason = "user_error"          // Invalid parameters/config (USER ERROR - not SLA violation)
+	FailureReasonNetworkError       FailureReason = "network_error"       // External network issue (EXTERNAL - not SLA violation)
+	FailureReasonInputError         FailureReason = "input_error"         // Corrupt/invalid input file (USER ERROR - not SLA violation)
+	FailureReasonPlatformError      FailureReason = "platform_error"      // Platform/scheduler/worker failure (PLATFORM - SLA violation)
+	FailureReasonResourceError      FailureReason = "resource_error"      // Resource exhaustion/management failure (PLATFORM - SLA violation)
 )
 
 // JobClassification represents the business classification of a job
@@ -43,31 +47,31 @@ const (
 // Job represents a workload to be executed on a compute node
 type Job struct {
 	ID               string                 `json:"id"`
-	TenantID         string                 `json:"tenant_id,omitempty"`         // Tenant/organization ID
-	UserID           string                 `json:"user_id,omitempty"`           // User who created the job
-	SequenceNumber   int                    `json:"sequence_number,omitempty"`   // Human-friendly job number
-	Scenario         string                 `json:"scenario"`                    // e.g., "4K60-h264"
-	Confidence       string                 `json:"confidence"`                  // "auto", "high", "medium", "low"
-	Engine           string                 `json:"engine,omitempty"`            // "auto", "ffmpeg", "gstreamer"
-	Classification   JobClassification      `json:"classification,omitempty"`    // "production", "test", "benchmark", "debug"
+	TenantID         string                 `json:"tenant_id,omitempty"`       // Tenant/organization ID
+	UserID           string                 `json:"user_id,omitempty"`         // User who created the job
+	SequenceNumber   int                    `json:"sequence_number,omitempty"` // Human-friendly job number
+	Scenario         string                 `json:"scenario"`                  // e.g., "4K60-h264"
+	Confidence       string                 `json:"confidence"`                // "auto", "high", "medium", "low"
+	Engine           string                 `json:"engine,omitempty"`          // "auto", "ffmpeg", "gstreamer"
+	Classification   JobClassification      `json:"classification,omitempty"`  // "production", "test", "benchmark", "debug"
 	Parameters       map[string]interface{} `json:"parameters,omitempty"`
 	Status           JobStatus              `json:"status"`
-	Queue            string                 `json:"queue,omitempty"`             // "live", "default", "batch"
-	Priority         string                 `json:"priority,omitempty"`          // "high", "medium", "low"
-	Progress         int                    `json:"progress,omitempty"`          // 0-100%
+	Queue            string                 `json:"queue,omitempty"`    // "live", "default", "batch"
+	Priority         string                 `json:"priority,omitempty"` // "high", "medium", "low"
+	Progress         int                    `json:"progress,omitempty"` // 0-100%
 	NodeID           string                 `json:"node_id,omitempty"`
-	NodeName         string                 `json:"node_name,omitempty"`         // Human-friendly node name (not stored, populated on read)
+	NodeName         string                 `json:"node_name,omitempty"` // Human-friendly node name (not stored, populated on read)
 	CreatedAt        time.Time              `json:"created_at"`
 	StartedAt        *time.Time             `json:"started_at,omitempty"`
-	LastActivityAt   *time.Time             `json:"last_activity_at,omitempty"`  // Tracks last heartbeat/progress update
+	LastActivityAt   *time.Time             `json:"last_activity_at,omitempty"` // Tracks last heartbeat/progress update
 	CompletedAt      *time.Time             `json:"completed_at,omitempty"`
 	RetryCount       int                    `json:"retry_count"`
-	MaxRetries       int                    `json:"max_retries,omitempty"`       // Max retry attempts (default: 3)
-	RetryReason      string                 `json:"retry_reason,omitempty"`      // Reason for current retry
+	MaxRetries       int                    `json:"max_retries,omitempty"`  // Max retry attempts (default: 3)
+	RetryReason      string                 `json:"retry_reason,omitempty"` // Reason for current retry
 	Error            string                 `json:"error,omitempty"`
-	FailureReason    FailureReason          `json:"failure_reason,omitempty"`    // Explicit failure classification
-	Logs             string                 `json:"logs,omitempty"`              // Worker execution logs
-	TimeoutAt        *time.Time             `json:"timeout_at,omitempty"`        // Calculated timeout deadline
+	FailureReason    FailureReason          `json:"failure_reason,omitempty"` // Explicit failure classification
+	Logs             string                 `json:"logs,omitempty"`           // Worker execution logs
+	TimeoutAt        *time.Time             `json:"timeout_at,omitempty"`     // Calculated timeout deadline
 	StateTransitions []StateTransition      `json:"state_transitions,omitempty"`
 }
 
@@ -75,7 +79,7 @@ type Job struct {
 type JobRequest struct {
 	Scenario       string                 `json:"scenario"`
 	Confidence     string                 `json:"confidence,omitempty"`
-	Engine         string                 `json:"engine,omitempty"`        // "auto", "ffmpeg", "gstreamer"
+	Engine         string                 `json:"engine,omitempty"`         // "auto", "ffmpeg", "gstreamer"
 	Classification string                 `json:"classification,omitempty"` // "production", "test", "benchmark", "debug"
 	Parameters     map[string]interface{} `json:"parameters,omitempty"`
 	Queue          string                 `json:"queue,omitempty"`    // "live", "default", "batch"
@@ -84,19 +88,19 @@ type JobRequest struct {
 
 // JobResult represents the result of a completed job
 type JobResult struct {
-	JobID            string                 `json:"job_id"`
-	NodeID           string                 `json:"node_id"`
-	Status           JobStatus              `json:"status"`
-	Progress         int                    `json:"progress,omitempty"` // Final progress 0-100%
-	Metrics          map[string]interface{} `json:"metrics,omitempty"`
-	AnalyzerOutput   map[string]interface{} `json:"analyzer_output,omitempty"`
-	Error            string                 `json:"error,omitempty"`
-	Logs             string                 `json:"logs,omitempty"` // Worker execution logs
-	CompletedAt      time.Time              `json:"completed_at"`
-	QoEScore         float64                `json:"qoe_score,omitempty"`
-	EfficiencyScore  float64                `json:"efficiency_score,omitempty"`
-	EnergyJoules     float64                `json:"energy_joules,omitempty"`
-	VMAFScore        float64                `json:"vmaf_score,omitempty"`
+	JobID           string                 `json:"job_id"`
+	NodeID          string                 `json:"node_id"`
+	Status          JobStatus              `json:"status"`
+	Progress        int                    `json:"progress,omitempty"` // Final progress 0-100%
+	Metrics         map[string]interface{} `json:"metrics,omitempty"`
+	AnalyzerOutput  map[string]interface{} `json:"analyzer_output,omitempty"`
+	Error           string                 `json:"error,omitempty"`
+	Logs            string                 `json:"logs,omitempty"` // Worker execution logs
+	CompletedAt     time.Time              `json:"completed_at"`
+	QoEScore        float64                `json:"qoe_score,omitempty"`
+	EfficiencyScore float64                `json:"efficiency_score,omitempty"`
+	EnergyJoules    float64                `json:"energy_joules,omitempty"`
+	VMAFScore       float64                `json:"vmaf_score,omitempty"`
 }
 
 // StateTransition tracks job state changes with timestamps
@@ -222,4 +226,107 @@ func (j *Job) GetSLACategory() string {
 	}
 
 	return "other"
+}
+
+// SLATimingTargets defines timing targets for platform SLA
+type SLATimingTargets struct {
+	MaxQueueTimeSeconds  float64 // Max time job should wait in queue (default: 30s)
+	MaxStartDelaySeconds float64 // Max time from assignment to start (default: 60s)
+	MaxProcessingSeconds float64 // Max total processing time (default: 600s)
+}
+
+// GetDefaultSLATimingTargets returns default SLA timing targets
+func GetDefaultSLATimingTargets() SLATimingTargets {
+	return SLATimingTargets{
+		MaxQueueTimeSeconds:  30.0,  // Job should be assigned within 30s
+		MaxStartDelaySeconds: 60.0,  // Job should start within 60s of assignment
+		MaxProcessingSeconds: 600.0, // Job should complete within 10 minutes
+	}
+}
+
+// CalculatePlatformSLACompliance checks if the platform met its SLA obligations
+// Returns (compliant bool, reason string)
+func (j *Job) CalculatePlatformSLACompliance(targets SLATimingTargets) (bool, string) {
+	// If job is not SLA-worthy, return compliant by default
+	if !j.IsSLAWorthy() {
+		return true, "not_sla_worthy"
+	}
+
+	// Check if job failed due to platform error (SLA violation)
+	if j.Status == JobStatusFailed || j.Status == JobStatusTimedOut {
+		switch j.FailureReason {
+		case FailureReasonPlatformError:
+			return false, "platform_failure"
+		case FailureReasonResourceError:
+			return false, "resource_management_failure"
+		case FailureReasonTimeout:
+			// Check if it's a platform timeout or reasonable processing time
+			if j.StartedAt != nil && j.CompletedAt != nil {
+				processingTime := j.CompletedAt.Sub(*j.StartedAt).Seconds()
+				if processingTime > targets.MaxProcessingSeconds {
+					return false, "platform_timeout_exceeded"
+				}
+			}
+			return true, "user_timeout_reasonable"
+		case FailureReasonUserError, FailureReasonCapabilityMismatch,
+			FailureReasonNetworkError, FailureReasonInputError:
+			// These are NOT platform failures - platform behaved correctly
+			return true, "external_failure_platform_ok"
+		case FailureReasonRuntimeError:
+			// Runtime errors need inspection - default to platform compliant
+			// unless we can prove it's a platform issue
+			return true, "runtime_error_external"
+		default:
+			// Unknown failure reason - assume platform compliant
+			return true, "unknown_failure_external"
+		}
+	}
+
+	// Check timing SLAs for successful or in-progress jobs
+	now := time.Now()
+
+	// 1. Check queue time (created → assigned)
+	if j.StartedAt != nil {
+		// Job has been assigned
+		queueTime := j.StartedAt.Sub(j.CreatedAt).Seconds()
+		if queueTime > targets.MaxQueueTimeSeconds {
+			return false, "queue_time_exceeded"
+		}
+	} else if j.Status != JobStatusCompleted {
+		// Job still waiting to be assigned
+		queueTime := now.Sub(j.CreatedAt).Seconds()
+		if queueTime > targets.MaxQueueTimeSeconds {
+			return false, "queue_time_exceeded"
+		}
+	}
+
+	// 2. Check start delay (assigned → started)
+	// Note: In our system, assignment happens when worker picks up the job
+	// So this is essentially checking if there was a delay between assignment and execution
+
+	// 3. Check total processing time (started → completed)
+	if j.StartedAt != nil && j.CompletedAt != nil {
+		processingTime := j.CompletedAt.Sub(*j.StartedAt).Seconds()
+		if processingTime > targets.MaxProcessingSeconds {
+			return false, "processing_time_exceeded"
+		}
+	}
+
+	// Platform met all SLA obligations
+	return true, "compliant"
+}
+
+// IsPlatformFailure returns true if the job failed due to platform issues
+func (j *Job) IsPlatformFailure() bool {
+	return j.FailureReason == FailureReasonPlatformError ||
+		j.FailureReason == FailureReasonResourceError ||
+		j.FailureReason == FailureReasonTimeout
+}
+
+// IsExternalFailure returns true if the job failed due to external/user issues
+func (j *Job) IsExternalFailure() bool {
+	return j.FailureReason == FailureReasonUserError ||
+		j.FailureReason == FailureReasonCapabilityMismatch ||
+		j.FailureReason == FailureReasonNetworkError ||
+		j.FailureReason == FailureReasonInputError
 }
