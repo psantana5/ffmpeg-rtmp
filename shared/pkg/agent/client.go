@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,14 +11,16 @@ import (
 	"time"
 
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/retry"
 )
 
 // Client manages communication with the master node
 type Client struct {
-	masterURL  string
-	httpClient *http.Client
-	nodeID     string
-	apiKey     string
+	masterURL   string
+	httpClient  *http.Client
+	nodeID      string
+	apiKey      string
+	retryConfig retry.Config
 }
 
 // NewClient creates a new agent client
@@ -27,6 +30,7 @@ func NewClient(masterURL string) *Client {
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
+		retryConfig: retry.DefaultConfig(),
 	}
 }
 
@@ -40,6 +44,7 @@ func NewClientWithTLS(masterURL string, tlsConfig *tls.Config) *Client {
 				TLSClientConfig: tlsConfig,
 			},
 		},
+		retryConfig: retry.DefaultConfig(),
 	}
 }
 
@@ -99,94 +104,107 @@ func (c *Client) Register(reg *models.NodeRegistration) (*models.Node, error) {
 }
 
 // SendHeartbeat sends a heartbeat to the master
+// Uses retry logic for transient network failures (messages, not work)
 func (c *Client) SendHeartbeat() error {
 	if c.nodeID == "" {
 		return fmt.Errorf("node not registered")
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/nodes/%s/heartbeat", c.masterURL, c.nodeID), nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
+	return retry.Do(context.Background(), c.retryConfig, func() error {
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/nodes/%s/heartbeat", c.masterURL, c.nodeID), nil)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
 
-	req.Header.Set("Content-Type", "application/json")
-	c.addAuthHeader(req)
+		req.Header.Set("Content-Type", "application/json")
+		c.addAuthHeader(req)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send heartbeat: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send heartbeat: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("heartbeat failed with status %d: %s", resp.StatusCode, string(body))
-	}
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("heartbeat failed with status %d: %s", resp.StatusCode, string(body))
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // GetNextJob retrieves the next available job
+// Uses retry logic for transient network failures (messages, not work)
 func (c *Client) GetNextJob() (*models.Job, error) {
 	if c.nodeID == "" {
 		return nil, fmt.Errorf("node not registered")
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/jobs/next?node_id=%s", c.masterURL, c.nodeID), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
+	var job *models.Job
+	err := retry.Do(context.Background(), c.retryConfig, func() error {
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/jobs/next?node_id=%s", c.masterURL, c.nodeID), nil)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
 
-	c.addAuthHeader(req)
+		c.addAuthHeader(req)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get next job: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to get next job: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get next job failed with status %d: %s", resp.StatusCode, string(body))
-	}
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("get next job failed with status %d: %s", resp.StatusCode, string(body))
+		}
 
-	var result struct {
-		Job *models.Job `json:"job"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode job: %w", err)
-	}
+		var result struct {
+			Job *models.Job `json:"job"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return fmt.Errorf("failed to decode job: %w", err)
+		}
 
-	return result.Job, nil
+		job = result.Job
+		return nil
+	})
+
+	return job, err
 }
 
 // SendResults sends job results to the master
+// Uses retry logic for transient network failures (messages, not work)
 func (c *Client) SendResults(result *models.JobResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("failed to marshal results: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.masterURL+"/results", bytes.NewBuffer(data))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
+	return retry.Do(context.Background(), c.retryConfig, func() error {
+		req, err := http.NewRequest("POST", c.masterURL+"/results", bytes.NewBuffer(data))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
 
-	req.Header.Set("Content-Type", "application/json")
-	c.addAuthHeader(req)
+		req.Header.Set("Content-Type", "application/json")
+		c.addAuthHeader(req)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send results: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send results: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("send results failed with status %d: %s", resp.StatusCode, string(body))
-	}
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("send results failed with status %d: %s", resp.StatusCode, string(body))
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // GetNodeID returns the node ID

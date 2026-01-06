@@ -21,6 +21,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/agent"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/logging"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/shutdown"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 	"github.com/psantana5/ffmpeg-rtmp/worker/exporters/prometheus"
 	"github.com/psantana5/ffmpeg-rtmp/worker/pkg/resources"
@@ -155,6 +156,8 @@ func main() {
 	}).Methods("GET")
 	
 	// Readiness check endpoint (readiness probe)
+	// Note: Master reachability check is deferred until after registration
+	var readyClient *agent.Client // Will be set after client creation
 	metricsRouter.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		
@@ -162,13 +165,52 @@ func main() {
 		ready := true
 		checks := make(map[string]string)
 		
-		// TODO: Add more readiness checks
-		// - Master reachability
-		// - Disk space
-		// - FFmpeg availability
+		// Check 1: FFmpeg availability
+		if _, err := exec.LookPath("ffmpeg"); err != nil {
+			checks["ffmpeg"] = "not_found"
+			ready = false
+		} else {
+			checks["ffmpeg"] = "available"
+		}
 		
-		checks["ffmpeg"] = "available"
-		checks["disk_space"] = "ok"
+		// Check 2: Disk space (require at least 10% free)
+		diskInfo, err := resources.CheckDiskSpace("/tmp")
+		if err != nil {
+			checks["disk_space"] = fmt.Sprintf("error: %v", err)
+			ready = false
+		} else if diskInfo.UsedPercent > 90 {
+			checks["disk_space"] = fmt.Sprintf("low: %.1f%% used", diskInfo.UsedPercent)
+			ready = false
+		} else {
+			checks["disk_space"] = fmt.Sprintf("ok: %.1f%% used, %d MB available", diskInfo.UsedPercent, diskInfo.AvailableMB)
+		}
+		
+		// Check 3: Master reachability (skip if not registered yet)
+		if readyClient != nil && readyClient.GetNodeID() != "" {
+			// Try to send a heartbeat as a connectivity test
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
+			done := make(chan error, 1)
+			go func() {
+				done <- readyClient.SendHeartbeat()
+			}()
+			
+			select {
+			case err := <-done:
+				if err != nil {
+					checks["master"] = fmt.Sprintf("unreachable: %v", err)
+					ready = false
+				} else {
+					checks["master"] = "reachable"
+				}
+			case <-ctx.Done():
+				checks["master"] = "timeout"
+				ready = false
+			}
+		} else {
+			checks["master"] = "not_registered"
+		}
 		
 		if ready {
 			w.WriteHeader(http.StatusOK)
@@ -197,9 +239,14 @@ func main() {
 	// Set encoder availability metrics
 	metricsExporter.SetEncoderAvailability(nvencAvailable, qsvAvailable, vaapiAvailable)
 	
+	metricsServer := &http.Server{
+		Addr:    ":" + *metricsPort,
+		Handler: metricsRouter,
+	}
+	
 	go func() {
 		log.Printf("✓ Prometheus metrics endpoint: http://localhost:%s/metrics", *metricsPort)
-		if err := http.ListenAndServe(":"+*metricsPort, metricsRouter); err != nil {
+		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Metrics server error: %v", err)
 		}
 	}()
@@ -255,6 +302,9 @@ func main() {
 	} else {
 		log.Println("WARNING: No API key provided (authentication disabled)")
 	}
+	
+	// Set client for readiness checks
+	readyClient = client
 
 	// Register with master if requested
 	if *register {
@@ -343,17 +393,45 @@ func main() {
 		return
 	}
 
-	// Start heartbeat loop
+	// Initialize graceful shutdown manager
+	shutdownMgr := shutdown.New(30 * time.Second)
+	
+	// Register shutdown handlers
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Stopping metrics server...")
+		return metricsServer.Shutdown(ctx)
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Closing logger...")
+		return logger.Close()
+	})
+	
+	// Start shutdown signal handler
 	go func() {
-		ticker := time.NewTicker(*heartbeatInterval)
-		defer ticker.Stop()
+		shutdownMgr.Wait()
+		logger.Info("Shutdown signal received")
+	}()
 
-		for range ticker.C {
-			if err := client.SendHeartbeat(); err != nil {
-				log.Printf("Heartbeat failed: %v", err)
-			} else {
-				log.Println("Heartbeat sent")
-				metricsExporter.IncrementHeartbeat()
+	// Start heartbeat loop
+	heartbeatTicker := time.NewTicker(*heartbeatInterval)
+	defer heartbeatTicker.Stop()
+	
+	heartbeatDone := make(chan struct{})
+	go func() {
+		defer close(heartbeatDone)
+		for {
+			select {
+			case <-heartbeatTicker.C:
+				if err := client.SendHeartbeat(); err != nil {
+					log.Printf("Heartbeat failed: %v", err)
+				} else {
+					log.Println("Heartbeat sent")
+					metricsExporter.IncrementHeartbeat()
+				}
+			case <-shutdownMgr.Done():
+				logger.Info("Stopping heartbeat loop")
+				return
 			}
 		}
 	}()
@@ -367,65 +445,98 @@ func main() {
 	jobSemaphore := make(chan struct{}, *maxConcurrentJobs)
 	activeJobsCount := 0
 	var activeJobsMutex sync.Mutex
+	var wg sync.WaitGroup
 
-	for range ticker.C {
-		// Check if we can accept more jobs
-		activeJobsMutex.Lock()
-		currentActive := activeJobsCount
-		activeJobsMutex.Unlock()
+	for {
+		select {
+		case <-ticker.C:
+			// Check if we can accept more jobs
+			activeJobsMutex.Lock()
+			currentActive := activeJobsCount
+			activeJobsMutex.Unlock()
 
-		if currentActive >= *maxConcurrentJobs {
-			log.Printf("At max concurrent jobs (%d/%d), waiting...", currentActive, *maxConcurrentJobs)
-			continue
-		}
-
-		job, err := client.GetNextJob()
-		if err != nil {
-			log.Printf("Failed to get next job: %v", err)
-			continue
-		}
-
-		if job == nil {
-			// log.Println("No jobs available")  // Too verbose, comment out
-			continue
-		}
-
-		log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
-
-		// Acquire semaphore slot
-		jobSemaphore <- struct{}{}
-		
-		// Increment active jobs counter
-		activeJobsMutex.Lock()
-		activeJobsCount++
-		currentActive = activeJobsCount
-		activeJobsMutex.Unlock()
-		metricsExporter.SetActiveJobs(currentActive)
-
-		// Execute job concurrently
-		go func(j *models.Job) {
-			defer func() {
-				// Release semaphore slot
-				<-jobSemaphore
-				
-				// Decrement active jobs counter
-				activeJobsMutex.Lock()
-				activeJobsCount--
-				currentActive := activeJobsCount
-				activeJobsMutex.Unlock()
-				metricsExporter.SetActiveJobs(currentActive)
-			}()
-
-			// Execute job with hardware-optimized parameters
-			result := executeJob(j, client, ffmpegOpt, engineSelector, inputGenerator, *generateInput, metricsExporter)
-
-			// Send results
-			if err := client.SendResults(result); err != nil {
-				log.Printf("Failed to send results: %v", err)
-			} else {
-				log.Printf("Results sent for job %s (status: %s)", j.ID, result.Status)
+			if currentActive >= *maxConcurrentJobs {
+				log.Printf("At max concurrent jobs (%d/%d), waiting...", currentActive, *maxConcurrentJobs)
+				continue
 			}
-		}(job)
+
+			job, err := client.GetNextJob()
+			if err != nil {
+				log.Printf("Failed to get next job: %v", err)
+				continue
+			}
+
+			if job == nil {
+				// log.Println("No jobs available")  // Too verbose, comment out
+				continue
+			}
+
+			log.Printf("Received job: %s (scenario: %s)", job.ID, job.Scenario)
+
+			// Acquire semaphore slot
+			jobSemaphore <- struct{}{}
+			
+			// Increment active jobs counter
+			activeJobsMutex.Lock()
+			activeJobsCount++
+			currentActive = activeJobsCount
+			activeJobsMutex.Unlock()
+			metricsExporter.SetActiveJobs(currentActive)
+
+			// Execute job concurrently
+			wg.Add(1)
+			go func(j *models.Job) {
+				defer wg.Done()
+				defer func() {
+					// Release semaphore slot
+					<-jobSemaphore
+					
+					// Decrement active jobs counter
+					activeJobsMutex.Lock()
+					activeJobsCount--
+					currentActive := activeJobsCount
+					activeJobsMutex.Unlock()
+					metricsExporter.SetActiveJobs(currentActive)
+				}()
+
+				// Execute job with hardware-optimized parameters
+				result := executeJob(j, client, ffmpegOpt, engineSelector, inputGenerator, *generateInput, metricsExporter)
+
+				// Send results
+				if err := client.SendResults(result); err != nil {
+					log.Printf("Failed to send results: %v", err)
+				} else {
+					log.Printf("Results sent for job %s (status: %s)", j.ID, result.Status)
+				}
+			}(job)
+			
+		case <-shutdownMgr.Done():
+			logger.Info("Shutdown signal received - stopping job polling")
+			logger.Info("Waiting for active jobs to complete...")
+			
+			// Wait for all jobs to complete with timeout
+			done := make(chan struct{})
+			go func() {
+				wg.Wait()
+				close(done)
+			}()
+			
+			select {
+			case <-done:
+				logger.Info("All jobs completed successfully")
+			case <-time.After(30 * time.Second):
+				logger.Warn("Timeout waiting for jobs - some jobs may not have completed")
+			}
+			
+			// Wait for heartbeat to stop
+			<-heartbeatDone
+			
+			// Execute shutdown handlers
+			shutdownMgr.Shutdown()
+			
+			logger.Info("Worker agent shutdown complete")
+			return
+		}
 	}
 }
 

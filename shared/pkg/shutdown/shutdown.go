@@ -15,6 +15,8 @@ type Manager struct {
 	shutdownFuncs []func(context.Context) error
 	mu            sync.Mutex
 	timeout       time.Duration
+	doneChan      chan struct{}
+	once          sync.Once
 }
 
 // New creates a new shutdown manager
@@ -22,6 +24,7 @@ func New(timeout time.Duration) *Manager {
 	return &Manager{
 		shutdownFuncs: make([]func(context.Context) error, 0),
 		timeout:       timeout,
+		doneChan:      make(chan struct{}),
 	}
 }
 
@@ -42,7 +45,15 @@ func (m *Manager) Wait() {
 	fmt.Printf("\nReceived signal: %v\n", sig)
 	fmt.Println("Initiating graceful shutdown...")
 	
-	m.Shutdown()
+	// Close done channel to notify waiting goroutines
+	m.once.Do(func() {
+		close(m.doneChan)
+	})
+}
+
+// Done returns a channel that is closed when shutdown is initiated
+func (m *Manager) Done() <-chan struct{} {
+	return m.doneChan
 }
 
 // Shutdown executes all registered shutdown functions

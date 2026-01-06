@@ -6,9 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -19,6 +17,7 @@ import (
 	"github.com/psantana5/ffmpeg-rtmp/pkg/cleanup"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/logging"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/scheduler"
+	"github.com/psantana5/ffmpeg-rtmp/pkg/shutdown"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 	tlsutil "github.com/psantana5/ffmpeg-rtmp/pkg/tls"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/tracing"
@@ -281,6 +280,7 @@ func main() {
 
 	// Add metrics endpoint if enabled
 	var metricsExporter *prometheus.MasterExporter
+	var metricsSrv *http.Server
 	if *enableMetrics {
 		log.Println("✓ Prometheus metrics endpoint enabled")
 		metricsExporter = prometheus.NewMasterExporter(dataStore, bandwidthMonitor)
@@ -297,7 +297,7 @@ func main() {
 			w.Write([]byte(`{"status":"healthy"}`))
 		}).Methods("GET")
 
-		metricsSrv := &http.Server{
+		metricsSrv = &http.Server{
 			Addr:         ":" + *metricsPort,
 			Handler:      metricsRouter,
 			ReadTimeout:  10 * time.Second,
@@ -376,9 +376,49 @@ func main() {
 		log.Println("Enable with --tls flag or set --tls=false explicitly to suppress this warning")
 	}
 
-	// Setup graceful shutdown
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	// Initialize graceful shutdown manager
+	shutdownMgr := shutdown.New(30 * time.Second)
+	
+	// Register shutdown handlers (LIFO order)
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Closing database connection...")
+		if closer, ok := dataStore.(interface{ Close() error }); ok {
+			return closer.Close()
+		}
+		return nil
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		if cleanupMgr != nil {
+			logger.Info("Stopping cleanup manager...")
+			cleanupMgr.Stop()
+		}
+		return nil
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Stopping scheduler...")
+		sched.Stop()
+		return nil
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Stopping metrics server...")
+		if metricsSrv != nil {
+			return metricsSrv.Shutdown(ctx)
+		}
+		return nil
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Stopping HTTP server...")
+		return srv.Shutdown(ctx)
+	})
+	
+	shutdownMgr.Register(func(ctx context.Context) error {
+		logger.Info("Closing logger...")
+		return logger.Close()
+	})
 
 	// Start server in goroutine
 	go func() {
@@ -405,28 +445,14 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
-	<-stop
+	// Wait for shutdown signal
+	shutdownMgr.Wait()
+	logger.Info("Shutdown signal received")
 
-	log.Println("Shutting down gracefully...")
+	// Execute shutdown handlers
+	shutdownMgr.Shutdown()
 
-	// Stop cleanup manager
-	if cleanupMgr != nil {
-		cleanupMgr.Stop()
-	}
-
-	// Stop scheduler first
-	sched.Stop()
-
-	// Give outstanding requests 30 seconds to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server shutdown error: %v", err)
-	}
-
-	log.Println("Server stopped")
+	logger.Info("Master server shutdown complete")
 }
 
 // maskPassword masks the password in a database DSN for logging
