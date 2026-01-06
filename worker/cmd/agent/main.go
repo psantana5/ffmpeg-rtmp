@@ -858,6 +858,11 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		}
 	}
 
+	// Check if wrapper is enabled for this job
+	if job.WrapperEnabled {
+		return executeWithWrapperPath(job, cmdPath, cmdName, args, limits, metricsExporter)
+	}
+
 	// Get duration for timeout calculation
 	duration := 0
 	if job.Parameters != nil {
@@ -1071,6 +1076,97 @@ func executeEngineJob(job *models.Job, client *agent.Client, engine agent.Engine
 		"status":        "success",
 	}
 
+	return metrics, analyzerOutput, logBuffer.String(), nil, nil
+}
+
+// executeWithWrapperPath executes a job using the edge workload wrapper
+func executeWithWrapperPath(job *models.Job, cmdPath string, cmdName string, args []string, limits *resources.ResourceLimits, metricsExporter *prometheus.WorkerExporter) (metrics map[string]interface{}, analyzerOutput map[string]interface{}, logs string, cancelResult *CancellationResult, err error) {
+	log.Printf("🔧 Wrapper mode enabled for job %s", job.ID)
+	
+	// Get duration for timeout calculation
+	duration := 0
+	if job.Parameters != nil {
+		if d, ok := job.Parameters["duration"].(float64); ok {
+			duration = int(d)
+		} else if d, ok := job.Parameters["duration"].(int); ok {
+			duration = d
+		} else if d, ok := job.Parameters["duration_seconds"].(float64); ok {
+			duration = int(d)
+		} else if d, ok := job.Parameters["duration_seconds"].(int); ok {
+			duration = d
+		}
+	}
+	
+	// Determine timeout
+	var timeoutDuration time.Duration
+	if limits.TimeoutSec > 0 {
+		timeoutDuration = time.Duration(limits.TimeoutSec) * time.Second
+	} else if duration > 0 {
+		timeoutDuration = time.Duration(duration*2 + 60) * time.Second
+	} else {
+		timeoutDuration = 10 * time.Minute
+	}
+	
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutDuration)
+	defer cancel()
+	
+	// Execute with wrapper
+	startTime := time.Now()
+	result, err := agent.ExecuteWithWrapper(ctx, job, cmdPath, args)
+	execDuration := time.Since(startTime).Seconds()
+	
+	// Build logs
+	var logBuffer bytes.Buffer
+	logBuffer.WriteString(fmt.Sprintf("=== Wrapper Execution ===\n"))
+	logBuffer.WriteString(fmt.Sprintf("Command: %s %s\n", cmdName, strings.Join(args, " ")))
+	logBuffer.WriteString(fmt.Sprintf("Duration: %.2f seconds\n", execDuration))
+	logBuffer.WriteString(fmt.Sprintf("PID: %d\n", result.PID))
+	logBuffer.WriteString(fmt.Sprintf("Exit Code: %d\n", result.ExitCode))
+	logBuffer.WriteString(fmt.Sprintf("Platform SLA: %v (%s)\n", result.PlatformSLA, result.PlatformSLAReason))
+	
+	if err != nil {
+		logBuffer.WriteString(fmt.Sprintf("\n=== ERROR ===\n%v\n", err))
+		return nil, nil, logBuffer.String(), nil, fmt.Errorf("wrapper execution failed: %w", err)
+	}
+	
+	// Check exit code
+	if result.ExitCode != 0 {
+		logBuffer.WriteString(fmt.Sprintf("\n=== NON-ZERO EXIT ===\nProcess exited with code %d\n", result.ExitCode))
+		return nil, nil, logBuffer.String(), nil, fmt.Errorf("%s exited with code %d", cmdName, result.ExitCode)
+	}
+	
+	// Success
+	logBuffer.WriteString(fmt.Sprintf("\n✓ %s completed via wrapper (%.2f seconds)\n", cmdName, execDuration))
+	
+	// Build metrics
+	metrics = map[string]interface{}{
+		"exec_duration":   execDuration,
+		"wrapper_enabled": true,
+		"platform_sla":    result.PlatformSLA,
+		"exit_code":       result.ExitCode,
+		"pid":             result.PID,
+	}
+	
+	// Determine output mode
+	outputMode := "file"
+	if job.Parameters != nil {
+		if mode, ok := job.Parameters["output_mode"].(string); ok {
+			outputMode = mode
+		}
+	}
+	
+	// Generate analyzer output
+	analyzerOutput = map[string]interface{}{
+		"scenario":      job.Scenario,
+		"engine":        cmdName,
+		"output_mode":   outputMode,
+		"exec_duration": execDuration,
+		"status":        "success",
+		"wrapper":       true,
+		"platform_sla":  result.PlatformSLA,
+	}
+	
 	return metrics, analyzerOutput, logBuffer.String(), nil, nil
 }
 
