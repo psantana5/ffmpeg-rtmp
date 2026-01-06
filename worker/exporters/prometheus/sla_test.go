@@ -12,9 +12,9 @@ func TestSLATracking(t *testing.T) {
 	slaTarget := GetDefaultSLATarget()
 	
 	// Record some jobs: 2 compliant, 1 violation
-	exporter.RecordJobCompletion(300, false, slaTarget)  // 5 min - compliant
-	exporter.RecordJobCompletion(500, false, slaTarget)  // 8.3 min - compliant
-	exporter.RecordJobCompletion(700, false, slaTarget)  // 11.7 min - violation (over 10 min target)
+	exporter.RecordJobCompletion(300, false, slaTarget, true)  // 5 min - compliant, SLA-worthy
+	exporter.RecordJobCompletion(500, false, slaTarget, true)  // 8.3 min - compliant, SLA-worthy
+	exporter.RecordJobCompletion(700, false, slaTarget, true)  // 11.7 min - violation (over 10 min target), SLA-worthy
 	
 	// Create HTTP test request
 	req := httptest.NewRequest("GET", "/metrics", nil)
@@ -66,9 +66,9 @@ func TestSLAFailedJobs(t *testing.T) {
 	slaTarget := GetDefaultSLATarget()
 	
 	// Record 2 successful, 1 failed job
-	exporter.RecordJobCompletion(300, false, slaTarget)  // Success
-	exporter.RecordJobCompletion(400, false, slaTarget)  // Success
-	exporter.RecordJobCompletion(200, true, slaTarget)   // Failed (doesn't count for SLA)
+	exporter.RecordJobCompletion(300, false, slaTarget, true)  // Success, SLA-worthy
+	exporter.RecordJobCompletion(400, false, slaTarget, true)  // Success, SLA-worthy
+	exporter.RecordJobCompletion(200, true, slaTarget, false)   // Failed (doesn't count for SLA)
 	
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
@@ -140,7 +140,7 @@ func TestSLAComplianceRate(t *testing.T) {
 			
 			// Record jobs
 			for _, job := range tc.jobs {
-				exporter.RecordJobCompletion(job.duration, job.failed, slaTarget)
+				exporter.RecordJobCompletion(job.duration, job.failed, slaTarget, true)
 			}
 			
 			// Check compliance rate
@@ -169,10 +169,10 @@ func TestGetJobCompletionStats(t *testing.T) {
 	slaTarget := GetDefaultSLATarget()
 	
 	// Record various jobs
-	exporter.RecordJobCompletion(300, false, slaTarget)  // Completed, compliant
-	exporter.RecordJobCompletion(700, false, slaTarget)  // Completed, violation
-	exporter.RecordJobCompletion(400, false, slaTarget)  // Completed, compliant
-	exporter.RecordJobCompletion(200, true, slaTarget)   // Failed
+	exporter.RecordJobCompletion(300, false, slaTarget, true)  // Completed, compliant, SLA-worthy
+	exporter.RecordJobCompletion(700, false, slaTarget, true)  // Completed, violation, SLA-worthy
+	exporter.RecordJobCompletion(400, false, slaTarget, true)  // Completed, compliant, SLA-worthy
+	exporter.RecordJobCompletion(200, true, slaTarget, false)   // Failed (not counted)
 	
 	completed, failed, compliant, violation := exporter.GetJobCompletionStats()
 	
@@ -213,9 +213,9 @@ func TestSLAExactBoundary(t *testing.T) {
 	slaTarget := SLATarget{MaxDurationSeconds: 600, MaxFailureRate: 0.05}
 	
 	// Test exact boundary cases
-	exporter.RecordJobCompletion(600.0, false, slaTarget)  // Exactly at limit - should be compliant
-	exporter.RecordJobCompletion(600.1, false, slaTarget)  // Just over limit - should be violation
-	exporter.RecordJobCompletion(599.9, false, slaTarget)  // Just under limit - should be compliant
+	exporter.RecordJobCompletion(600.0, false, slaTarget, true)  // Exactly at limit - should be compliant
+	exporter.RecordJobCompletion(600.1, false, slaTarget, true)  // Just over limit - should be violation
+	exporter.RecordJobCompletion(599.9, false, slaTarget, true)  // Just under limit - should be compliant
 	
 	completed, _, compliant, violation := exporter.GetJobCompletionStats()
 	

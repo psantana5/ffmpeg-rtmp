@@ -151,7 +151,7 @@ curl -sk -H "Authorization: Bearer $API_KEY" "$MASTER_URL/jobs" | \
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "⏳ Monitor progress: watch -n 2 'curl -sk -H \"Authorization: Bearer \$MASTER_API_KEY\" $MASTER_URL/jobs | jq \".count, .jobs | group_by(.status) | map({status: .[0].status, count: length})\"'"
+echo "Monitor progress: watch -n 2 'curl -sk -H \"Authorization: Bearer \$MASTER_API_KEY\" $MASTER_URL/jobs | jq \".count, .jobs | group_by(.status) | map({status: .[0].status, count: length})\"'"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

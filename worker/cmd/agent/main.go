@@ -602,8 +602,9 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 	
 	if err != nil {
-		// Record failed job for SLA tracking
-		metricsExporter.RecordJobCompletion(duration, true, slaTarget)
+		// Record failed job for SLA tracking (check if SLA-worthy)
+		isSLAWorthy := job.IsSLAWorthy()
+		metricsExporter.RecordJobCompletion(duration, true, slaTarget, isSLAWorthy)
 		
 		log.Printf("\n╔════════════════════════════════════════════════════════════════╗")
 		log.Printf("║ ❌ JOB FAILED: %s", job.ID)
@@ -633,8 +634,12 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	metrics["engine"] = selectedEngine.Name()
 	
 	// Add SLA tracking to metrics
+	isSLAWorthy := job.IsSLAWorthy()
+	slaCategory := job.GetSLACategory()
 	metrics["sla_target_seconds"] = slaTarget.MaxDurationSeconds
 	metrics["sla_compliant"] = duration <= slaTarget.MaxDurationSeconds
+	metrics["sla_worthy"] = isSLAWorthy
+	metrics["sla_category"] = slaCategory
 	
 	// Add input generation metrics if applicable
 	if inputGenResult != nil {
@@ -673,12 +678,15 @@ func executeJob(job *models.Job, client *agent.Client, ffmpegOpt *agent.FFmpegOp
 	}
 	
 	// Record successful job completion for SLA tracking
-	metricsExporter.RecordJobCompletion(duration, false, slaTarget)
-	
+	metricsExporter.RecordJobCompletion(duration, false, slaTarget, isSLAWorthy)
+
 	// Check if job met SLA and log it
 	slaStatus := "✅ SLA MET"
 	if duration > slaTarget.MaxDurationSeconds {
 		slaStatus = "⚠️  SLA VIOLATED"
+	}
+	if !isSLAWorthy {
+		slaStatus = fmt.Sprintf("ℹ️  NOT SLA-WORTHY (%s)", slaCategory)
 	}
 
 	log.Printf("\n╔════════════════════════════════════════════════════════════════╗")

@@ -399,29 +399,33 @@ func GetDefaultSLATarget() SLATarget {
 }
 
 // RecordJobCompletion records a completed job and tracks SLA compliance
-func (e *WorkerExporter) RecordJobCompletion(durationSeconds float64, failed bool, slaTarget SLATarget) {
+// Only counts SLA-worthy jobs (production workloads) toward SLA metrics
+func (e *WorkerExporter) RecordJobCompletion(durationSeconds float64, failed bool, slaTarget SLATarget, isSLAWorthy bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	if failed {
 		e.jobsFailedTotal++
 	} else {
 		e.jobsCompletedTotal++
-		
-		// Check SLA compliance (only for successful jobs)
-		if durationSeconds <= slaTarget.MaxDurationSeconds {
-			e.jobsSLACompliant++
-		} else {
-			e.jobsSLAViolation++
+
+		// Only track SLA compliance for SLA-worthy jobs (production workloads)
+		// Test, benchmark, and debug jobs are excluded from SLA metrics
+		if isSLAWorthy {
+			if durationSeconds <= slaTarget.MaxDurationSeconds {
+				e.jobsSLACompliant++
+			} else {
+				e.jobsSLAViolation++
+			}
 		}
 	}
-	
-	// Calculate current SLA compliance rate
+
+	// Calculate current SLA compliance rate (only from SLA-worthy jobs)
 	totalSLAEligibleJobs := e.jobsSLACompliant + e.jobsSLAViolation
 	if totalSLAEligibleJobs > 0 {
 		e.currentSLAComplianceRate = (float64(e.jobsSLACompliant) / float64(totalSLAEligibleJobs)) * 100
 	} else {
-		e.currentSLAComplianceRate = 100.0 // No jobs yet = 100% compliance
+		e.currentSLAComplianceRate = 100.0 // No SLA-worthy jobs yet = 100% compliance
 	}
 }
 
