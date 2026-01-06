@@ -44,7 +44,15 @@ func Run(ctx context.Context, jobID string, limits *cgroups.Limits, command stri
 	pid := cmd.Process.Pid
 	
 	// Apply limits (best effort)
-	applyLimits(jobID, pid, limits)
+	cgroupPath := applyLimits(jobID, pid, limits)
+	
+	// Cleanup cgroup on exit
+	defer func() {
+		if cgroupPath != "" {
+			mgr := cgroups.New()
+			mgr.Delete(cgroupPath)
+		}
+	}()
 	
 	// Wait for completion
 	err := cmd.Wait()
@@ -69,19 +77,22 @@ func Run(ctx context.Context, jobID string, limits *cgroups.Limits, command stri
 }
 
 // applyLimits applies cgroup limits (best effort)
-func applyLimits(jobID string, pid int, limits *cgroups.Limits) {
+// Returns cgroup path for cleanup
+func applyLimits(jobID string, pid int, limits *cgroups.Limits) string {
 	if limits == nil {
-		return
+		return ""
 	}
 	
 	mgr := cgroups.New()
 	cgroupPath, err := mgr.Create(jobID)
 	if err != nil || cgroupPath == "" {
-		return // Can't create cgroup, continue anyway
+		return "" // Can't create cgroup, continue anyway
 	}
 	
 	// Join cgroup
-	mgr.Join(cgroupPath, pid)
+	if err := mgr.Join(cgroupPath, pid); err != nil {
+		return "" // Failed to join, skip limits
+	}
 	
 	// Apply limits (all best effort)
 	if limits.CPUMax != "" {
@@ -96,6 +107,8 @@ func applyLimits(jobID string, pid int, limits *cgroups.Limits) {
 	if limits.IOMax != "" {
 		cgroups.WriteIOMax(cgroupPath, limits.IOMax)
 	}
+	
+	return cgroupPath
 }
 
 // calculatePlatformSLA determines if platform behaved correctly

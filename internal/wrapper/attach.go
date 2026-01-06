@@ -29,18 +29,28 @@ func Attach(ctx context.Context, jobID string, pid int, limits *cgroups.Limits) 
 	timing := observe.NewTiming()
 	
 	// Apply limits (best effort, no errors)
-	applyLimits(jobID, pid, limits)
+	cgroupPath := applyLimits(jobID, pid, limits)
+	
+	// Cleanup cgroup on exit (best effort)
+	defer func() {
+		if cgroupPath != "" {
+			mgr := cgroups.New()
+			mgr.Delete(cgroupPath)
+		}
+	}()
 	
 	// Create watcher
 	watcher := observe.New(pid)
 	
-	// Passive observation only
-	// If wrapper crashes here → workload continues ✓
+	// Wait for process to exit (or context cancel)
+	done := make(chan struct{})
+	
 	go func() {
-		<-ctx.Done()
+		watcher.Wait()
+		close(done)
 	}()
 	
-	// Wait for process to exit (or context cancel)
+	// If wrapper crashes here → workload continues ✓
 	select {
 	case <-ctx.Done():
 		// Wrapper told to stop, workload continues
@@ -49,11 +59,9 @@ func Attach(ctx context.Context, jobID string, pid int, limits *cgroups.Limits) 
 		result.SetPlatformSLA(true, "detached_workload_continues")
 		return result, ctx.Err()
 		
-	default:
-		// Wait for process exit
-		watcher.Wait()
+	case <-done:
+		// Process exited naturally
 		timing.Complete()
-		
 		result := report.NewResult(jobID, pid, -1, timing.Duration(), "attach")
 		result.SetPlatformSLA(true, "observed_to_completion")
 		return result, nil

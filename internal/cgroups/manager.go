@@ -31,7 +31,7 @@ func New() *Manager {
 // Returns: cgroup path (empty if failed)
 func (m *Manager) Create(jobID string) (string, error) {
 	if jobID == "" {
-		return "", fmt.Errorf("job_id required")
+		jobID = fmt.Sprintf("unnamed-%d", os.Getpid())
 	}
 	
 	cgroupName := fmt.Sprintf("ffrtmp/%s", jobID)
