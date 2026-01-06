@@ -10,7 +10,6 @@ import (
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/bandwidth"
-	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/store"
 )
 
@@ -44,68 +43,38 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Collect current state
 	nodes := e.store.GetAllNodes()
-	jobs := e.store.GetAllJobs()
-
-	// Count jobs by state
-	jobsByState := make(map[models.JobStatus]int)
-	activeJobs := 0
-	queueLength := 0
-	var totalDuration float64
-	jobCount := 0
 	
-	// Count jobs by engine (new)
-	jobsByEngine := map[string]int{
-		"ffmpeg":    0,
-		"gstreamer": 0,
-		"auto":      0,
-	}
-	completedByEngine := map[string]int{
-		"ffmpeg":    0,
-		"gstreamer": 0,
+	// Get job metrics efficiently (without loading all jobs into memory)
+	jobMetrics, err := e.store.GetJobMetrics()
+	if err != nil {
+		// Fallback to error response
+		http.Error(w, fmt.Sprintf("Error collecting job metrics: %v", err), http.StatusInternalServerError)
+		return
 	}
 
-	for _, job := range jobs {
-		jobsByState[job.Status]++
-		
-		// Track engine distribution
-		if job.Engine != "" {
-			jobsByEngine[job.Engine]++
-		}
-		
-		// Count active jobs (processing or assigned)
-		if job.Status == models.JobStatusProcessing || job.Status == models.JobStatusAssigned {
-			activeJobs++
-		}
-		
-		// Count queued jobs (includes both pending and queued states)
-		if job.Status == models.JobStatusQueued || job.Status == models.JobStatusPending {
-			queueLength++
-		}
-
-		// Calculate durations for completed jobs
-		if job.Status == models.JobStatusCompleted || job.Status == models.JobStatusFailed {
-			if job.CompletedAt != nil && !job.CreatedAt.IsZero() {
-				duration := job.CompletedAt.Sub(job.CreatedAt).Seconds()
-				totalDuration += duration
-				jobCount++
-			}
-			
-			// Track completed jobs by actual engine used
-			// If engine is "auto", treat it as ffmpeg (the default implementation)
-			if job.Status == models.JobStatusCompleted && job.Engine != "" {
-				engine := job.Engine
-				if engine == "auto" {
-					engine = "ffmpeg" // Auto defaults to ffmpeg
-				}
-				completedByEngine[engine]++
-			}
-		}
+	// Extract metrics for easier access
+	jobsByState := jobMetrics.JobsByState
+	activeJobs := jobMetrics.ActiveJobs
+	queueLength := jobMetrics.QueueLength
+	avgDuration := jobMetrics.AvgDuration
+	jobsByEngine := jobMetrics.JobsByEngine
+	completedByEngine := jobMetrics.CompletedByEngine
+	
+	// Ensure all engine types exist (even if 0)
+	if _, ok := jobsByEngine["ffmpeg"]; !ok {
+		jobsByEngine["ffmpeg"] = 0
 	}
-
-	// Calculate average duration
-	avgDuration := 0.0
-	if jobCount > 0 {
-		avgDuration = totalDuration / float64(jobCount)
+	if _, ok := jobsByEngine["gstreamer"]; !ok {
+		jobsByEngine["gstreamer"] = 0
+	}
+	if _, ok := jobsByEngine["auto"]; !ok {
+		jobsByEngine["auto"] = 0
+	}
+	if _, ok := completedByEngine["ffmpeg"]; !ok {
+		completedByEngine["ffmpeg"] = 0
+	}
+	if _, ok := completedByEngine["gstreamer"]; !ok {
+		completedByEngine["gstreamer"] = 0
 	}
 
 	// ffrtmp_jobs_total{state}
@@ -170,24 +139,28 @@ func (e *MasterExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "ffrtmp_nodes_by_status{status=\"%s\"} %d\n", status, nodesByStatus[status])
 	}
 
-	// Queue breakdown by priority and type
+	// Queue breakdown by priority and type (from optimized query)
+	queueByPriority := jobMetrics.QueueByPriority
+	queueByType := jobMetrics.QueueByType
+	
 	// Initialize all possible values to ensure metrics always exist
-	queueByPriority := map[string]int{
-		"high":   0,
-		"medium": 0,
-		"low":    0,
+	if _, ok := queueByPriority["high"]; !ok {
+		queueByPriority["high"] = 0
 	}
-	queueByType := map[string]int{
-		"live":    0,
-		"default": 0,
-		"batch":   0,
+	if _, ok := queueByPriority["medium"]; !ok {
+		queueByPriority["medium"] = 0
 	}
-	for _, job := range jobs {
-		// Count jobs in queue (both pending and queued states)
-		if job.Status == models.JobStatusQueued || job.Status == models.JobStatusPending {
-			queueByPriority[job.Priority]++
-			queueByType[job.Queue]++
-		}
+	if _, ok := queueByPriority["low"]; !ok {
+		queueByPriority["low"] = 0
+	}
+	if _, ok := queueByType["live"]; !ok {
+		queueByType["live"] = 0
+	}
+	if _, ok := queueByType["default"]; !ok {
+		queueByType["default"] = 0
+	}
+	if _, ok := queueByType["batch"]; !ok {
+		queueByType["batch"] = 0
 	}
 	
 	fmt.Fprintf(w, "\n# HELP ffrtmp_queue_by_priority Jobs in queue by priority\n")

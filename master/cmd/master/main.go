@@ -302,7 +302,7 @@ func main() {
 			Addr:         ":" + *metricsPort,
 			Handler:      metricsRouter,
 			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
+			WriteTimeout: 30 * time.Second, // Increased for metrics collection
 		}
 
 		// Start metrics server in background

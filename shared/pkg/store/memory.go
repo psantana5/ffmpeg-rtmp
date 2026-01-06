@@ -802,3 +802,70 @@ func (s *MemoryStore) GetJobs(status string) ([]models.Job, error) {
 func (s *MemoryStore) Vacuum() error {
 	return nil
 }
+
+// GetJobMetrics returns aggregated job statistics optimized for metrics endpoint
+func (s *MemoryStore) GetJobMetrics() (*JobMetrics, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	metrics := &JobMetrics{
+		JobsByState:       make(map[models.JobStatus]int),
+		JobsByEngine:      make(map[string]int),
+		CompletedByEngine: make(map[string]int),
+		QueueByPriority:   make(map[string]int),
+		QueueByType:       make(map[string]int),
+	}
+
+	var totalDuration float64
+	var durationCount int
+
+	for _, job := range s.jobs {
+		// Count by state
+		metrics.JobsByState[job.Status]++
+		metrics.TotalJobs++
+
+		// Count by engine
+		if job.Engine != "" {
+			metrics.JobsByEngine[job.Engine]++
+		}
+
+		// Count active jobs
+		if job.Status == models.JobStatusProcessing || job.Status == models.JobStatusAssigned {
+			metrics.ActiveJobs++
+		}
+
+		// Count queued jobs
+		if job.Status == models.JobStatusQueued || job.Status == models.JobStatusPending {
+			metrics.QueueLength++
+			
+			// Count by priority and type for queued jobs
+			metrics.QueueByPriority[job.Priority]++
+			metrics.QueueByType[job.Queue]++
+		}
+
+		// Count completed by engine and calculate durations
+		if job.Status == models.JobStatusCompleted || job.Status == models.JobStatusFailed {
+			if job.CompletedAt != nil && !job.CreatedAt.IsZero() {
+				duration := job.CompletedAt.Sub(job.CreatedAt).Seconds()
+				totalDuration += duration
+				durationCount++
+			}
+
+			// Track completed jobs by actual engine used
+			if job.Status == models.JobStatusCompleted && job.Engine != "" {
+				engine := job.Engine
+				if engine == "auto" {
+					engine = "ffmpeg" // Auto defaults to ffmpeg
+				}
+				metrics.CompletedByEngine[engine]++
+			}
+		}
+	}
+
+	// Calculate average duration
+	if durationCount > 0 {
+		metrics.AvgDuration = totalDuration / float64(durationCount)
+	}
+
+	return metrics, nil
+}

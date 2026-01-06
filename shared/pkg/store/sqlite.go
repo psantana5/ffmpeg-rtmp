@@ -1193,7 +1193,7 @@ func (s *SQLiteStore) GetJobs(status string) ([]models.Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.Query("SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, created_at, started_at, last_activity_at, completed_at, retry_count, max_retries, retry_reason, error, failure_reason, tenant_id FROM jobs WHERE status = ?", status)
+	rows, err := s.db.Query("SELECT id, sequence_number, scenario, confidence, engine, parameters, status, queue, priority, progress, node_id, created_at, started_at, last_activity_at, completed_at, retry_count, max_retries, retry_reason, error, failure_reason FROM jobs WHERE status = ?", status)
 	if err != nil {
 		return nil, err
 	}
@@ -1202,7 +1202,7 @@ func (s *SQLiteStore) GetJobs(status string) ([]models.Job, error) {
 	var jobs []models.Job
 	for rows.Next() {
 		var job models.Job
-		var parametersJSON, confidenceStr, failureReasonStr, tenantID []byte
+		var parametersJSON, confidenceStr, failureReasonStr []byte
 		var startedAt, lastActivityAt, completedAt sql.NullTime
 		var nodeID, retryReason, errorMsg sql.NullString
 
@@ -1227,7 +1227,6 @@ func (s *SQLiteStore) GetJobs(status string) ([]models.Job, error) {
 			&retryReason,
 			&errorMsg,
 			&failureReasonStr,
-			&tenantID,
 		)
 		if err != nil {
 			return nil, err
@@ -1467,5 +1466,154 @@ return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
 
 func (s *SQLiteStore) GetNodesByTenant(tenantID string) ([]*models.Node, error) {
 return nil, fmt.Errorf("multi-tenancy not supported in SQLite store")
+}
+
+// GetJobMetrics returns aggregated job statistics optimized for metrics endpoint
+// This avoids loading all jobs into memory
+func (s *SQLiteStore) GetJobMetrics() (*JobMetrics, error) {
+	metrics := &JobMetrics{
+		JobsByState:       make(map[models.JobStatus]int),
+		JobsByEngine:      make(map[string]int),
+		CompletedByEngine: make(map[string]int),
+		QueueByPriority:   make(map[string]int),
+		QueueByType:       make(map[string]int),
+	}
+
+	// Count jobs by state
+	rows, err := s.db.Query(`
+		SELECT status, COUNT(*) as count
+		FROM jobs
+		GROUP BY status
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count jobs by state: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			continue
+		}
+		metrics.JobsByState[models.JobStatus(status)] = count
+		metrics.TotalJobs += count
+
+		// Count active jobs
+		if status == string(models.JobStatusProcessing) || status == string(models.JobStatusAssigned) {
+			metrics.ActiveJobs += count
+		}
+		// Count queued jobs
+		if status == string(models.JobStatusQueued) || status == string(models.JobStatusPending) {
+			metrics.QueueLength += count
+		}
+	}
+
+	// Count jobs by engine
+	rows, err = s.db.Query(`
+		SELECT engine, COUNT(*) as count
+		FROM jobs
+		WHERE engine != ''
+		GROUP BY engine
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count jobs by engine: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var engine string
+		var count int
+		if err := rows.Scan(&engine, &count); err != nil {
+			continue
+		}
+		metrics.JobsByEngine[engine] = count
+	}
+
+	// Count completed jobs by engine
+	rows, err = s.db.Query(`
+		SELECT engine, COUNT(*) as count
+		FROM jobs
+		WHERE status = 'completed' AND engine != ''
+		GROUP BY engine
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count completed by engine: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var engine string
+		var count int
+		if err := rows.Scan(&engine, &count); err != nil {
+			continue
+		}
+		// Normalize "auto" to "ffmpeg" for completed jobs
+		if engine == "auto" {
+			engine = "ffmpeg"
+		}
+		metrics.CompletedByEngine[engine] += count
+	}
+
+	// Count queued jobs by priority
+	rows, err = s.db.Query(`
+		SELECT priority, COUNT(*) as count
+		FROM jobs
+		WHERE status IN ('queued', 'pending')
+		GROUP BY priority
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count queue by priority: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var priority string
+		var count int
+		if err := rows.Scan(&priority, &count); err != nil {
+			continue
+		}
+		metrics.QueueByPriority[priority] = count
+	}
+
+	// Count queued jobs by type
+	rows, err = s.db.Query(`
+		SELECT queue, COUNT(*) as count
+		FROM jobs
+		WHERE status IN ('queued', 'pending')
+		GROUP BY queue
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count queue by type: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var queueType string
+		var count int
+		if err := rows.Scan(&queueType, &count); err != nil {
+			continue
+		}
+		metrics.QueueByType[queueType] = count
+	}
+
+	// Calculate average duration for completed/failed jobs
+	var totalDuration sql.NullFloat64
+	var jobCount sql.NullInt64
+	err = s.db.QueryRow(`
+		SELECT 
+			AVG(CAST((julianday(completed_at) - julianday(created_at)) * 86400 AS REAL)) as avg_duration,
+			COUNT(*) as count
+		FROM jobs
+		WHERE (status = 'completed' OR status = 'failed') 
+		  AND completed_at IS NOT NULL 
+		  AND created_at IS NOT NULL
+	`).Scan(&totalDuration, &jobCount)
+	
+	if err == nil && totalDuration.Valid && jobCount.Valid && jobCount.Int64 > 0 {
+		metrics.AvgDuration = totalDuration.Float64
+	}
+
+	return metrics, nil
 }
 

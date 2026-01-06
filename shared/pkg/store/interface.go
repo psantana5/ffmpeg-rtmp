@@ -68,6 +68,22 @@ type Store interface {
 	Close() error
 	HealthCheck() error
 	Vacuum() error
+
+	// Metrics operations (optimized for large datasets)
+	GetJobMetrics() (*JobMetrics, error)
+}
+
+// JobMetrics contains aggregated job statistics for metrics endpoint
+type JobMetrics struct {
+	JobsByState       map[models.JobStatus]int
+	JobsByEngine      map[string]int
+	CompletedByEngine map[string]int
+	QueueByPriority   map[string]int
+	QueueByType       map[string]int
+	ActiveJobs        int
+	QueueLength       int
+	AvgDuration       float64
+	TotalJobs         int
 }
 
 // ExtendedStore includes FSM operations for production scheduler
