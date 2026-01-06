@@ -417,6 +417,46 @@ make build-cli
 
 See [docs/README.md](docs/README.md) for comprehensive documentation.
 
+## NEW: Production Readiness Features (v2.4 - 2026-01-06) 🆕
+
+**Swedish principles: boring, correct, non-reactive architecture**
+
+### Transport-Layer Retry Logic
+- **Retries apply to messages, not work** - Only HTTP requests retry, never job execution
+- **Exponential backoff** - 1s → 30s, max 3 retries
+- **Context-aware** - Respects cancellation and deadlines
+- **Retryable operations**: Heartbeats, job polling, result delivery
+- **Never retried**: FFmpeg execution, wrapper actions, actual workloads
+
+### Graceful Shutdown
+- **Worker**: Stop accepting jobs, wait for current jobs to finish (30s timeout)
+- **Master**: LIFO shutdown order (HTTP → metrics → scheduler → cleanup → DB → logger)
+- **No workload killing** - Jobs complete naturally or reach their timeout
+- **Async coordination** - `shutdown.Done()` channel for clean coordination
+
+### Enhanced Readiness Checks
+- **FFmpeg validation** - Verifies FFmpeg is available and working
+- **Disk space check** - Ensures adequate space before accepting jobs
+- **Master reachability** - Validates connection to master node
+- **HTTP 200 only when ready** - Kubernetes/load balancer friendly
+
+### Centralized Logging
+- **Directory structure**: `/var/log/ffrtmp/<component>/<subcomponent>.log`
+- **Multi-writer**: Logs to both file AND stdout (systemd journald compatible)
+- **Automatic fallback**: Uses `./logs/` if `/var/log` not writable
+- **Rotation ready**: Logrotate configs in `deployment/logrotate/`
+
+### Security & Quality Assurance
+- **Security review complete** ✅ - All TLS configs properly guarded, no hardcoded secrets
+- **Critical panic eliminated** ✅ - Replaced with graceful error handling
+- **Integration tests added** ✅ - 10 tests covering retry, shutdown, readiness
+- **Dependencies updated** ✅ - 6 packages updated, all tests passing
+
+**Documentation:**
+- [Production Readiness Guide](docs/PRODUCTION_READINESS.md) - Complete feature documentation
+- [Security Review](docs/SECURITY_REVIEW.md) - Security audit and approval
+- [Audit Summary](AUDIT_COMPLETE.md) - Technical debt elimination details
+
 ## NEW: Enterprise-Grade Fault Tolerance
 
 **Production-ready reliability features for mission-critical workloads:**
