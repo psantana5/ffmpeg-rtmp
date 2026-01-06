@@ -44,6 +44,14 @@ const (
 	JobClassificationDebug      JobClassification = "debug"      // Debugging/troubleshooting (not SLA-worthy)
 )
 
+// WrapperConstraints defines resource constraints for the workload wrapper
+type WrapperConstraints struct {
+	CPUMax      string `json:"cpu_max,omitempty"`       // CPU quota in "quota period" format
+	CPUWeight   int    `json:"cpu_weight,omitempty"`    // CPU weight (1-10000, default 100)
+	MemoryMaxMB int64  `json:"memory_max_mb,omitempty"` // Memory limit in MB
+	IOMax       string `json:"io_max,omitempty"`        // IO max (cgroup v2 only)
+}
+
 // Job represents a workload to be executed on a compute node
 type Job struct {
 	ID               string                 `json:"id"`
@@ -54,6 +62,8 @@ type Job struct {
 	Confidence       string                 `json:"confidence"`                // "auto", "high", "medium", "low"
 	Engine           string                 `json:"engine,omitempty"`          // "auto", "ffmpeg", "gstreamer"
 	Classification   JobClassification      `json:"classification,omitempty"`  // "production", "test", "benchmark", "debug"
+	WrapperEnabled   bool                   `json:"wrapper_enabled,omitempty"` // Use wrapper for execution
+	WrapperConstraints *WrapperConstraints  `json:"wrapper_constraints,omitempty"` // Resource constraints
 	Parameters       map[string]interface{} `json:"parameters,omitempty"`
 	Status           JobStatus              `json:"status"`
 	Queue            string                 `json:"queue,omitempty"`    // "live", "default", "batch"
@@ -73,6 +83,10 @@ type Job struct {
 	Logs             string                 `json:"logs,omitempty"`           // Worker execution logs
 	TimeoutAt        *time.Time             `json:"timeout_at,omitempty"`     // Calculated timeout deadline
 	StateTransitions []StateTransition      `json:"state_transitions,omitempty"`
+	
+	// Wrapper results (populated after execution)
+	PlatformSLA       bool   `json:"platform_sla_compliant,omitempty"`
+	PlatformSLAReason string `json:"platform_sla_reason,omitempty"`
 }
 
 // JobRequest represents a request to create a new job
