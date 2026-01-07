@@ -1,0 +1,17 @@
+---
+# Master node specific variables
+
+# Master configuration
+ffrtmp_master_port: 8080
+ffrtmp_master_metrics_port: 9090
+ffrtmp_master_tls_port: 8443
+
+# Database
+ffrtmp_master_db_path: "{{ ffrtmp_master_data_dir }}/master.db"
+
+# API
+ffrtmp_master_generate_api_key: true
+ffrtmp_master_api_key_file: "{{ ffrtmp_master_config_dir }}/api-key"
+
+# Logging
+ffrtmp_master_log_level: "info"
