@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/psantana5/ffmpeg-rtmp/internal/cgroups"
+	"github.com/psantana5/ffmpeg-rtmp/internal/discover"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/agent"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/logging"
 	"github.com/psantana5/ffmpeg-rtmp/pkg/models"
@@ -414,19 +416,85 @@ func main() {
 		return logger.Close()
 	})
 	
-	// Auto-attach service configuration (for future integration)
+	// Start auto-attach service if enabled
+	var autoAttachService *discover.AutoAttachService
+	
 	if *enableAutoAttach {
 		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		log.Println("Auto-Attach Service Enabled")
+		log.Println("✓ Auto-Attach Service Enabled")
 		log.Printf("  Scan Interval: %v", *autoAttachScanInterval)
-		log.Printf("  CPU Quota: %d", *autoAttachCPUQuota)
+		log.Printf("  CPU Quota: %d%%", *autoAttachCPUQuota)
 		log.Printf("  Memory Limit: %d MB", *autoAttachMemLimit)
-		log.Println("  This will automatically discover and govern running FFmpeg processes")
+		log.Println("  Automatically discovering and governing FFmpeg/GStreamer processes")
 		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 		
-		// TODO: Import and use internal/discover package
-		// This requires adding the discover package to worker dependencies
-		log.Println("⚠️  Auto-attach integration coming soon - use 'ffrtmp watch' for now")
+		// Build default limits
+		limits := &cgroups.Limits{
+			CPUWeight: 100,
+		}
+		
+		if *autoAttachCPUQuota > 0 {
+			quota := *autoAttachCPUQuota * 1000
+			limits.CPUMax = fmt.Sprintf("%d 100000", quota)
+		}
+		
+		if *autoAttachMemLimit > 0 {
+			limits.MemoryMax = int64(*autoAttachMemLimit) * 1024 * 1024
+		}
+		
+		// Configure auto-attach service
+		config := &discover.AttachConfig{
+			ScanInterval:   *autoAttachScanInterval,
+			TargetCommands: []string{"ffmpeg", "gst-launch-1.0"},
+			DefaultLimits:  limits,
+			Logger:         log.New(os.Stdout, "[auto-attach] ", log.LstdFlags),
+			OnAttach: func(pid int, jobID string) {
+				log.Printf("[auto-attach] ✓ Attached to PID %d (job: %s)", pid, jobID)
+				metricsExporter.IncrementDiscoveredProcesses()
+			},
+			OnDetach: func(pid int, jobID string) {
+				log.Printf("[auto-attach] ⊗ Detached from PID %d (job: %s)", pid, jobID)
+			},
+		}
+		
+		// Create and start service
+		autoAttachService = discover.NewAutoAttachService(config)
+		
+		// Start in background
+		go func() {
+			if err := autoAttachService.Start(context.Background()); err != nil && err != context.Canceled {
+				log.Printf("[auto-attach] Error: %v", err)
+			}
+		}()
+		
+		// Update metrics periodically
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			
+			for {
+				select {
+				case <-ticker.C:
+					if autoAttachService != nil {
+						count := autoAttachService.GetActiveAttachments()
+						metricsExporter.SetActiveAttachments(count)
+					}
+				case <-shutdownMgr.Done():
+					return
+				}
+			}
+		}()
+		
+		// Register shutdown handler
+		shutdownMgr.Register(func(ctx context.Context) error {
+			if autoAttachService != nil {
+				logger.Info("Stopping auto-attach service...")
+				autoAttachService.Stop()
+			}
+			return nil
+		})
+		
+		log.Println("✓ Auto-attach service started successfully")
 	}
 	
 	// Start shutdown signal handler

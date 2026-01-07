@@ -59,6 +59,10 @@ type WorkerExporter struct {
 	jobsSLAViolation           int64   // Jobs that violated SLA
 	currentSLAComplianceRate   float64 // Percentage (0-100)
 	
+	// Auto-attach metrics
+	discoveredProcessesTotal   int64   // Total processes discovered
+	activeAttachments          int     // Currently attached processes
+	
 	// Cancellation metrics
 	jobsCanceledTotal          int64
 	jobsCanceledGracefulTotal  int64 // Terminated with SIGTERM
@@ -232,6 +236,15 @@ func (e *WorkerExporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_jobs_canceled_forceful_total Jobs terminated forcefully with SIGKILL\n")
 	fmt.Fprintf(w, "# TYPE ffrtmp_worker_jobs_canceled_forceful_total counter\n")
 	fmt.Fprintf(w, "ffrtmp_worker_jobs_canceled_forceful_total{node_id=\"%s\"} %d\n", e.nodeID, e.jobsCanceledForcefulTotal)
+	
+	// Auto-attach metrics
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_discovered_processes_total Total number of processes discovered via auto-attach\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_discovered_processes_total counter\n")
+	fmt.Fprintf(w, "ffrtmp_worker_discovered_processes_total{node_id=\"%s\"} %d\n", e.nodeID, e.discoveredProcessesTotal)
+	
+	fmt.Fprintf(w, "\n# HELP ffrtmp_worker_active_attachments Number of currently attached processes\n")
+	fmt.Fprintf(w, "# TYPE ffrtmp_worker_active_attachments gauge\n")
+	fmt.Fprintf(w, "ffrtmp_worker_active_attachments{node_id=\"%s\"} %d\n", e.nodeID, e.activeAttachments)
 }
 
 // updateMetrics updates hardware metrics
@@ -292,6 +305,20 @@ func (e *WorkerExporter) IncrementHeartbeat() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.heartbeatCount++
+}
+
+// IncrementDiscoveredProcesses increments the discovered processes counter
+func (e *WorkerExporter) IncrementDiscoveredProcesses() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.discoveredProcessesTotal++
+}
+
+// SetActiveAttachments sets the number of actively attached processes
+func (e *WorkerExporter) SetActiveAttachments(count int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.activeAttachments = count
 }
 
 // GetCPUUsage returns current CPU usage
