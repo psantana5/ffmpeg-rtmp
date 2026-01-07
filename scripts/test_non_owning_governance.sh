@@ -30,6 +30,10 @@ echo ""
 echo -e "${YELLOW}Philosophy: We govern workloads, we don't OWN them.${NC}"
 echo -e "${YELLOW}Result: Workloads survive wrapper failures.${NC}"
 echo ""
+echo -e "${BLUE}NOTE: This test intentionally kills wrapper processes to verify${NC}"
+echo -e "${BLUE}      that workloads continue running. Any 'Killed' messages are${NC}"
+echo -e "${BLUE}      EXPECTED and demonstrate the resilience of the system.${NC}"
+echo ""
 
 # Cleanup function
 cleanup() {
@@ -118,7 +122,8 @@ echo ""
 echo -e "${BLUE}→ Simulating wrapper crash (SIGKILL)...${NC}"
 sleep 1
 kill -9 $WRAPPER_PID 2>/dev/null || true
-echo -e "${GREEN}✓ Wrapper killed${NC}"
+wait $WRAPPER_PID 2>/dev/null || true  # Suppress "Killed" message
+echo -e "${GREEN}✓ Wrapper killed (this is expected!)${NC}"
 echo ""
 
 echo -e "${BLUE}→ Checking if workload is still running...${NC}"
@@ -195,7 +200,8 @@ echo ""
 
 echo -e "${BLUE}→ Killing attached wrapper (SIGKILL)...${NC}"
 kill -9 $WRAPPER_ATTACH_PID 2>/dev/null || true
-echo -e "${GREEN}✓ Wrapper killed${NC}"
+wait $WRAPPER_ATTACH_PID 2>/dev/null || true  # Suppress "Killed" message
+echo -e "${GREEN}✓ Wrapper killed (workload should be unaffected)${NC}"
 echo ""
 
 echo -e "${BLUE}→ Checking if workload noticed...${NC}"
@@ -271,7 +277,8 @@ else
         
         echo -e "${BLUE}→ Killing wrapper mid-transcode...${NC}"
         kill -9 $WRAPPER_FFMPEG_PID 2>/dev/null || true
-        echo -e "${GREEN}✓ Wrapper killed${NC}"
+        wait $WRAPPER_FFMPEG_PID 2>/dev/null || true  # Suppress "Killed" message
+        echo -e "${GREEN}✓ Wrapper killed (FFmpeg should continue)${NC}"
         echo ""
         
         echo -e "${BLUE}→ Checking FFmpeg status...${NC}"
@@ -352,7 +359,8 @@ if command -v ffmpeg &> /dev/null; then
     
     echo -e "${BLUE}→ Killing watch daemon...${NC}"
     kill -9 $WATCH_PID 2>/dev/null || true
-    echo -e "${GREEN}✓ Watch daemon killed${NC}"
+    wait $WATCH_PID 2>/dev/null || true  # Suppress "Killed" message
+    echo -e "${GREEN}✓ Watch daemon killed (external process should continue)${NC}"
     echo ""
     
     echo -e "${BLUE}→ Checking external process...${NC}"
