@@ -414,12 +414,7 @@ func main() {
 		return logger.Close()
 	})
 	
-	// Start auto-attach service if enabled
-	var autoAttachService interface {
-		Start(context.Context) error
-		Stop()
-	}
-	
+	// Auto-attach service configuration (for future integration)
 	if *enableAutoAttach {
 		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 		log.Println("Auto-Attach Service Enabled")
@@ -429,10 +424,9 @@ func main() {
 		log.Println("  This will automatically discover and govern running FFmpeg processes")
 		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 		
-		// Note: Import and use internal/discover package
-		// This would require importing the package from the main project
-		// For now, log that it would be enabled
-		log.Println("⚠️  Auto-attach requires internal/discover package")
+		// TODO: Import and use internal/discover package
+		// This requires adding the discover package to worker dependencies
+		log.Println("⚠️  Auto-attach integration coming soon - use 'ffrtmp watch' for now")
 	}
 	
 	// Start shutdown signal handler
