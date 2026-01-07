@@ -34,21 +34,28 @@ echo ""
 
 # Check 1: Binary exists
 echo "[1/10] Checking binary installation..."
-if [ -f "/usr/local/bin/ffrtmp" ]; then
-    log_pass "Binary found: /usr/local/bin/ffrtmp"
+if [ -f "/opt/ffrtmp/bin/ffrtmp" ]; then
+    log_pass "Binary found: /opt/ffrtmp/bin/ffrtmp"
     
     # Check executable
-    if [ -x "/usr/local/bin/ffrtmp" ]; then
+    if [ -x "/opt/ffrtmp/bin/ffrtmp" ]; then
         log_pass "Binary is executable"
     else
         log_fail "Binary is not executable"
     fi
     
+    # Check symlink
+    if [ -L "/usr/local/bin/ffrtmp" ]; then
+        log_pass "Symlink exists: /usr/local/bin/ffrtmp"
+    else
+        log_warn "Symlink not found (optional)"
+    fi
+    
     # Check version
-    VERSION=$(/usr/local/bin/ffrtmp watch --help 2>&1 | head -1 || echo "unknown")
+    VERSION=$(/opt/ffrtmp/bin/ffrtmp watch --help 2>&1 | head -1 || echo "unknown")
     log_pass "Version info: $VERSION"
 else
-    log_fail "Binary not found: /usr/local/bin/ffrtmp"
+    log_fail "Binary not found: /opt/ffrtmp/bin/ffrtmp"
 fi
 echo ""
 
@@ -103,11 +110,13 @@ echo ""
 
 # Check 4: Directories
 echo "[4/10] Checking directories..."
+
+# State directory
 if [ -d "/var/lib/ffrtmp" ]; then
     log_pass "State directory exists: /var/lib/ffrtmp"
     
     # Check permissions
-    OWNER=$(stat -c '%U:%G' /var/lib/ffrtmp)
+    OWNER=$(stat -c '%U:%G' /var/lib/ffrtmp 2>/dev/null || echo "unknown:unknown")
     if [ "$OWNER" = "ffrtmp:ffrtmp" ]; then
         log_pass "Correct ownership: $OWNER"
     else
@@ -115,13 +124,27 @@ if [ -d "/var/lib/ffrtmp" ]; then
     fi
     
     # Check writable
-    if sudo -u ffrtmp test -w /var/lib/ffrtmp; then
+    if sudo -u ffrtmp test -w /var/lib/ffrtmp 2>/dev/null; then
         log_pass "Directory is writable by ffrtmp user"
     else
         log_fail "Directory not writable by ffrtmp user"
     fi
 else
     log_fail "State directory not found: /var/lib/ffrtmp"
+fi
+
+# Log directory
+if [ -d "/var/log/ffrtmp" ]; then
+    log_pass "Log directory exists: /var/log/ffrtmp"
+else
+    log_warn "Log directory not found: /var/log/ffrtmp (will be created by systemd)"
+fi
+
+# Streams directory
+if [ -d "/opt/ffrtmp/streams" ]; then
+    log_pass "Streams directory exists: /opt/ffrtmp/streams"
+else
+    log_warn "Streams directory not found: /opt/ffrtmp/streams"
 fi
 echo ""
 

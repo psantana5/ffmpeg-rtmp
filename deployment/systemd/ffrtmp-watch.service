@@ -17,7 +17,7 @@ EnvironmentFile=-/etc/ffrtmp/watch.env
 Environment="WATCH_CONFIG=/etc/ffrtmp/watch-config.yaml"
 
 # Binary with full reliability stack
-ExecStart=/usr/local/bin/ffrtmp watch \
+ExecStart=/opt/ffrtmp/bin/ffrtmp watch \
     --watch-config=${WATCH_CONFIG} \
     --enable-state \
     --state-path=/var/lib/ffrtmp/watch-state.json \
