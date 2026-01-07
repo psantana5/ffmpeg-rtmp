@@ -1,0 +1,145 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  build-and-package:
+    name: Build and Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Build all binaries
+        run: |
+          make build-master
+          make build-agent
+          make build-cli
+      
+      - name: Create deployment package
+        run: |
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          tar -czf ffrtmp-${VERSION}.tar.gz bin/ deployment/ ansible/
+      
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: ffrtmp-*.tar.gz
+
+  deploy-master:
+    name: Deploy Master Node
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      
+      - name: Run pre-flight checks
+        run: |
+          ssh ${{ secrets.MASTER_HOST }} "bash -s" < deployment/checks/preflight-check.sh -- --master
+      
+      - name: Deploy to master
+        run: |
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          scp ffrtmp-${VERSION}.tar.gz ${{ secrets.MASTER_HOST }}:/tmp/
+          ssh ${{ secrets.MASTER_HOST }} "cd /tmp && tar -xzf ffrtmp-${VERSION}.tar.gz"
+          ssh ${{ secrets.MASTER_HOST }} "cd /tmp && ./deployment/orchestration/blue-green-deploy.sh --deploy --master --version ${VERSION}"
+      
+      - name: Health check
+        run: |
+          ssh ${{ secrets.MASTER_HOST }} "bash -s" < deployment/checks/health-check.sh -- --master
+      
+      - name: Switch to new version
+        run: |
+          ssh ${{ secrets.MASTER_HOST }} "./deployment/orchestration/blue-green-deploy.sh --switch --master"
+      
+      - name: Final health check
+        run: |
+          ssh ${{ secrets.MASTER_HOST }} "bash -s" < deployment/checks/health-check.sh -- --master
+
+  deploy-workers:
+    name: Deploy Worker Nodes
+    needs: [build-and-package, deploy-master]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package
+      
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      
+      - name: Rolling update workers
+        run: |
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          ./deployment/orchestration/rolling-update.sh \
+            --workers ${{ secrets.WORKER_HOSTS }} \
+            --version ${VERSION} \
+            --master-url ${{ secrets.MASTER_URL }} \
+            --api-key ${{ secrets.MASTER_API_KEY }} \
+            --max-parallel 2
+
+  notify:
+    name: Notify Deployment Status
+    needs: [deploy-master, deploy-workers]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "Deployment ${{ needs.deploy-workers.result == 'success' && 'succeeded' || 'failed' }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*FFmpeg-RTMP Deployment*\nEnvironment: ${{ github.event.inputs.environment || 'production' }}\nVersion: ${{ github.event.inputs.version || github.ref_name }}\nStatus: ${{ needs.deploy-workers.result }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
