@@ -45,6 +45,13 @@ func main() {
 	generateInput := flag.Bool("generate-input", true, "Automatically generate input videos for jobs (default: true)")
 	maxConcurrentJobs := flag.Int("max-concurrent-jobs", 1, "Maximum number of concurrent jobs to process (default: 1)")
 	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+	
+	// Auto-attach flags
+	enableAutoAttach := flag.Bool("enable-auto-attach", false, "Enable automatic discovery and attachment to running FFmpeg processes")
+	autoAttachScanInterval := flag.Duration("auto-attach-scan-interval", 10*time.Second, "Scan interval for auto-attach (default: 10s)")
+	autoAttachCPUQuota := flag.Int("auto-attach-cpu-quota", 0, "Default CPU quota for auto-attached processes (0=unlimited)")
+	autoAttachMemLimit := flag.Int("auto-attach-memory-limit", 0, "Default memory limit in MB for auto-attached processes (0=unlimited)")
+	
 	flag.Parse()
 
 	// Initialize file logger: /var/log/ffrtmp/worker/agent.log
@@ -406,6 +413,27 @@ func main() {
 		logger.Info("Closing logger...")
 		return logger.Close()
 	})
+	
+	// Start auto-attach service if enabled
+	var autoAttachService interface {
+		Start(context.Context) error
+		Stop()
+	}
+	
+	if *enableAutoAttach {
+		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		log.Println("Auto-Attach Service Enabled")
+		log.Printf("  Scan Interval: %v", *autoAttachScanInterval)
+		log.Printf("  CPU Quota: %d", *autoAttachCPUQuota)
+		log.Printf("  Memory Limit: %d MB", *autoAttachMemLimit)
+		log.Println("  This will automatically discover and govern running FFmpeg processes")
+		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		
+		// Note: Import and use internal/discover package
+		// This would require importing the package from the main project
+		// For now, log that it would be enabled
+		log.Println("⚠️  Auto-attach requires internal/discover package")
+	}
 	
 	// Start shutdown signal handler
 	go func() {

@@ -16,12 +16,16 @@ import (
 var (
 	// Metadata
 	jobID       string
+	slaEligible bool
 	
 	// Constraints
 	cpuMax      string
+	cpuQuota    int
 	cpuWeight   int
 	memoryMax   int64
+	memoryLimit int
 	ioMax       string
+	niceValue   int
 	
 	// Run mode
 	workDir string
@@ -43,7 +47,7 @@ This is governance, not execution.
 
 Example:
   ffrtmp run --job-id job-001 -- ffmpeg -i input.mp4 output.mp4
-  ffrtmp run --job-id job-002 --cpu-max "200000 100000" -- python train.py`,
+  ffrtmp run --job-id transcode-001 --sla-eligible --cpu-quota 200 --memory-limit 4096 -- ffmpeg -i input.mp4 -c:v h264_nvenc output.mp4`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runWorkload,
 }
@@ -58,7 +62,7 @@ No restart. No signals. Just observe.
 
 Example:
   ffrtmp attach --pid 12345 --job-id job-001
-  ffrtmp attach --pid 12345 --cpu-weight 50`,
+  ffrtmp attach --pid 12345 --job-id existing-job-042 --cpu-weight 150 --nice -5`,
 	RunE: attachToWorkload,
 }
 
@@ -69,9 +73,12 @@ func init() {
 	// Common flags
 	for _, cmd := range []*cobra.Command{runCmd, attachCmd} {
 		cmd.Flags().StringVar(&jobID, "job-id", "", "Job identifier")
+		cmd.Flags().BoolVar(&slaEligible, "sla-eligible", false, "Mark job as SLA-eligible")
 		cmd.Flags().StringVar(&cpuMax, "cpu-max", "", "CPU max (quota period format, e.g. '200000 100000')")
+		cmd.Flags().IntVar(&cpuQuota, "cpu-quota", 0, "CPU quota percentage (0-1600, where 100=1 core)")
 		cmd.Flags().IntVar(&cpuWeight, "cpu-weight", 100, "CPU weight (1-10000)")
 		cmd.Flags().Int64Var(&memoryMax, "memory-max", 0, "Memory limit in bytes (0=unlimited)")
+		cmd.Flags().IntVar(&memoryLimit, "memory-limit", 0, "Memory limit in MB (0=unlimited)")
 		cmd.Flags().StringVar(&ioMax, "io-max", "", "IO max (major:minor rbps=X wbps=Y)")
 		cmd.Flags().BoolVar(&jsonOutput, "json", false, "JSON output")
 	}
@@ -81,6 +88,7 @@ func init() {
 	
 	// Attach mode flags
 	attachCmd.Flags().IntVar(&attachPID, "pid", 0, "PID to attach to")
+	attachCmd.Flags().IntVar(&niceValue, "nice", 0, "Process nice value (-20 to 19)")
 	attachCmd.MarkFlagRequired("pid")
 }
 
@@ -92,11 +100,25 @@ func runWorkload(cmd *cobra.Command, args []string) error {
 	command := args[0]
 	cmdArgs := args[1:]
 	
+	// Convert cpu-quota to cpu-max format if provided
+	cpuMaxValue := cpuMax
+	if cpuQuota > 0 {
+		// Convert percentage to quota/period (100% = 100000/100000, 200% = 200000/100000)
+		quota := cpuQuota * 1000
+		cpuMaxValue = fmt.Sprintf("%d 100000", quota)
+	}
+	
+	// Convert memory-limit (MB) to memory-max (bytes) if provided
+	memoryMaxValue := memoryMax
+	if memoryLimit > 0 {
+		memoryMaxValue = int64(memoryLimit) * 1024 * 1024
+	}
+	
 	// Build limits
 	limits := &cgroups.Limits{
-		CPUMax:      cpuMax,
+		CPUMax:      cpuMaxValue,
 		CPUWeight:   cpuWeight,
-		MemoryMax:   memoryMax,
+		MemoryMax:   memoryMaxValue,
 		IOMax:       ioMax,
 	}
 	
@@ -140,12 +162,32 @@ func attachToWorkload(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid PID: %d", attachPID)
 	}
 	
+	// Convert cpu-quota to cpu-max format if provided
+	cpuMaxValue := cpuMax
+	if cpuQuota > 0 {
+		quota := cpuQuota * 1000
+		cpuMaxValue = fmt.Sprintf("%d 100000", quota)
+	}
+	
+	// Convert memory-limit (MB) to memory-max (bytes) if provided
+	memoryMaxValue := memoryMax
+	if memoryLimit > 0 {
+		memoryMaxValue = int64(memoryLimit) * 1024 * 1024
+	}
+	
 	// Build limits
 	limits := &cgroups.Limits{
-		CPUMax:      cpuMax,
+		CPUMax:      cpuMaxValue,
 		CPUWeight:   cpuWeight,
-		MemoryMax:   memoryMax,
+		MemoryMax:   memoryMaxValue,
 		IOMax:       ioMax,
+	}
+	
+	// Apply nice value if specified
+	if niceValue != 0 {
+		if err := syscall.Setpriority(syscall.PRIO_PROCESS, attachPID, niceValue); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to set nice value: %v\n", err)
+		}
 	}
 	
 	// Setup context
