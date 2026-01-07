@@ -34,8 +34,8 @@ api:
     - "192.168.0.0/16"
 
 worker:
-  heartbeat_timeout: 30s
-  max_missed_heartbeats: 5
+  heartbeat_timeout: 90s  # 3 missed heartbeats @ 30s interval
+  max_missed_heartbeats: 3
   cleanup_interval: 60s
 
 job:
