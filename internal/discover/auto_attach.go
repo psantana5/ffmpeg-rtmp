@@ -30,6 +30,9 @@ type AttachConfig struct {
 	
 	// Logger for output (optional)
 	Logger *log.Logger
+	
+	// StateConfig for persistence (optional)
+	StateConfig *StateConfig
 }
 
 // AutoAttachService automatically discovers and attaches to running processes
@@ -50,6 +53,9 @@ type AutoAttachService struct {
 		LastScanTime     time.Time
 	}
 	statsMu sync.RWMutex
+	
+	// State management (Phase 3)
+	stateManager *StateManager
 	
 	// Control channels
 	stopCh chan struct{}
@@ -73,13 +79,38 @@ func NewAutoAttachService(config *AttachConfig) *AutoAttachService {
 		logger = log.New(log.Writer(), "[auto-attach] ", log.LstdFlags)
 	}
 	
-	return &AutoAttachService{
+	service := &AutoAttachService{
 		config:      config,
 		scanner:     NewScanner(config.TargetCommands),
 		attachments: make(map[int]context.CancelFunc),
 		stopCh:      make(chan struct{}),
 		logger:      logger,
 	}
+	
+	// Initialize state manager if configured
+	if config.StateConfig != nil {
+		service.stateManager = NewStateManager(config.StateConfig)
+		
+		// Load existing state
+		if err := service.stateManager.Load(); err != nil {
+			logger.Printf("Warning: failed to load state: %v", err)
+		} else {
+			logger.Printf("State loaded from %s", config.StateConfig.StatePath)
+			
+			// Restore statistics from state
+			stats := service.stateManager.GetStatistics()
+			service.statsMu.Lock()
+			service.stats.TotalScans = stats.TotalScans
+			service.stats.TotalDiscovered = stats.TotalDiscovered
+			service.stats.TotalAttachments = stats.TotalAttachments
+			service.statsMu.Unlock()
+		}
+		
+		// Start periodic flush
+		go service.stateManager.StartPeriodicFlush()
+	}
+	
+	return service
 }
 
 // Start begins the auto-attach service
@@ -131,6 +162,12 @@ func (s *AutoAttachService) Stop() {
 		cancel()
 	}
 	
+	// Stop state manager if enabled
+	if s.stateManager != nil {
+		s.stateManager.Stop()
+		s.logger.Println("State saved")
+	}
+	
 	close(s.stopCh)
 	s.logger.Println("Auto-attach service stopped")
 }
@@ -154,6 +191,11 @@ func (s *AutoAttachService) scanAndAttach() error {
 	totalFound := len(newProcesses)
 	s.stats.TotalDiscovered += int64(totalFound)
 	s.statsMu.Unlock()
+	
+	// Record scan in state manager
+	if s.stateManager != nil {
+		s.stateManager.RecordScan()
+	}
 	
 	// Get current tracked count
 	s.mu.Lock()
@@ -184,6 +226,11 @@ func (s *AutoAttachService) attachToProcess(proc *Process) {
 	
 	s.logger.Printf("Attaching to PID %d (%s) as job %s", proc.PID, proc.Command, jobID)
 	
+	// Record discovery in state manager
+	if s.stateManager != nil {
+		s.stateManager.RecordDiscovery(proc.PID, jobID, proc.Command)
+	}
+	
 	// Mark as tracked
 	s.scanner.MarkAsTracked(proc.PID)
 	
@@ -198,6 +245,11 @@ func (s *AutoAttachService) attachToProcess(proc *Process) {
 	
 	// Attach in background
 	go func() {
+		// Record attachment in state manager
+		if s.stateManager != nil {
+			s.stateManager.RecordAttachment(proc.PID)
+		}
+		
 		result, err := wrapper.Attach(ctx, jobID, proc.PID, s.config.DefaultLimits)
 		
 		// Update statistics
@@ -210,6 +262,11 @@ func (s *AutoAttachService) attachToProcess(proc *Process) {
 		delete(s.attachments, proc.PID)
 		s.scanner.UnmarkTracked(proc.PID)
 		s.mu.Unlock()
+		
+		// Remove from state manager
+		if s.stateManager != nil {
+			s.stateManager.RemoveProcess(proc.PID)
+		}
 		
 		if err != nil && err != context.Canceled {
 			s.logger.Printf("Attachment to PID %d failed: %v", proc.PID, err)

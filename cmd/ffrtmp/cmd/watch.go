@@ -21,6 +21,11 @@ var (
 	daemonCPUWeight int
 	daemonMemLimit int
 	watchConfigFile string // Config file path
+	
+	// State persistence (Phase 3)
+	enableStatePersistence bool
+	statePath             string
+	stateFlushInterval    time.Duration
 )
 
 var watchCmd = &cobra.Command{
@@ -51,6 +56,11 @@ func init() {
 	watchCmd.Flags().IntVar(&daemonCPUQuota, "cpu-quota", 0, "Default CPU quota for discovered processes (0=unlimited)")
 	watchCmd.Flags().IntVar(&daemonCPUWeight, "cpu-weight", 100, "Default CPU weight for discovered processes")
 	watchCmd.Flags().IntVar(&daemonMemLimit, "memory-limit", 0, "Default memory limit in MB for discovered processes (0=unlimited)")
+	
+	// State persistence flags
+	watchCmd.Flags().BoolVar(&enableStatePersistence, "enable-state", false, "Enable state persistence across restarts")
+	watchCmd.Flags().StringVar(&statePath, "state-path", "/var/lib/ffrtmp/watch-state.json", "Path to state file")
+	watchCmd.Flags().DurationVar(&stateFlushInterval, "state-flush-interval", 30*time.Second, "How often to flush state to disk")
 }
 
 func runWatchDaemon(cmd *cobra.Command, args []string) error {
@@ -138,6 +148,16 @@ func runWatchDaemon(cmd *cobra.Command, args []string) error {
 	}
 	config.OnDetach = func(pid int, jobID string) {
 		logger.Printf("⊗ Detached from PID %d (job: %s)", pid, jobID)
+	}
+	
+	// Add state configuration if enabled
+	if enableStatePersistence {
+		config.StateConfig = &discover.StateConfig{
+			StatePath:     statePath,
+			FlushInterval: stateFlushInterval,
+			EnableSync:    false, // fsync can be expensive, disabled by default
+		}
+		logger.Printf("State persistence enabled: %s", statePath)
 	}
 	
 	// Create service
