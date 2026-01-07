@@ -1,0 +1,38 @@
+---
+- name: Install firewalld (RedHat)
+  yum:
+    name: firewalld
+    state: present
+  when: is_redhat
+
+- name: Start and enable firewalld (RedHat)
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  when: is_redhat
+
+- name: Install ufw (Debian)
+  apt:
+    name: ufw
+    state: present
+  when: is_debian
+
+- name: Enable ufw (Debian)
+  ufw:
+    state: enabled
+  when: is_debian
+
+- name: Allow SSH
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+  when: is_debian
+
+- name: Allow SSH (RedHat)
+  firewalld:
+    service: ssh
+    permanent: yes
+    state: enabled
+  when: is_redhat
