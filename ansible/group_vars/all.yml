@@ -1,0 +1,57 @@
+---
+# Common variables for all hosts
+
+# Project settings
+ffrtmp_version: "latest"
+ffrtmp_git_repo: "https://github.com/psantana5/ffmpeg-rtmp.git"
+ffrtmp_git_branch: "main"
+
+# Build options
+build_from_source: true
+go_version: "1.24.0"
+go_archive: "go{{ go_version }}.linux-amd64.tar.gz"
+go_download_url: "https://golang.org/dl/{{ go_archive }}"
+go_install_dir: "/usr/local"
+
+# Directories
+ffrtmp_base_dir: "/opt/ffrtmp"
+ffrtmp_master_base_dir: "/opt/ffrtmp-master"
+ffrtmp_config_dir: "/etc/ffrtmp"
+ffrtmp_master_config_dir: "/etc/ffrtmp-master"
+ffrtmp_data_dir: "/var/lib/ffrtmp"
+ffrtmp_master_data_dir: "/var/lib/ffrtmp-master"
+ffrtmp_log_dir: "/var/log/ffrtmp"
+ffrtmp_master_log_dir: "/var/log/ffrtmp-master"
+ffrtmp_stream_dir: "{{ ffrtmp_base_dir }}/streams"
+
+# Users
+ffrtmp_user: "ffrtmp"
+ffrtmp_group: "ffrtmp"
+ffrtmp_master_user: "ffrtmp-master"
+ffrtmp_master_group: "ffrtmp-master"
+
+# TLS Configuration
+enable_tls: false
+tls_generate_certs: false
+tls_cert_validity_days: 365
+tls_master_ip: "{{ ansible_default_ipv4.address }}"
+tls_master_host: "{{ ansible_fqdn }}"
+
+# Firewall
+configure_firewall: true
+firewall_allowed_networks:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+
+# Cgroups
+enable_cgroups_v2: true
+
+# FFmpeg options
+ffmpeg_version: "6.1"
+ffmpeg_enable_nvenc: false
+ffmpeg_enable_qsv: false
+
+# GStreamer (optional)
+install_gstreamer: false
+gstreamer_version: "1.22"
