@@ -1,0 +1,41 @@
+[Unit]
+Description=FFmpeg-RTMP Master Server
+Documentation=https://github.com/psantana5/ffmpeg-rtmp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ffrtmp_master_user }}
+Group={{ ffrtmp_master_group }}
+WorkingDirectory={{ ffrtmp_master_data_dir }}
+
+EnvironmentFile={{ ffrtmp_master_config_dir }}/master.env
+
+ExecStart={{ ffrtmp_master_base_dir }}/bin/ffrtmp-master \
+    --port=${PORT} \
+    --db=${DATABASE_PATH} \
+    --api-key-file=${API_KEY_FILE}
+
+Restart=on-failure
+RestartSec=10s
+KillMode=process
+TimeoutStopSec=30s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ ffrtmp_master_data_dir }} {{ ffrtmp_master_log_dir }}
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ffrtmp-master
+
+[Install]
+WantedBy=multi-user.target
