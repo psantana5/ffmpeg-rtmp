@@ -1,0 +1,43 @@
+# Development Environment Configuration for Master Node
+# Override these values in your local deployment
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+database:
+  type: "sqlite"
+  path: "/var/lib/ffrtmp-master/master.db"
+  
+logging:
+  level: "debug"
+  format: "text"
+  output: "/var/log/ffrtmp/master.log"
+
+api:
+  rate_limit: 100
+  burst: 200
+  enable_cors: true
+  
+worker:
+  heartbeat_timeout: 60s
+  max_missed_heartbeats: 3
+  cleanup_interval: 300s
+
+job:
+  default_timeout: 3600s
+  max_retries: 3
+  cleanup_retention: 168h  # 7 days
+
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+
+tls:
+  enabled: false
+  cert_file: "/etc/ffrtmp-master/certs/server.crt"
+  key_file: "/etc/ffrtmp-master/certs/server.key"
