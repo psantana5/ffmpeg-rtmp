@@ -1,0 +1,28 @@
+---
+# Worker node specific variables
+
+# Worker configuration
+ffrtmp_worker_max_jobs: 4
+ffrtmp_worker_heartbeat_interval: "30s"
+ffrtmp_worker_metrics_port: 9091
+ffrtmp_worker_poll_interval: "10s"
+ffrtmp_worker_log_level: "info"
+
+# Master connection (will be configured during deployment)
+ffrtmp_master_url: "http://{{ groups['master'][0] }}:8080"
+
+# Watch daemon
+ffrtmp_watch_enabled: true
+ffrtmp_watch_scan_interval: "10s"
+ffrtmp_watch_cpu_quota: 150
+ffrtmp_watch_memory_limit: 2048
+ffrtmp_watch_enable_retry: true
+ffrtmp_watch_max_retry_attempts: 3
+
+# Resource limits
+ffrtmp_worker_enable_cgroups: true
+ffrtmp_worker_cpu_quota: 0  # 0 = unlimited
+ffrtmp_worker_memory_limit: 0  # 0 = unlimited
+
+# Auto-attach
+ffrtmp_worker_enable_auto_attach: false
