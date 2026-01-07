@@ -1,0 +1,24 @@
+---
+- name: Install GStreamer (Debian)
+  apt:
+    name:
+      - gstreamer1.0-tools
+      - gstreamer1.0-plugins-base
+      - gstreamer1.0-plugins-good
+      - gstreamer1.0-plugins-bad
+      - gstreamer1.0-plugins-ugly
+      - libgstreamer1.0-dev
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install GStreamer (RedHat)
+  yum:
+    name:
+      - gstreamer1
+      - gstreamer1-plugins-base
+      - gstreamer1-plugins-good
+      - gstreamer1-plugins-bad-free
+      - gstreamer1-plugins-ugly
+      - gstreamer1-devel
+    state: present
+  when: ansible_os_family == 'RedHat'
