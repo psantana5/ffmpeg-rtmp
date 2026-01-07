@@ -1,0 +1,15 @@
+---
+# Install all dependencies: Go, FFmpeg, GStreamer
+
+- name: Install Go
+  include_tasks: go.yml
+  tags: go
+
+- name: Install FFmpeg
+  include_tasks: ffmpeg.yml
+  tags: ffmpeg
+
+- name: Install GStreamer
+  include_tasks: gstreamer.yml
+  when: install_gstreamer | bool
+  tags: gstreamer
