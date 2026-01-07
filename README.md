@@ -7,7 +7,8 @@
 [![SLA Compliance](https://img.shields.io/badge/SLA%20compliance-99.9%25-brightgreen.svg)](docs/SLA_CLASSIFICATION.md)
 
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, **distributed compute capabilities** for scaling workloads across multiple nodes, and **edge workload wrapper** for production governance. **Achieved 99.9% SLA compliance** tested with **45,000+ mixed workload jobs**.
-<img width="1658" height="1020" alt="image" src="https://github.com/user-attachments/assets/12e560b2-1d60-407d-b856-f7a80dcfd02c" />
+<img width="1899" height="963" alt="image" src="https://github.com/user-attachments/assets/a7434728-cefd-43c3-8940-1b6d1f7e4c52" />
+
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
