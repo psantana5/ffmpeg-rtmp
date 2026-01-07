@@ -1,0 +1,36 @@
+[Unit]
+Description=FFmpeg Auto-Discovery Watch Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ffrtmp_user }}
+Group={{ ffrtmp_group }}
+WorkingDirectory={{ ffrtmp_base_dir }}
+
+ExecStart={{ ffrtmp_base_dir }}/bin/ffrtmp watch \
+    --watch-config {{ ffrtmp_config_dir }}/watch-config.yaml \
+    --enable-retry \
+    --max-retry-attempts {{ ffrtmp_watch_max_retry_attempts }}
+
+Restart=on-failure
+RestartSec=10s
+KillMode=process
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ ffrtmp_stream_dir }} {{ ffrtmp_log_dir }} {{ ffrtmp_data_dir }}
+
+# Cgroup delegation
+Delegate=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ffrtmp-watch
+
+[Install]
+WantedBy=multi-user.target
