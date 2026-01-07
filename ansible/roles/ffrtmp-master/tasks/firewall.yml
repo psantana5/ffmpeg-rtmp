@@ -1,0 +1,21 @@
+---
+- name: Allow master port (Debian)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ ffrtmp_master_port }}"
+    - "{{ ffrtmp_master_tls_port if enable_tls else [] }}"
+  when: ansible_os_family == 'Debian'
+
+- name: Allow master port (RedHat)
+  firewalld:
+    port: "{{ item }}/tcp"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - "{{ ffrtmp_master_port }}"
+    - "{{ ffrtmp_master_tls_port if enable_tls else [] }}"
+  when: ansible_os_family == 'RedHat'
