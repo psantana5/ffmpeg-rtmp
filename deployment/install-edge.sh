@@ -299,12 +299,13 @@ if [ ! -f "$CONFIG_DIR/worker.env" ]; then
     if [ -f "deployment/systemd/worker.env.example" ]; then
         cp deployment/systemd/worker.env.example "$CONFIG_DIR/worker.env"
         log_success "Worker config template → $CONFIG_DIR/worker.env"
-        log_warn "IMPORTANT: Edit $CONFIG_DIR/worker.env and set MASTER_URL and MASTER_API_KEY"
+        log_warn "IMPORTANT: Edit $CONFIG_DIR/worker.env and set MASTER_URL and API_KEY"
     else
         log_error "Worker config template not found"
     fi
 else
-    log_success "Worker config already exists: $CONFIG_DIR/worker.env"
+    backup_file "$CONFIG_DIR/worker.env"
+    log_success "Worker config already exists: $CONFIG_DIR/worker.env (preserved)"
 fi
 
 # Watch daemon YAML configuration
@@ -316,7 +317,8 @@ if [ ! -f "$CONFIG_DIR/watch-config.yaml" ]; then
         log_error "Watch config template not found"
     fi
 else
-    log_success "Watch config already exists: $CONFIG_DIR/watch-config.yaml"
+    backup_file "$CONFIG_DIR/watch-config.yaml"
+    log_success "Watch config already exists: $CONFIG_DIR/watch-config.yaml (preserved)"
 fi
 
 # Watch daemon environment
