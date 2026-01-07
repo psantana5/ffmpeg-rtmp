@@ -33,6 +33,10 @@ type AttachConfig struct {
 	
 	// StateConfig for persistence (optional)
 	StateConfig *StateConfig
+	
+	// Reliability configuration (Phase 3)
+	EnableRetry   bool // Enable retry for failed attachments
+	MaxRetryAttempts int  // Max retry attempts (default: 3)
 }
 
 // AutoAttachService automatically discovers and attaches to running processes
@@ -57,6 +61,11 @@ type AutoAttachService struct {
 	// State management (Phase 3)
 	stateManager *StateManager
 	
+	// Reliability (Phase 3)
+	healthCheck     *HealthCheck
+	retryQueue      *RetryQueue
+	errorClassifier *ErrorClassifier
+	
 	// Control channels
 	stopCh chan struct{}
 	logger *log.Logger
@@ -80,11 +89,23 @@ func NewAutoAttachService(config *AttachConfig) *AutoAttachService {
 	}
 	
 	service := &AutoAttachService{
-		config:      config,
-		scanner:     NewScanner(config.TargetCommands),
-		attachments: make(map[int]context.CancelFunc),
-		stopCh:      make(chan struct{}),
-		logger:      logger,
+		config:          config,
+		scanner:         NewScanner(config.TargetCommands),
+		attachments:     make(map[int]context.CancelFunc),
+		stopCh:          make(chan struct{}),
+		logger:          logger,
+		healthCheck:     NewHealthCheck(),
+		errorClassifier: &ErrorClassifier{},
+	}
+	
+	// Initialize retry queue if enabled
+	if config.EnableRetry {
+		maxAttempts := config.MaxRetryAttempts
+		if maxAttempts <= 0 {
+			maxAttempts = 3
+		}
+		service.retryQueue = NewRetryQueue(maxAttempts, logger)
+		logger.Printf("Retry queue enabled (max attempts: %d)", maxAttempts)
 	}
 	
 	// Initialize state manager if configured
@@ -122,6 +143,17 @@ func (s *AutoAttachService) Start(ctx context.Context) error {
 	// Exclude watch daemon's own PID from discoveries
 	s.scanner.ExcludeParentPID(s.scanner.ownPID)
 	
+	// Start retry worker if enabled
+	if s.retryQueue != nil {
+		retryFunc := func(proc *Process) error {
+			s.logger.Printf("Retrying attachment to PID %d (%s)", proc.PID, proc.Command)
+			s.attachToProcess(proc)
+			return nil
+		}
+		go s.retryQueue.StartRetryWorker(ctx, retryFunc)
+		s.logger.Println("Retry worker started")
+	}
+	
 	ticker := time.NewTicker(s.config.ScanInterval)
 	defer ticker.Stop()
 	
@@ -129,6 +161,11 @@ func (s *AutoAttachService) Start(ctx context.Context) error {
 	s.logger.Println("Performing initial scan...")
 	if err := s.scanAndAttach(); err != nil {
 		s.logger.Printf("Initial scan failed: %v", err)
+		// Log health status after initial scan failure
+		if s.healthCheck != nil {
+			status := s.healthCheck.GetStatus()
+			s.logger.Printf("Health status: %s", status)
+		}
 	}
 	
 	for {
@@ -144,6 +181,15 @@ func (s *AutoAttachService) Start(ctx context.Context) error {
 			s.logger.Println("Scanning for processes...")
 			if err := s.scanAndAttach(); err != nil {
 				s.logger.Printf("Scan failed: %v", err)
+				// Log health status on degradation
+				if s.healthCheck != nil {
+					status := s.healthCheck.GetStatus()
+					report := s.healthCheck.GetHealthReport()
+					if status != HealthStatusHealthy {
+						s.logger.Printf("Health status: %s (scan failures: %d, attach failures: %d)",
+							status, report["consecutive_scan_failures"], report["consecutive_attachment_failures"])
+					}
+				}
 			}
 		}
 	}
@@ -178,10 +224,32 @@ func (s *AutoAttachService) scanAndAttach() error {
 	
 	newProcesses, err := s.scanner.GetNewProcesses()
 	if err != nil {
-		return fmt.Errorf("failed to scan processes: %w", err)
+		// Wrap error with context for error classification
+		discErr := &DiscoveryError{
+			Operation: "scan",
+			Timestamp: scanStart,
+			Err:       err,
+		}
+		
+		// Classify error and determine if retryable
+		errType := s.errorClassifier.Classify(err)
+		discErr.Type = errType
+		discErr.Retryable = (errType == ErrorTypeTransient || errType == ErrorTypeRateLimit)
+		
+		// Record failure in health check
+		if s.healthCheck != nil {
+			s.healthCheck.RecordScanFailure(discErr)
+		}
+		
+		return discErr
 	}
 	
 	scanDuration := time.Since(scanStart)
+	
+	// Record successful scan in health check
+	if s.healthCheck != nil {
+		s.healthCheck.RecordScanSuccess()
+	}
 	
 	// Update statistics
 	s.statsMu.Lock()
@@ -250,12 +318,60 @@ func (s *AutoAttachService) attachToProcess(proc *Process) {
 			s.stateManager.RecordAttachment(proc.PID)
 		}
 		
+		attachStart := time.Now()
 		result, err := wrapper.Attach(ctx, jobID, proc.PID, s.config.DefaultLimits)
 		
-		// Update statistics
+		// Handle attachment error
+		if err != nil && err != context.Canceled {
+			// Wrap error with context for classification
+			discErr := &DiscoveryError{
+				Operation: "attach",
+				PID:       proc.PID,
+				Timestamp: attachStart,
+				Err:       err,
+			}
+			
+			// Classify error and determine if retryable
+			errType := s.errorClassifier.Classify(err)
+			discErr.Type = errType
+			discErr.Retryable = (errType == ErrorTypeTransient || errType == ErrorTypeRateLimit || errType == ErrorTypeResource)
+			
+			// Record failure in health check
+			if s.healthCheck != nil {
+				s.healthCheck.RecordAttachFailure(discErr)
+			}
+			
+			// Add to retry queue if retryable and retry is enabled
+			if discErr.Retryable && s.retryQueue != nil {
+				s.retryQueue.Add(proc, discErr)
+				s.logger.Printf("Attachment to PID %d failed (%s), added to retry queue: %v", proc.PID, errType, err)
+			} else {
+				s.logger.Printf("Attachment to PID %d failed (%s): %v", proc.PID, errType, err)
+			}
+			
+			// Clean up failed attachment
+			s.mu.Lock()
+			delete(s.attachments, proc.PID)
+			s.scanner.UnmarkTracked(proc.PID)
+			s.mu.Unlock()
+			
+			// Remove from state manager
+			if s.stateManager != nil {
+				s.stateManager.RemoveProcess(proc.PID)
+			}
+			
+			return
+		}
+		
+		// Update statistics for successful attachment
 		s.statsMu.Lock()
 		s.stats.TotalAttachments++
 		s.statsMu.Unlock()
+		
+		// Record success in health check
+		if s.healthCheck != nil {
+			s.healthCheck.RecordAttachSuccess()
+		}
 		
 		// Clean up when attachment ends
 		s.mu.Lock()
@@ -268,9 +384,7 @@ func (s *AutoAttachService) attachToProcess(proc *Process) {
 			s.stateManager.RemoveProcess(proc.PID)
 		}
 		
-		if err != nil && err != context.Canceled {
-			s.logger.Printf("Attachment to PID %d failed: %v", proc.PID, err)
-		} else if result != nil {
+		if result != nil {
 			s.logger.Printf("Process %d exited (job %s, duration: %.2fs)", 
 				proc.PID, result.JobID, result.Duration.Seconds())
 		}
@@ -333,4 +447,20 @@ func (s *AutoAttachService) GetStats() Stats {
 // GetScanner returns the underlying scanner (for applying filters)
 func (s *AutoAttachService) GetScanner() *Scanner {
 	return s.scanner
+}
+
+// GetHealthStatus returns the current health status and detailed report
+func (s *AutoAttachService) GetHealthStatus() (HealthStatus, map[string]interface{}) {
+	if s.healthCheck == nil {
+		return HealthStatusHealthy, nil
+	}
+	return s.healthCheck.GetStatus(), s.healthCheck.GetHealthReport()
+}
+
+// GetHealthReport returns a detailed health report
+func (s *AutoAttachService) GetHealthReport() map[string]interface{} {
+	if s.healthCheck == nil {
+		return map[string]interface{}{"enabled": false}
+	}
+	return s.healthCheck.GetHealthReport()
 }

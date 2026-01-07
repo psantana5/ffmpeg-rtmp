@@ -22,10 +22,14 @@ var (
 	daemonMemLimit int
 	watchConfigFile string // Config file path
 	
-	// State persistence (Phase 3)
+	// State persistence (Phase 3.1)
 	enableStatePersistence bool
 	statePath             string
 	stateFlushInterval    time.Duration
+	
+	// Retry configuration (Phase 3.2-3.4)
+	enableRetry       bool
+	maxRetryAttempts  int
 )
 
 var watchCmd = &cobra.Command{
@@ -61,6 +65,10 @@ func init() {
 	watchCmd.Flags().BoolVar(&enableStatePersistence, "enable-state", false, "Enable state persistence across restarts")
 	watchCmd.Flags().StringVar(&statePath, "state-path", "/var/lib/ffrtmp/watch-state.json", "Path to state file")
 	watchCmd.Flags().DurationVar(&stateFlushInterval, "state-flush-interval", 30*time.Second, "How often to flush state to disk")
+	
+	// Retry configuration flags
+	watchCmd.Flags().BoolVar(&enableRetry, "enable-retry", false, "Enable retry mechanism for failed attachments")
+	watchCmd.Flags().IntVar(&maxRetryAttempts, "max-retry-attempts", 3, "Maximum number of retry attempts for failed attachments")
 }
 
 func runWatchDaemon(cmd *cobra.Command, args []string) error {
@@ -158,6 +166,13 @@ func runWatchDaemon(cmd *cobra.Command, args []string) error {
 			EnableSync:    false, // fsync can be expensive, disabled by default
 		}
 		logger.Printf("State persistence enabled: %s", statePath)
+	}
+	
+	// Add retry configuration if enabled
+	if enableRetry {
+		config.EnableRetry = true
+		config.MaxRetryAttempts = maxRetryAttempts
+		logger.Printf("Retry mechanism enabled (max attempts: %d)", maxRetryAttempts)
 	}
 	
 	// Create service
