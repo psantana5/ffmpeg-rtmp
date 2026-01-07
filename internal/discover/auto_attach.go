@@ -82,6 +82,7 @@ func (s *AutoAttachService) Start(ctx context.Context) error {
 	defer ticker.Stop()
 	
 	// Initial scan
+	s.logger.Println("Performing initial scan...")
 	if err := s.scanAndAttach(); err != nil {
 		s.logger.Printf("Initial scan failed: %v", err)
 	}
@@ -96,6 +97,7 @@ func (s *AutoAttachService) Start(ctx context.Context) error {
 			s.logger.Println("Stop signal received")
 			return nil
 		case <-ticker.C:
+			s.logger.Println("Scanning for processes...")
 			if err := s.scanAndAttach(); err != nil {
 				s.logger.Printf("Scan failed: %v", err)
 			}
@@ -128,6 +130,7 @@ func (s *AutoAttachService) scanAndAttach() error {
 	}
 	
 	if len(newProcesses) == 0 {
+		// Silent scan - no new processes found
 		return nil
 	}
 	

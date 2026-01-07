@@ -40,12 +40,13 @@ echo ""
 
 echo "Step 3: Starting FFmpeg process (externally, not via wrapper)..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-ffmpeg -f lavfi -i testsrc=duration=20:size=640x480:rate=30 \
+ffmpeg -f lavfi -i testsrc=duration=60:size=640x480:rate=30 \
        -c:v libx264 -preset ultrafast /tmp/demo_output.mp4 \
        > /dev/null 2>&1 &
 FFMPEG_PID=$!
 echo "FFmpeg started (PID: $FFMPEG_PID)"
 echo "→ This is an EXTERNAL process (not started by wrapper)"
+echo "→ Duration: 60 seconds (long enough to be discovered)"
 echo ""
 
 echo "Step 4: Waiting for watch daemon to discover it..."
