@@ -1,0 +1,17 @@
+---
+# Deploy Master Node Only
+- name: Deploy FFmpeg-RTMP Master
+  hosts: master
+  become: yes
+  
+  pre_tasks:
+    - name: Validate master group exists
+      assert:
+        that:
+          - groups['master'] | length > 0
+        fail_msg: "No hosts in 'master' group"
+
+  roles:
+    - common
+    - dependencies
+    - ffrtmp-master
