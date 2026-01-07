@@ -1,58 +1,77 @@
-# FFmpeg RTMP Power Monitoring
+# FFmpeg-RTMP: A Production-Validated Reference System
+
 [![CI](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/ci.yml/badge.svg)](https://github.com/psantana5/ffmpeg-rtmp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go 1.24+](https://img.shields.io/badge/go-1.24+-00ADD8.svg)](https://golang.org/)
-[![Test Coverage](https://img.shields.io/badge/coverage-60%25-brightgreen.svg)](#testing)
-[![Code Quality](https://img.shields.io/badge/code%20quality-A-success.svg)](#)
-[![SLA Compliance](https://img.shields.io/badge/SLA%20compliance-99.9%25-brightgreen.svg)](docs/SLA_CLASSIFICATION.md)
 
-A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, **distributed compute capabilities** for scaling workloads across multiple nodes, and **edge workload wrapper** for production governance. **Achieved 99.9% SLA compliance** tested with **45,000+ mixed workload jobs**.
+A distributed video transcoding system documenting architectural patterns, design invariants, and failure semantics observed under real load. This reference implementation demonstrates master-worker coordination, state machine guarantees, and operational tradeoffs in production environments.
+
 <img width="1899" height="963" alt="image" src="https://github.com/user-attachments/assets/a7434728-cefd-43c3-8940-1b6d1f7e4c52" />
 
-## Production-Validated Reference System
+## About This Reference System
 
-**FFmpeg-RTMP is presented as a production-validated reference system.** It documents architectural choices, invariants, and failure semantics observed under real load. While the system is used in production and is available for reuse, its primary goal is to communicate design tradeoffs and operational lessons rather than to serve as a general-purpose or commercially supported platform.
+**FFmpeg-RTMP documents architectural choices, invariants, and failure semantics observed under real load.** While the system is used in production and is available for reuse, its primary goal is to communicate design tradeoffs and operational lessons rather than to serve as a general-purpose or commercially supported platform.
 
-**Key characteristics:**
-- **Production-validated patterns**: FSM state machines, row-level locking, exponential backoff, graceful shutdown
-- **Real operational data**: 45,000+ jobs tested across 31 scenarios with documented SLA compliance
-- **Design transparency**: Explicit invariants, failure modes, and tradeoffs documented
-- **Educational focus**: Demonstrates distributed systems patterns and production architecture
-- **Reusable foundation**: Available for adaptation to specific use cases
+### Research Goals
 
-**What this means:**
-- Architectural decisions are documented with rationale and alternatives considered
-- Failure modes and recovery patterns are explicitly described
-- Performance characteristics are measured and reported honestly
-- Code quality reflects production standards but deployment is environment-specific
-- Primary value is as a reference implementation and learning resource
+This reference implementation demonstrates:
 
-**Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
+- **Architectural patterns**: Pull-based coordination, state machine guarantees, idempotent operations
+- **Design invariants**: What never changes, even under failure conditions
+- **Failure semantics**: Explicit documentation of retry boundaries and terminal states
+- **Operational tradeoffs**: Why certain design choices were made over alternatives
+- **Performance characteristics**: Measured behavior under realistic workloads (45,000+ jobs tested)
+
+### Key Contributions
+
+1. **State Machine Correctness**: FSM with validated transitions and row-level locking prevents race conditions
+2. **Failure Mode Documentation**: Explicit boundaries between transient (retry) and terminal (fail) errors
+3. **Graceful Degradation**: Heartbeat-based failure detection with configurable recovery semantics
+4. **Production Patterns**: Exponential backoff, connection pooling, graceful shutdown demonstrated at scale
+5. **Transparency**: Design decisions documented with rationale and alternatives considered
+
+### What This Is NOT
+
+- **Not a commercial platform**: No support, SLAs, or stability guarantees across versions
+- **Not general-purpose**: Optimized for batch transcoding workloads, not real-time streaming
+- **Not plug-and-play**: Requires understanding of distributed systems concepts for deployment
+- **Not feature-complete**: Focuses on core patterns; many production features deliberately omitted
+
+### Intended Audience
+
+- Systems researchers studying distributed coordination patterns
+- Engineers evaluating architectural approaches for similar problems
+- Students learning production distributed systems design
+- Teams seeking a reference implementation to adapt for specific use cases
+
+**This is a teaching tool backed by real operational data, not a turnkey solution.**
 
 ## Project Organization
 
-This project is organized into three main directories for clarity:
+This reference implementation is organized to clearly separate concerns:
 
-- **[`master/`](master/)** - Master node components (orchestration, monitoring, visualization)
-- **[`worker/`](worker/)** - Worker node components (transcoding, hardware metrics)
-- **[`shared/`](shared/)** - Shared libraries, scripts, and documentation
+- **[`master/`](master/)** - Orchestration: job scheduling, failure detection, state management
+- **[`worker/`](worker/)** - Execution: job processing, FFmpeg integration, metrics collection
+- **[`shared/`](shared/)** - Common libraries: FSM, retry semantics, database abstractions
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for system architecture and design.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design discussion and [CODE_VERIFICATION_REPORT.md](CODE_VERIFICATION_REPORT.md) for implementation validation.
 
-## Quick Start (Local Development)
+## Running the Reference Implementation
 
-**For local testing**, use the automated script to run both master and agent on your machine:
+### Local Development Environment
+
+For studying the system behavior locally:
 
 ```bash
 # One-command setup: builds, runs, and verifies everything
 ./scripts/run_local_stack.sh
 ```
 
-This will compile all binaries, start master+agent, and display helpful commands. See [docs/LOCAL_STACK_GUIDE.md](docs/LOCAL_STACK_GUIDE.md) for details.
+See [docs/LOCAL_STACK_GUIDE.md](docs/LOCAL_STACK_GUIDE.md) for details.
 
-## Quick Start (Production - Distributed Mode)
+## Distributed Deployment (Research/Production Use)
 
-The **recommended way** to deploy for production workloads is **Distributed Compute Mode** with master and agent nodes.
+The reference implementation can be deployed across multiple nodes to study distributed behavior patterns.
 
 ### Prerequisites
 
@@ -69,7 +88,7 @@ git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
 make build-master
 
-# Set API key (recommended for production)
+# Set API key for authentication
 export MASTER_API_KEY=$(openssl rand -base64 32)
 
 # Start master service
@@ -83,10 +102,10 @@ export MASTER_API_KEY=$(openssl rand -base64 32)
 make vm-up-build
 ```
 
-### Deploy Compute Agent(s)
+### Deploy Worker Node(s)
 
 ```bash
-# On compute node(s)
+# On worker node(s)
 git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
 make build-agent
@@ -94,11 +113,8 @@ make build-agent
 # Set same API key as master
 export MASTER_API_KEY="<same-key-as-master>"
 
-# Get optimal configuration for this hardware
-./bin/ffrtmp config recommend --environment production
-
 # Register and start agent
-# Recommended: Use hardware-appropriate concurrency settings
+# Concurrency settings affect failure mode behavior
 ./bin/agent \
   --register \
   --master https://MASTER_IP:8080 \
@@ -107,21 +123,20 @@ export MASTER_API_KEY="<same-key-as-master>"
   --poll-interval 3s \
   --insecure-skip-verify
   
-# Note: --insecure-skip-verify only needed for self-signed certs
-# For production with proper TLS, use --ca flag instead
+# Note: --insecure-skip-verify only for self-signed certs in research environments
 ```
 
-### Submit and Run Jobs
+### Submit Jobs and Observe Behavior
 
 ```bash
-# Using CLI tool (recommended)
+# Submit via CLI
 ./bin/ffrtmp jobs submit \
   --master https://MASTER_IP:8080 \
   --scenario 1080p-h264 \
   --bitrate 5M \
   --duration 300
 
-# Using curl (for automation)
+# Or via REST API
 curl -X POST https://MASTER_IP:8080/jobs \
   -H "Authorization: Bearer $MASTER_API_KEY" \
   -H "Content-Type: application/json" \
@@ -131,38 +146,34 @@ curl -X POST https://MASTER_IP:8080/jobs \
     "parameters": {"duration": 300, "bitrate": "5M"}
   }'
 
-# Agent automatically picks up and executes jobs
-# Failed jobs auto-retry up to 3 times
+# Workers poll master and execute jobs
+# Observe state transitions and failure recovery patterns
 # Monitor progress at https://MASTER_IP:8080/jobs
 ```
 
-### Access Dashboards
+### Observability Endpoints
 
-- **Master API**: https://MASTER_IP:8080/nodes (view registered nodes)
+- **Master API**: https://MASTER_IP:8080/nodes (registered nodes, health status)
 - **Prometheus Metrics**: http://MASTER_IP:9090/metrics
-- **Grafana** (if enabled): http://MASTER_IP:3000 (admin/admin)
-- **VictoriaMetrics** (if enabled): http://MASTER_IP:8428
+- **Grafana** (optional): http://MASTER_IP:3000 (admin/admin)
+- **VictoriaMetrics** (optional): http://MASTER_IP:8428
 
-### Production Deployment with Systemd
-
-See [deployment/README.md](deployment/README.md) for systemd service templates and production setup.
+For systemd service configuration, see [deployment/README.md](deployment/README.md).
 
 ---
 
-## Edge Workload Wrapper 🆕
+## Experimental: Edge Workload Wrapper
 
-The **Edge Workload Wrapper** provides production-grade governance for workloads on edge nodes. This thin control-plane wrapper applies OS-level constraints without owning the workload.
+The Edge Workload Wrapper demonstrates OS-level resource constraint patterns for compute workloads. This experimental component explores non-owning governance models where workloads survive wrapper crashes.
 
-### Key Features
+### Design Patterns Demonstrated
 
-- **Non-owning design**: Workloads survive wrapper crashes
-- **Run mode**: Spawn new processes with constraints
-- **Attach mode**: Govern already-running processes (zero-downtime)
-- **OS-level constraints**: CPU, memory, IO, nice priority, OOM score
-- **Lifecycle tracking**: Exit codes, reasons, duration
-- **Graceful degradation**: Works even without cgroups/root
+- **Non-owning supervision**: Workloads run independently of wrapper lifecycle
+- **Attach semantics**: Govern already-running processes without restart
+- **Graceful fallback**: OS-level constraints degrade gracefully without root/cgroups
+- **Exit tracking**: Capture exit codes, reasons, and execution duration
 
-### Quick Examples
+### Example Usage
 
 ```bash
 # Run FFmpeg with resource constraints
@@ -173,7 +184,7 @@ ffrtmp run \
   --memory-limit 4096 \
   -- ffmpeg -i input.mp4 -c:v h264_nvenc output.mp4
 
-# Attach to already-running process (critical for adoption!)
+# Attach to existing process (demonstrates attach semantics)
 ffrtmp attach \
   --pid 12345 \
   --job-id existing-job-042 \
@@ -188,52 +199,44 @@ ffrtmp watch \
   --watch-config /etc/ffrtmp/watch-config.yaml
 ```
 
-### Auto-Discovery Watch Daemon 🆕
+### Auto-Discovery Watch Daemon (Experimental)
 
-The **watch daemon** automatically discovers and governs FFmpeg processes that start outside the wrapper's control. Perfect for:
-- Client-initiated streams
-- Legacy systems without code changes
-- External triggers spawning processes
-- Production edge nodes requiring comprehensive governance
+Demonstrates automatic process discovery and governance patterns. Explores techniques for:
+- Non-intrusive process discovery via /proc scanning
+- State persistence across daemon restarts
+- Configuration-driven process filtering and governance
 
-**Key Features**:
-- Automatic process discovery via /proc scanning
-- State persistence across restarts
-- Intelligent error handling and retry
-- Health monitoring with degradation tracking
-- YAML-based configuration with filtering rules
-
-**Quick Start**:
+**Example deployment**:
 ```bash
-# Install on production node
+# Install experimental daemon
 sudo ./deployment/install-edge.sh
 
-# Configure
+# Configure discovery rules
 sudo nano /etc/ffrtmp/watch-config.yaml
 
 # Start service
 sudo systemctl start ffrtmp-watch
-sudo systemctl enable ffrtmp-watch
 ```
 
-See **[deployment/WATCH_DEPLOYMENT.md](deployment/WATCH_DEPLOYMENT.md)** for complete deployment guide.
+See [deployment/WATCH_DEPLOYMENT.md](deployment/WATCH_DEPLOYMENT.md) for implementation details.
 
-### Documentation
+### Wrapper Documentation
 
-- **[Wrapper Architecture](docs/WRAPPER_ARCHITECTURE.md)** - Core design and philosophy
-- **[Wrapper Examples](docs/WRAPPER_EXAMPLES.md)** - Comprehensive usage examples
-- See [WRAPPER_ARCHITECTURE.md](docs/WRAPPER_ARCHITECTURE.md) for complete documentation
+- **[Wrapper Architecture](docs/WRAPPER_ARCHITECTURE.md)** - Design patterns and philosophy
+- **[Wrapper Examples](docs/WRAPPER_EXAMPLES.md)** - Usage demonstrations
 
 ---
 
-## Resource Management & Production Best Practices
+## System Architecture and Design Patterns
 
-### Running as Root (Recommended for Production)
+### Resource Management Patterns
 
-**For production deployments, running the worker agent as root is strongly recommended** to enable full resource management capabilities:
+The reference implementation demonstrates several resource management approaches:
+
+**Running with privileged access** (research/production):
 
 ```bash
-# Run worker with full cgroup support (recommended)
+# Full cgroup support for resource isolation
 sudo ./bin/agent \
   --register \
   --master https://MASTER_IP:8080 \
@@ -242,21 +245,21 @@ sudo ./bin/agent \
   --poll-interval 3s
 ```
 
-**Benefits of running as root:**
--  **Full CPU limits**: Enforce per-job CPU quotas via cgroups
--  **Memory limits**: Hard memory caps with OOM protection
--  **Resource isolation**: Complete process isolation per job
--  **Production stability**: Prevent resource exhaustion and runaway jobs
+**Benefits of privileged execution:**
+- Strict CPU quotas via cgroups (v1/v2)
+- Hard memory limits with OOM protection
+- Complete process isolation per job
+- Resource exhaustion prevention
 
-**Without root privileges**, the system gracefully falls back to:
--  Disk space monitoring (always enforced)
--  Timeout enforcement (always enforced)  
--  Process priority control via nice (always enforced)
--  CPU/Memory limits disabled (soft limits only)
+**Graceful degradation without privileges:**
+- Disk space monitoring (always enforced)
+- Timeout enforcement (always enforced)
+- Process priority control via nice
+- CPU/memory limits disabled (monitoring only)
 
-### Resource Limits Per Job
+### Per-Job Resource Constraints
 
-Every job supports configurable resource limits to ensure system stability:
+Jobs support configurable limits for studying resource contention:
 
 ```json
 {
@@ -274,19 +277,18 @@ Every job supports configurable resource limits to ensure system stability:
 }
 ```
 
-**Default limits** (if not specified):
+**Default constraints**:
 - **CPU**: All available cores (numCPU × 100%)
 - **Memory**: 2048 MB (2GB)
 - **Disk**: 5000 MB (5GB)
 - **Timeout**: 3600 seconds (1 hour)
 
-### Resource Management Features
+### Resource Isolation Techniques
 
 **1. CPU Limits (cgroup-based)**
-- Prevent jobs from monopolizing CPU resources
-- Support for cgroup v1 and v2
-- Automatic fallback to nice priority without root
-- Per-job CPU percentage allocation (100% = 1 core)
+- Demonstrates per-job CPU percentage allocation (100% = 1 core)
+- Supports cgroup v1 and v2
+- Fallback to nice priority without root
 
 **2. Memory Limits (cgroup-based)**
 - Hard memory caps via Linux cgroups
@@ -295,105 +297,55 @@ Every job supports configurable resource limits to ensure system stability:
 - Requires root for enforcement
 
 **3. Disk Space Monitoring**
-- Pre-job disk space validation
-- Reject jobs at 95% disk usage
-- Warn at 90% disk usage
-- Always enforced (no root required)
+**2. Memory Limits (cgroup-based)**
+- Hard memory caps with OOM protection
+- Automatic fallback to monitoring without enforcement (no root)
+
+**3. Disk Space Monitoring**
+- Pre-job validation (reject at 95% usage)
+- Always enforced (no privileges required)
+- Configurable cleanup policies for temporary files
 
 **4. Timeout Enforcement**
-- Per-job timeout configuration
-- Context-based cancellation
+- Per-job timeout with context-based cancellation
 - SIGTERM → SIGKILL escalation
 - Process group cleanup
 
 **5. Process Priority**
-- Nice value = 10 (lower priority than system services)
-- Prevents worker from impacting other services
-- Always enforced (no root required)
+- Nice value = 10 (lower than system services)
+- Always enforced (no privileges required)
 
-**6. Bandwidth Tracking** 🆕
-- Per-job input/output file size tracking
-- Real-time bandwidth utilization metrics (Mbps)
-- Cumulative bandwidth statistics per worker
-- Compression ratio analysis
-- Capacity planning support
+### Observability and Metrics
 
-**7. SLA Tracking**
-- **99.8% SLA compliance** achieved with 45,000+ production jobs
-- Intelligent job classification (production vs test/benchmark/debug)
-- Automatic SLA-worthy detection based on scenario, duration, and queue
-- Per-worker SLA compliance percentage with trend analysis
-- Real-time SLA status in job logs
-- Projected: Trend indicates 99.9% compliance with continued optimization
-- See [SLA Classification Guide](docs/SLA_CLASSIFICATION.md) for complete methodology
+The system exports Prometheus metrics demonstrating:
 
-**8. Automatic Process Discovery and Resource Governance**
-- Automatically discover and govern FFmpeg processes started outside wrapper control
-- Three operational modes: run (spawn), attach (observe existing), watch (auto-discover)
-- Configuration-driven discovery policies with advanced filtering
-- Non-owning governance: processes survive wrapper crashes
-- Filter by user, directory, runtime, parent process
-- Per-command resource limit overrides
-- Statistics tracking: scan duration, discoveries, active attachments
-- See [Auto-Attach Documentation](docs/AUTO_ATTACH.md) for complete guide
+- **Resource usage patterns**: CPU, memory, GPU utilization per job
+- **Job lifecycle**: Active jobs, completion rates, latency distribution
+- **Hardware monitoring**: GPU power, temperature (NVIDIA)
+- **Encoder availability**: NVENC, QSV, VAAPI runtime detection
+- **Bandwidth tracking**: Input/output bytes, compression ratios
+- **SLA classification**: Intelligent job categorization (production vs test/debug)
 
-### Monitoring & Metrics
-
-**Prometheus Metrics Endpoint**: `http://worker:9091/metrics`
-
-Available metrics include:
-- **Resource Usage**: CPU, memory, GPU utilization
-- **Job Metrics**: Active jobs, completion rate, latency, success/failure counts
-- **Hardware**: GPU power, temperature (NVIDIA)
-- **Encoder Availability**: NVENC, QSV, VAAPI runtime validation
-- **Bandwidth**: Input/output bytes, bandwidth utilization (Mbps)
-- **SLA Tracking**: 99.8% compliance rate (45K+ jobs), intelligent classification, trend analysis
-- **Auto-Discovery**: Discovered processes, active attachments, scan duration
+**Metrics endpoint**: `http://worker:9091/metrics`
 
 **Documentation:**
-- [Auto-Attach Documentation](docs/AUTO_ATTACH.md) - Automatic process discovery and governance
-- [Bandwidth Metrics Guide](docs/BANDWIDTH_METRICS.md) - Bandwidth tracking and capacity planning
-- [SLA Tracking Guide](docs/SLA_TRACKING.md) - Service level agreement monitoring
-- [SLA Classification Guide](docs/SLA_CLASSIFICATION.md) - 99.8% compliance methodology (45K+ jobs)
-- [Alerting Guide](docs/ALERTING.md) - Prometheus alerts and notification setup
+- [Auto-Attach Documentation](docs/AUTO_ATTACH.md) - Process discovery patterns
+- [Bandwidth Metrics Guide](docs/BANDWIDTH_METRICS.md) - Bandwidth tracking implementation
+- [SLA Tracking Guide](docs/SLA_TRACKING.md) - Service level monitoring approach
+- [SLA Classification Guide](docs/SLA_CLASSIFICATION.md) - Job classification methodology (99.8% compliance with 45K+ jobs)
+- [Alerting Guide](docs/ALERTING.md) - Prometheus alert configuration
 
-**3. Disk Space Monitoring**
-- Pre-job disk space validation
-- Reject jobs if < 5% disk space available
-- Warning alerts at 90% disk usage
-- Automatic cleanup of temporary input files (configurable with `PERSIST_INPUTS`)
-- Automatic cleanup of temporary output files (configurable with `PERSIST_OUTPUTS`)
+### Measured Performance Characteristics
 
-**File Cleanup Configuration:**
+**Test Results (45,000+ jobs across 31 scenarios):**
+- 99.8% SLA compliance observed
+- Automatic retry recovers transient failures (network errors, node failures)
+- FFmpeg failures terminal (codec errors, format issues)
+- Heartbeat-based failure detection (90s timeout, 3 missed heartbeats)
 
-```bash
-# Control input file cleanup (default: cleanup after job)
-export PERSIST_INPUTS=true   # Keep generated input files
-export PERSIST_INPUTS=false  # Delete input files after job (default)
+See [CODE_VERIFICATION_REPORT.md](CODE_VERIFICATION_REPORT.md) for implementation validation and [docs/SLA_CLASSIFICATION.md](docs/SLA_CLASSIFICATION.md) for complete testing methodology.
 
-# Control output file cleanup (default: keep outputs)
-export PERSIST_OUTPUTS=true   # Keep output files (default)
-export PERSIST_OUTPUTS=false  # Delete temporary outputs after job
-```
-
-**Cleanup behavior:**
-- Input files (`input_*.mp4`): Cleaned up by default unless `PERSIST_INPUTS=true`
-- Output files (`job_*_output.mp4`): Preserved by default unless `PERSIST_OUTPUTS=false`
-- User-specified paths: Never automatically cleaned up
-- Files outside `/tmp`: Never automatically cleaned up
-
-**4. Timeout Enforcement**
-- Configurable per-job timeouts
-- Process group cleanup (SIGTERM → SIGKILL)
-- Prevents runaway jobs
-- Always enforced (no special permissions needed)
-
-**5. Process Priority Management**
-- Lower priority (nice=10) for transcoding jobs
-- System remains responsive under heavy load
-- Automatic background prioritization
-
-### Best Practices by Workload
+### Configuration Examples by Workload Type
 
 **720p Fast Encoding:**
 ```json
@@ -425,170 +377,143 @@ export PERSIST_OUTPUTS=false  # Delete temporary outputs after job
 ### System Requirements for Resource Limits
 
 **Minimum (without root):**
+**System requirements:**
 - Linux kernel 3.10+
 - /tmp with 10GB+ free space
 - 2GB+ RAM per worker
 
-**Recommended (with root):**
+**Recommended (with privileged access):**
 - Linux kernel 4.5+ (cgroup v2 support)
-- /tmp with 50GB+ free space  
+- /tmp with 50GB+ free space
 - 8GB+ RAM per worker
 - SSD storage for /tmp
-- Root or sudo access
 
-**For complete documentation**, see:
-- **[Resource Limits Guide](docs/RESOURCE_LIMITS.md)** - Complete API and configuration reference
-- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Additional production hardening
-- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues and solutions
+**Additional documentation:**
+- **[Resource Limits Guide](docs/RESOURCE_LIMITS.md)** - Configuration reference
+- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Additional hardening patterns
+- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues
 
 ---
 
-## Quick Start (Development - Local Testing Mode)
+## Local Development Mode
 
-For **development and local testing only**, you can use Docker Compose to run all components on a single machine.
-
-**Important**: Docker Compose mode is **NOT recommended for production**. Use Distributed Mode above for production workloads.
-
-### Prerequisites
-
-- Docker 20.10+ and Docker Compose 2.0+
-- Python 3.10+
-- FFmpeg
-
-### Start Local Stack
+For development and experimentation, Docker Compose provides a single-machine setup:
 
 ```bash
-# Clone repository
+# Clone and start
 git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
-
-# Start all services
 make up-build
-```
 
-### Run Local Test
-
-```bash
-# Build the CLI tool
+# Submit test jobs
 make build-cli
+./bin/ffrtmp jobs submit --scenario 1080p-h264 --bitrate 5M --duration 60
 
-# Submit jobs with different configurations
-./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120 --engine auto
-./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60 --engine ffmpeg
-./bin/ffrtmp jobs submit --scenario 720p30-h264 --bitrate 2M --duration 60 --engine gstreamer
-
-# View dashboards at http://localhost:3000
+# View metrics at http://localhost:3000
 ```
 
-**See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and setup instructions.**
+**Note**: Docker Compose is for local testing only. For distributed deployment, see above.
 
-**For running exporters without Docker**, see:
-- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Quick commands and setup
-- **[Master Exporters Guide](master/exporters/README.md)** - Detailed Python exporter deployment
-- **[Worker Exporters Guide](worker/exporters/DEPLOYMENT.md)** - Detailed Go exporter deployment
+See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for deployment comparisons.
 
-## What's New: Production-Ready v2.3
+## Key Design Patterns Demonstrated
 
-**Latest enhancements for distributed transcoding:**
+### Version 2.4 (2026-01-06): Production Reliability Patterns
 
-- **Concurrent Job Processing** - Workers can process multiple jobs simultaneously with `--max-concurrent-jobs`
-- **Hardware-Aware Configuration** - Built-in tool recommends optimal settings: `ffrtmp config recommend`
-- **Production Job Launcher** - Batch submit 1000s of jobs with `scripts/launch_jobs.sh`
-- **TLS/HTTPS** - Enabled by default with auto-generated certificates
-- **API Authentication** - Secure via `MASTER_API_KEY` environment variable
-- **SQLite Persistence** - Jobs survive restarts with master.db
-- **Automatic Job Retry** - Failed jobs retry up to 3 times with exponential backoff
-- **Prometheus Metrics** - Built-in metrics endpoint on port 9090
-- **Dual Engine Support** - Choose between FFmpeg and GStreamer based on workload
+**Retry Semantics**:
+- Transport-layer retry only (HTTP requests, heartbeats, polling)
+- Exponential backoff: 1s → 30s, max 3 retries
+- Context-aware (respects cancellation)
+- Job execution never retried (FFmpeg failures terminal)
+
+**Graceful Shutdown**:
+- Worker: Stop accepting jobs, drain current jobs (30s timeout)
+- Master: LIFO shutdown order (HTTP → metrics → scheduler → DB → logger)
+- No workload interruption (jobs complete naturally or timeout)
+- Async coordination via `shutdown.Done()` channel
+
+**Readiness Checks**:
+- FFmpeg validation before accepting work
+- Disk space verification
+- Master connectivity check
+- HTTP 200 only when truly ready (Kubernetes-friendly)
+
+**Centralized Logging**:
+- Structured directory: `/var/log/ffrtmp/<component>/<subcomponent>.log`
+- Multi-writer: file + stdout (systemd journald compatible)
+- Automatic fallback to `./logs/` without privileges
+
+**Documentation:**
+- [Production Readiness Guide](docs/PRODUCTION_READINESS.md) - Complete pattern documentation
+- [Security Review](docs/SECURITY_REVIEW.md) - Security audit
+- [Audit Summary](AUDIT_COMPLETE.md) - Technical debt elimination
+
+### Version 2.3: Distributed Coordination Patterns
+
+**Concurrency**:
+- Workers process multiple jobs simultaneously (`--max-concurrent-jobs`)
+- Hardware-aware configuration tool: `ffrtmp config recommend`
+
+**Reliability**:
+- TLS/HTTPS enabled by default (auto-generated certificates)
+- API authentication via `MASTER_API_KEY`
+- SQLite persistence (jobs survive restarts)
+- Automatic retry with exponential backoff
+
+**Observability**:
+- Built-in Prometheus metrics (port 9090)
+- Dual engine support (FFmpeg/GStreamer)
 
 See [docs/README.md](docs/README.md) for comprehensive documentation.
 
-## NEW: Production Readiness Features (v2.4 - 2026-01-06) 🆕
+## Fault Tolerance Implementation
 
-**Swedish principles: boring, correct, non-reactive architecture**
+### Job Recovery Patterns
 
-### Transport-Layer Retry Logic
-- **Retries apply to messages, not work** - Only HTTP requests retry, never job execution
-- **Exponential backoff** - 1s → 30s, max 3 retries
-- **Context-aware** - Respects cancellation and deadlines
-- **Retryable operations**: Heartbeats, job polling, result delivery
-- **Never retried**: FFmpeg execution, wrapper actions, actual workloads
+**Failure Detection**:
+- Heartbeat-based (90s timeout, 3 missed heartbeats)
+- Identifies dead nodes and orphaned jobs
 
-### Graceful Shutdown
-- **Worker**: Stop accepting jobs, wait for current jobs to finish (30s timeout)
-- **Master**: LIFO shutdown order (HTTP → metrics → scheduler → cleanup → DB → logger)
-- **No workload killing** - Jobs complete naturally or reach their timeout
-- **Async coordination** - `shutdown.Done()` channel for clean coordination
+**Automatic Reassignment**:
+- Jobs from failed workers automatically reassigned
+- Smart retry for transient failures (network errors, timeouts)
+- FFmpeg failures terminal (not retried)
+- Max 3 retry attempts with exponential backoff
 
-### Enhanced Readiness Checks
-- **FFmpeg validation** - Verifies FFmpeg is available and working
-- **Disk space check** - Ensures adequate space before accepting jobs
-- **Master reachability** - Validates connection to master node
-- **HTTP 200 only when ready** - Kubernetes/load balancer friendly
+**Stale Job Handling**:
+- Batch jobs timeout after 30min
+- Live jobs timeout after 5min inactivity
 
-### Centralized Logging
-- **Directory structure**: `/var/log/ffrtmp/<component>/<subcomponent>.log`
-- **Multi-writer**: Logs to both file AND stdout (systemd journald compatible)
-- **Automatic fallback**: Uses `./logs/` if `/var/log` not writable
-- **Rotation ready**: Logrotate configs in `deployment/logrotate/`
+### Priority Queue Implementation
 
-### Security & Quality Assurance
-- **Security review complete**  - All TLS configs properly guarded, no hardcoded secrets
-- **Critical panic eliminated**  - Replaced with graceful error handling
-- **Integration tests added**  - 10 tests covering retry, shutdown, readiness
-- **Dependencies updated**  - 6 packages updated, all tests passing
+**Multi-level priorities**: Live > High > Medium > Low > Batch
 
-**Documentation:**
-- [Production Readiness Guide](docs/PRODUCTION_READINESS.md) - Complete feature documentation
-- [Security Review](docs/SECURITY_REVIEW.md) - Security audit and approval
-- [Audit Summary](AUDIT_COMPLETE.md) - Technical debt elimination details
+**Queue-based scheduling**: `live`, `default`, `batch` queues with different SLAs
 
-## NEW: Enterprise-Grade Fault Tolerance
+**FIFO within priority**: Fair scheduling for same-priority jobs
 
-**Production-ready reliability features for mission-critical workloads:**
+### Security Patterns
 
-### Automatic Job Recovery
-- **Node Failure Detection** - Identifies dead nodes based on heartbeat timeout (2min default)
-- **Automatic Job Reassignment** - Jobs from failed nodes automatically reassigned to healthy workers
-- **Transient Failure Retry** - Smart retry for connection errors, timeouts, network issues
-- **Configurable Max Retries** - Default 3 attempts with exponential backoff
-- **Stale Job Detection** - Batch jobs timeout after 30min, live jobs after 5min inactivity
-
-### Priority Queue Management
-- **Multi-Level Priorities** - Live > High > Medium > Low > Batch
-- **Queue-Based Scheduling** - `live`, `default`, `batch` queues with different SLAs
-- **FIFO Within Priority** - Fair scheduling for same-priority jobs
-- **Smart Job Selection** - Automatic priority-based job assignment
-
-### Observability
-- **Distributed Tracing** - OpenTelemetry integration for end-to-end visibility
-- **Prometheus Metrics** - Comprehensive metrics for jobs, nodes, and system health
-- **Structured Logging** - Production-grade logging with context
-- **Rate Limiting** - Built-in per-IP rate limiting (100 req/s default)
-
-### Security
-- **TLS/mTLS** - Mutual TLS authentication between master and workers
-- **API Key Authentication** - Required for all API operations
-- **Certificate Management** - Auto-generation and rotation support
+- TLS/mTLS between master and workers
+- API key authentication required
+- Certificate auto-generation support
 
 ```bash
-# Submit high-priority live stream job
+# Example: Submit high-priority job
 ./bin/ffrtmp jobs submit \
     --scenario live-4k \
     --queue live \
     --priority high \
-    --duration 3600 \
-    --engine gstreamer
+    --duration 3600
 
-# Configure master with custom settings
+# Configure master
 ./bin/master \
     --port 8080 \
     --max-retries 5 \
     --scheduler-interval 10s \
     --api-key "$MASTER_API_KEY"
     
-# Configure agent with optimal concurrency
-./bin/ffrtmp config recommend --environment production
+# Configure worker
 ./bin/agent \
     --master https://MASTER_IP:8080 \
     --max-concurrent-jobs 4 \
@@ -596,19 +521,19 @@ See [docs/README.md](docs/README.md) for comprehensive documentation.
     --heartbeat-interval 30s
 ```
 
-See [docs/README.md](docs/README.md) for complete production deployment guide.
+See [docs/README.md](docs/README.md) for complete implementation details.
 
-## Dual Transcoding Engine Support
+## Dual Engine Support (FFmpeg + GStreamer)
 
-**Choose the best transcoding engine for your workload:**
+Demonstrates engine selection patterns for different workload characteristics:
 
-- **FFmpeg** (default) - Versatile, mature, excellent for file transcoding
-- **GStreamer** - Optimized for low-latency live streaming
-- **Intelligent Auto-Selection** - System picks the best engine automatically
-- **Hardware Acceleration** - NVIDIA NVENC, Intel QSV/VAAPI support for both engines
+- **FFmpeg** (default): General-purpose file transcoding
+- **GStreamer**: Low-latency live streaming
+- **Auto-selection**: System chooses based on workload type
+- **Hardware acceleration**: NVENC, QSV, VAAPI support for both
 
 ```bash
-# Auto-select best engine (default)
+# Auto-select engine (default)
 ./bin/ffrtmp jobs submit --scenario live-stream --engine auto
 
 # Force specific engine
@@ -616,104 +541,100 @@ See [docs/README.md](docs/README.md) for complete production deployment guide.
 ./bin/ffrtmp jobs submit --scenario live-rtmp --engine gstreamer
 ```
 
-**Auto-selection logic:**
+**Auto-selection logic**:
 - LIVE queue → GStreamer (low latency)
 - FILE/batch → FFmpeg (better for offline)
 - RTMP streaming → GStreamer
 - GPU+NVENC+streaming → GStreamer
 
-See **[docs/DUAL_ENGINE_SUPPORT.md](docs/DUAL_ENGINE_SUPPORT.md)** for complete documentation.
+See [docs/DUAL_ENGINE_SUPPORT.md](docs/DUAL_ENGINE_SUPPORT.md) for details.
 
-## What This Project Does
+## Research Applications
 
-This project helps you:
+This reference system can be used to study:
 
-1. **Run FFmpeg streaming tests** with various configurations (bitrate, resolution, codec)
-2. **Monitor power consumption** in real-time using Intel RAPL
-3. **Collect system metrics** (CPU, memory, network, Docker overhead)
-4. **Analyze energy efficiency** and get recommendations for optimal transcoding settings
-5. **Visualize results** in Grafana dashboards
-6. **Set up alerts** for power thresholds
-7. **Scale workloads** across multiple compute nodes (NEW in v2.1)
+1. **Distributed coordination**: Master-worker patterns, state machine guarantees, failure detection
+2. **Resource management**: CPU/memory limits, cgroup isolation, graceful degradation
+3. **Retry semantics**: Transient vs terminal failures, exponential backoff, idempotent operations
+4. **Observability patterns**: Metrics collection, distributed tracing, structured logging
+5. **Energy efficiency**: Power consumption during video transcoding (Intel RAPL)
+6. **Workload scaling**: Performance characteristics across multiple nodes
 
-## Architecture
+## System Architecture
 
-The system supports two deployment modes:
+### Distributed Deployment (Primary Use Case)
 
-### 1. Distributed Compute Mode (Production)
+Master-worker architecture demonstrating coordination patterns:
 
-Master-agent architecture for scaling across multiple nodes:
-
-- **Master Node**: Job orchestration, metrics aggregation, dashboards
-  - Master Service (Go HTTP API)
-  - VictoriaMetrics (TSDB with 30-day retention)
+- **Master Node**: Job orchestration, failure detection, metrics aggregation
+  - HTTP API (Go)
+  - VictoriaMetrics (30-day retention)
   - Grafana (visualization)
-- **Compute Agents**: Execute transcoding workloads
+- **Worker Nodes**: Job execution, resource monitoring, heartbeat reporting
   - Hardware auto-detection
-  - Job polling and execution
+  - Pull-based job polling
   - Local metrics collection
-  - Results reporting
+  - Result reporting
 
-### 2. Local Testing Mode (Development Only)
+### Local Development (Single Machine)
 
-Docker Compose stack on single machine:
+Docker Compose stack for experimentation:
 
-- **Nginx RTMP**: Streaming server
-- **VictoriaMetrics**: Time-series database
-- **Grafana**: Dashboards
-- **Go Exporters**: CPU (RAPL), GPU (NVML), FFmpeg stats
-- **Python Exporters**: QoE metrics, cost analysis, results tracking
-- **Alertmanager**: Alert routing
+- Nginx RTMP (streaming server)
+- VictoriaMetrics (time-series database)
+- Grafana (dashboards)
+- Go Exporters (CPU/GPU metrics via RAPL/NVML)
+- Python Exporters (QoE metrics, analysis)
+- Alertmanager (alert routing)
 
-**Local Testing mode is for development only. Use Distributed Compute mode for production.**
+See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for architecture diagrams.
 
-See [shared/docs/DEPLOYMENT_MODES.md](shared/docs/DEPLOYMENT_MODES.md) for detailed comparison and architecture diagrams.
+## Documentation Index
 
-## Documentation
+**Primary documentation**: [docs/README.md](docs/README.md) - Complete reference guide
 
-**NEW: [Complete Documentation Guide](docs/README.md)** - Comprehensive reference with architecture, configuration, API, security, and troubleshooting
+### Implementation Guides
+- **[Configuration Tool](docs/CONFIGURATION_TOOL.md)** - Hardware-aware worker configuration
+- **[Concurrent Jobs Guide](CONCURRENT_JOBS_IMPLEMENTATION.md)** - Parallel job processing
+- **[Job Launcher Script](scripts/LAUNCH_JOBS_README.md)** - Batch job submission
+### Academic Publications
+- **[Deployment Success Report](DEPLOYMENT_SUCCESS.md)** - Real-world deployment case study
 
-### Quick Reference
-- **[Configuration Tool](docs/CONFIGURATION_TOOL.md)** - Hardware-aware worker configuration (CLI: `ffrtmp config recommend`)
-- **[Concurrent Jobs Guide](CONCURRENT_JOBS_IMPLEMENTATION.md)** - Parallel job processing implementation
-- **[Job Launcher Script](scripts/LAUNCH_JOBS_README.md)** - Production-grade batch job submission
-- **[Deployment Success Report](DEPLOYMENT_SUCCESS.md)** - Real-world production deployment results
+### Implementation Details
+- **[Dual Engine Support](docs/DUAL_ENGINE_SUPPORT.md)** - FFmpeg + GStreamer selection patterns
+- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Reliability patterns (TLS, auth, retry, metrics)
+- **[Deployment Modes](shared/docs/DEPLOYMENT_MODES.md)** - Architecture comparison
+- **[Internal Architecture](shared/docs/INTERNAL_ARCHITECTURE.md)** - Runtime model and operations
+- **[Distributed Architecture](shared/docs/distributed_architecture_v1.md)** - Master-worker coordination
+- **[Production Deployment](deployment/README.md)** - Systemd service configuration
+- **[Getting Started Guide](shared/docs/getting-started.md)** - Initial setup
 
-### Deployment & Operations
-- **[Dual Engine Support](docs/DUAL_ENGINE_SUPPORT.md)** - FFmpeg + GStreamer engine selection guide
-- **[Production Features](shared/docs/PRODUCTION_FEATURES.md)** - Production-ready features guide (TLS, auth, retry, metrics)
-- **[Deployment Modes](shared/docs/DEPLOYMENT_MODES.md)** - Production vs development deployment guide
-- **[Internal Architecture](shared/docs/INTERNAL_ARCHITECTURE.md)** - Complete runtime model and operations reference
-- **[Distributed Architecture](shared/docs/distributed_architecture_v1.md)** - Distributed compute details
-- **[Production Deployment](deployment/README.md)** - Systemd service templates and setup
-- **[Getting Started Guide](shared/docs/getting-started.md)** - Initial setup walkthrough
-
-### Development & Testing
-- **[Running Tests](scripts/README.md)** - Test scenarios and batch execution
-- **[Go Exporters Quick Start](shared/docs/QUICKSTART_GO_EXPORTERS.md)** - One-command Go exporter deployment
-- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues and solutions
+### Testing and Validation
+- **[Running Tests](scripts/README.md)** - Test scenarios and execution
+- **[Go Exporters Quick Start](shared/docs/QUICKSTART_GO_EXPORTERS.md)** - Metrics collection setup
+- **[Troubleshooting](shared/docs/troubleshooting.md)** - Common issues
 
 ### Technical Reference
 - **[Architecture Overview](shared/docs/architecture.md)** - System design and data flow
-- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Quick commands for deploying exporters without Docker
-- **[Exporters Overview](master/README.md#exporters)** - Master exporters (results, qoe, cost)
-- **[Master Exporters Manual Deployment](master/exporters/README.md)** - Running master exporters without Docker
-- **[Worker Exporters](worker/README.md#exporters)** - Worker exporters (CPU, GPU, FFmpeg)
-- **[Worker Exporters Manual Deployment](worker/exporters/DEPLOYMENT.md)** - Running worker exporters without Docker
-- **[Energy Advisor](shared/advisor/README.md)** - ML models and efficiency scoring
-- **[Documentation Index](shared/docs/)** - All technical documentation
+- **[Exporters Quick Reference](docs/EXPORTERS_QUICK_REFERENCE.md)** - Metrics collection patterns
+- **[Exporters Overview](master/README.md#exporters)** - Master-side metrics
+- **[Master Exporters Deployment](master/exporters/README.md)** - Master metrics setup
+- **[Worker Exporters](worker/README.md#exporters)** - Worker-side metrics
+- **[Worker Exporters Deployment](worker/exporters/DEPLOYMENT.md)** - Worker metrics setup
+- **[Energy Advisor](shared/advisor/README.md)** - ML-based efficiency analysis
+- **[Documentation Index](shared/docs/)** - Complete technical documentation
 
-## Common Commands
+## Command Reference
 
-### Distributed Mode (Production)
+### Distributed Deployment Commands
 ```bash
-# Build binaries
+# Build components
 make build-master          # Build master node binary
-make build-agent           # Build compute agent binary
+make build-agent           # Build worker agent binary
 make build-cli             # Build ffrtmp CLI tool
 make build-distributed     # Build all
 
-# Get hardware-aware configuration recommendations
+# Get hardware-aware configuration
 ./bin/ffrtmp config recommend --environment production --output text
 
 # Run services
@@ -723,110 +644,115 @@ make build-distributed     # Build all
   --max-concurrent-jobs 4 \
   --insecure-skip-verify
 
-# Submit jobs using CLI
+# Submit and manage jobs
 ./bin/ffrtmp jobs submit --scenario 1080p-h264 --bitrate 5M --duration 300
 ./bin/ffrtmp jobs status <job-id>
 ./bin/ffrtmp nodes list
 
-# Production with systemd
-sudo systemctl start ffmpeg-master    # Start master service
-sudo systemctl start ffmpeg-agent     # Start agent service
-sudo systemctl status ffmpeg-master   # Check status
+# Systemd service management
+sudo systemctl start ffmpeg-master
+sudo systemctl start ffmpeg-agent
+sudo systemctl status ffmpeg-master
 
-# Monitor
-curl -k https://localhost:8080/nodes      # List registered agents
+# Monitor and observe
+curl -k https://localhost:8080/nodes      # List registered workers
 curl -k https://localhost:8080/jobs       # List jobs
 curl http://localhost:9090/metrics        # Prometheus metrics
 journalctl -u ffmpeg-master -f            # View master logs
-journalctl -u ffmpeg-agent -f             # View agent logs
+journalctl -u ffmpeg-agent -f             # View worker logs
 ```
 
-### Local Testing Mode (Development)
+### Local Development Commands
 ```bash
 # Stack management
 make up-build              # Start Docker Compose stack
 make down                  # Stop stack
 make ps                    # Show container status
-make logs SERVICE=victoriametrics  # View specific service logs
+make logs SERVICE=victoriametrics  # View service logs
 
-# Testing (local mode)
+# Testing scenarios
 make test-single           # Run single stream test
 make test-batch            # Run batch test matrix
-make run-benchmarks        # Run automated benchmark suite
-make analyze               # Analyze latest results
+make run-benchmarks        # Run benchmark suite
+make analyze               # Analyze results
 
-# Development
-make lint                  # Run code linting
+# Development tools
+make lint                  # Run linting
 make format                # Format code
 make test                  # Run test suite
 ```
 
-## Example Use Cases
+## Example Research Scenarios
 
-### Production: Distributed Transcoding Benchmarks
+### Scenario 1: Studying Distributed Failure Recovery
 
-Run long-duration benchmarks across multiple compute nodes:
+Observe job reassignment after worker failure:
 
 ```bash
-# Submit multiple jobs using CLI
+# Submit long-running jobs
 ./bin/ffrtmp jobs submit --scenario 4K-h265 --bitrate 15M --duration 3600
 ./bin/ffrtmp jobs submit --scenario 1080p-h264 --bitrate 5M --duration 1800
-./bin/ffrtmp jobs submit --scenario 720p-vp9 --bitrate 2M --duration 900
 
-# Or submit in batch using curl with authentication
-curl -X POST https://master:8080/jobs \
-  -H "Authorization: Bearer $MASTER_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scenario": "4K-h265",
-    "confidence": "auto",
-    "parameters": {"duration": 3600, "bitrate": "15M"}
-  }'
+# Monitor initial assignment
+curl -k https://master:8080/jobs
 
-# Agents automatically pick up and execute jobs in parallel
-# Monitor at https://master:8080/jobs
-# View results in Grafana at http://master:3000
+# Kill a worker mid-job (simulate failure)
+sudo systemctl stop ffmpeg-agent  # On worker node
+
+# Observe master detecting failure (90s timeout)
+# Watch job reassignment to healthy workers
+curl -k https://master:8080/jobs  # Check job state transitions
+
+# Analyze recovery time and behavior
+journalctl -u ffmpeg-master -f
 ```
 
-### Development: Find Energy-Efficient Encoding Settings
+**Observations to study**:
+- Heartbeat failure detection timing (3 × 30s = 90s)
+- Job state transitions (running → failed → queued)
+- Reassignment latency
+- Worker re-registration behavior
 
-Use local testing mode to iterate quickly:
+### Scenario 2: Analyzing Resource Isolation Effectiveness
+
+Test cgroup-based resource limits under contention:
 
 ```bash
-# Start local stack
-make up-build
+# Submit multiple jobs with different CPU limits
+./bin/ffrtmp jobs submit --scenario 1080p-h264 --duration 600 \
+  --cpu-limit 200   # 2 cores
 
-# Build CLI tool
-make build-cli
+./bin/ffrtmp jobs submit --scenario 1080p-h264 --duration 600 \
+  --cpu-limit 100   # 1 core
 
-# Submit multiple test jobs with different configurations
-./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120 --engine auto
-./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60 --engine ffmpeg
-./bin/ffrtmp jobs submit --scenario 720p30-vp9 --bitrate 2M --duration 60 --engine gstreamer
+# Monitor actual CPU usage via Prometheus metrics
+curl http://worker:9091/metrics | grep cpu_usage
 
-# Monitor job status
-./bin/ffrtmp jobs status <job-id>
-
-# Analyze results and get recommendations
-python3 scripts/analyze_results.py
+# Compare observed vs requested CPU allocation
+# Study cgroup enforcement effectiveness
 ```
 
-The analyzer ranks configurations by energy efficiency and recommends optimal settings.
+### Scenario 3: Energy Efficiency Analysis
 
-### Development: Compare H.264 vs H.265 Power Consumption
-
-Submit jobs to test different codecs:
+Compare codec energy consumption patterns:
 
 ```bash
-# H.264 tests
+# Start local development stack
+make up-build && make build-cli
+
+# Test H.264 codec
 ./bin/ffrtmp jobs submit --scenario 4K60-h264 --bitrate 10M --duration 120
 ./bin/ffrtmp jobs submit --scenario 1080p60-h264 --bitrate 5M --duration 60
 
-# H.265 tests
+# Test H.265 codec
 ./bin/ffrtmp jobs submit --scenario 4K60-h265 --bitrate 10M --duration 120
 ./bin/ffrtmp jobs submit --scenario 1080p60-h265 --bitrate 5M --duration 60
 
-# Compare results in Grafana dashboards at http://localhost:3000
+# Analyze energy consumption via RAPL metrics
+python3 scripts/analyze_results.py
+
+# View power consumption dashboards
+# Open Grafana at http://localhost:3000
 ```
 
 ### Production: Continuous CI/CD Benchmarking
