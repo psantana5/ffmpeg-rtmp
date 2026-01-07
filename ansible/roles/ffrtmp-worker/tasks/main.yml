@@ -1,0 +1,107 @@
+---
+# Deploy FFmpeg-RTMP Worker Node
+
+- name: Create worker user
+  user:
+    name: "{{ ffrtmp_user }}"
+    system: yes
+    shell: /bin/false
+    home: "{{ ffrtmp_data_dir }}"
+    create_home: no
+
+- name: Create worker directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ffrtmp_user }}"
+    group: "{{ ffrtmp_group }}"
+    mode: '0755'
+  loop:
+    - "{{ ffrtmp_base_dir }}/bin"
+    - "{{ ffrtmp_config_dir }}"
+    - "{{ ffrtmp_data_dir }}"
+    - "{{ ffrtmp_log_dir }}"
+    - "{{ ffrtmp_stream_dir }}"
+
+- name: Clone or update repository
+  git:
+    repo: "{{ ffrtmp_git_repo }}"
+    dest: "/tmp/ffrtmp-build"
+    version: "{{ ffrtmp_git_branch }}"
+    force: yes
+  when: build_from_source | bool
+
+- name: Build worker binaries
+  shell: |
+    export PATH=$PATH:/usr/local/go/bin
+    cd /tmp/ffrtmp-build
+    make build-agent build-cli
+  when: build_from_source | bool
+
+- name: Copy worker binaries
+  copy:
+    src: "/tmp/ffrtmp-build/bin/{{ item.src }}"
+    dest: "{{ ffrtmp_base_dir }}/bin/{{ item.dest }}"
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - { src: 'agent', dest: 'agent' }
+    - { src: 'ffrtmp', dest: 'ffrtmp' }
+
+- name: Create worker configuration
+  template:
+    src: worker.env.j2
+    dest: "{{ ffrtmp_config_dir }}/worker.env"
+    owner: "{{ ffrtmp_user }}"
+    group: "{{ ffrtmp_group }}"
+    mode: '0644'
+
+- name: Create watch daemon configuration
+  template:
+    src: watch-config.yaml.j2
+    dest: "{{ ffrtmp_config_dir }}/watch-config.yaml"
+    owner: "{{ ffrtmp_user }}"
+    group: "{{ ffrtmp_group }}"
+    mode: '0644'
+  when: ffrtmp_watch_enabled | bool
+
+- name: Install worker systemd service
+  template:
+    src: ffrtmp-worker.service.j2
+    dest: /etc/systemd/system/ffrtmp-worker.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Install watch daemon systemd service
+  template:
+    src: ffrtmp-watch.service.j2
+    dest: /etc/systemd/system/ffrtmp-watch.service
+    mode: '0644'
+  when: ffrtmp_watch_enabled | bool
+  notify: reload systemd
+
+- name: Enable cgroup controllers
+  lineinfile:
+    path: /sys/fs/cgroup/cgroup.subtree_control
+    line: "+cpu +memory +io"
+    create: no
+  ignore_errors: yes
+
+- name: Enable and start worker service
+  systemd:
+    name: ffrtmp-worker
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Enable and start watch service
+  systemd:
+    name: ffrtmp-watch
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: ffrtmp_watch_enabled | bool
+
+- name: Open firewall ports
+  include_tasks: firewall.yml
+  tags: firewall
