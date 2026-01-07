@@ -1,0 +1,34 @@
+---
+- name: Check kernel parameters
+  shell: cat /proc/cmdline
+  register: kernel_cmdline
+  changed_when: false
+
+- name: Update GRUB for cgroups v2 (Debian)
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="systemd.unified_cgroup_hierarchy=1"'
+    backup: yes
+  when:
+    - is_debian
+    - "'systemd.unified_cgroup_hierarchy=1' not in kernel_cmdline.stdout"
+  register: grub_updated_debian
+
+- name: Update GRUB for cgroups v2 (RedHat)
+  shell: grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=1"
+  when:
+    - is_redhat
+    - "'systemd.unified_cgroup_hierarchy=1' not in kernel_cmdline.stdout"
+  register: grub_updated_redhat
+
+- name: Update GRUB (Debian)
+  command: update-grub
+  when:
+    - grub_updated_debian is changed
+    - is_debian
+
+- name: Notify reboot required
+  debug:
+    msg: "System reboot required to enable cgroups v2"
+  when: grub_updated_debian is changed or grub_updated_redhat is changed
