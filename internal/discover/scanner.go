@@ -22,6 +22,8 @@ type Process struct {
 type Scanner struct {
 	targetCommands []string
 	trackedPIDs    map[int]bool
+	ownPID         int              // Scanner's own PID (to filter out self)
+	excludePPIDs   map[int]bool     // Parent PIDs to exclude
 }
 
 // NewScanner creates a new process scanner
@@ -32,7 +34,14 @@ func NewScanner(targetCommands []string) *Scanner {
 	return &Scanner{
 		targetCommands: targetCommands,
 		trackedPIDs:    make(map[int]bool),
+		ownPID:         os.Getpid(),
+		excludePPIDs:   make(map[int]bool),
 	}
+}
+
+// ExcludeParentPID adds a parent PID to exclude (e.g., watch daemon's own PID)
+func (s *Scanner) ExcludeParentPID(ppid int) {
+	s.excludePPIDs[ppid] = true
 }
 
 // ScanRunningProcesses discovers all matching processes
@@ -78,6 +87,17 @@ func (s *Scanner) ScanRunningProcesses() ([]*Process, error) {
 		// Check if this is a target command
 		command := filepath.Base(parts[0])
 		if !s.isTargetCommand(command) {
+			continue
+		}
+
+		// Filter out our own PID
+		if pid == s.ownPID {
+			continue
+		}
+
+		// Get parent PID and check if we should exclude it
+		ppid := s.getParentPID(filepath.Join(procDir, pidStr, "stat"))
+		if s.excludePPIDs[ppid] {
 			continue
 		}
 
@@ -197,4 +217,26 @@ func (s *Scanner) getSystemBootTime() (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("btime not found in /proc/stat")
+}
+
+// getParentPID extracts parent PID from /proc/[pid]/stat
+func (s *Scanner) getParentPID(statPath string) int {
+	data, err := os.ReadFile(statPath)
+	if err != nil {
+		return 0
+	}
+
+	// Parse stat file - ppid is field 4 (1-indexed, 3 in 0-indexed)
+	// Format: pid (comm) state ppid ...
+	fields := strings.Fields(string(data))
+	if len(fields) < 4 {
+		return 0
+	}
+
+	ppid, err := strconv.Atoi(fields[3])
+	if err != nil {
+		return 0
+	}
+
+	return ppid
 }
