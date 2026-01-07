@@ -87,6 +87,18 @@ commands:
       min_runtime: "10s"
 ```
 
+**Reliability features (NEW in Phase 3):**
+
+```bash
+# Enable state persistence and retry
+ffrtmp watch \
+  --enable-state \
+  --state-path /var/lib/ffrtmp/watch.json \
+  --state-flush-interval 30s \
+  --enable-retry \
+  --max-retry-attempts 3
+```
+
 See `examples/watch-config.yaml` for full configuration options.
 
 ## Command Reference
@@ -549,11 +561,46 @@ Related documentation:
 
 **Features**: Config-driven discovery with security and compliance capabilities
 
+### Phase 3: Reliability Features (2026-01-07)
+
+#### Phase 3.1: State Persistence
+- **Status**: Complete and production-ready
+- JSON-based state files with atomic writes
+- Periodic flushing (default: 30s)
+- Stale PID cleanup on startup
+- Statistics preservation across restarts
+- **CLI**: `--enable-state`, `--state-path`, `--state-flush-interval`
+
+#### Phase 3.2-3.4: Error Handling, Retry, Health Checks
+- **Status**: Complete and production-ready
+- Error classification (5 types: Transient, Permanent, RateLimit, Resource, Unknown)
+- Automatic retry queue with exponential backoff (1s → 5min)
+- Health check system (Healthy, Degraded, Unhealthy)
+- Background retry worker (5-second intervals)
+- Health status logging on degradation
+- **CLI**: `--enable-retry`, `--max-retry-attempts`
+
+**Full reliability stack example**:
+```bash
+ffrtmp watch \
+  --enable-state --state-path /var/lib/ffrtmp/watch.json \
+  --enable-retry --max-retry-attempts 5
+```
+
+**Error handling**: Intelligent classification determines retry eligibility
+**Backoff strategy**: 1s → 2s → 4s → 8s → ... → 5min (max)
+**Health thresholds**: 5 consecutive scan failures = unhealthy, 10 attach failures = degraded
+
+#### Testing
+- Phase 1: `scripts/test_discovery_comprehensive.sh` (6 tests)
+- Phase 2: `scripts/test_phase2_metadata.sh` (5 tests)
+- Phase 3: `scripts/test_phase3_reliability.sh` (6 tests)
+- All test suites validated and passing
+
 ## Future Enhancements
 
 Potential future improvements:
 
-- State persistence (survive daemon restarts)
 - inotify-based discovery (instant detection, no polling)
 - Network bandwidth limits (TC integration)
 - GPU resource limits (nvidia-docker integration)

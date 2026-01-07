@@ -61,6 +61,63 @@ All notable changes to this project will be documented in this file.
 - UID blacklisting (e.g., block root processes)
 - Declarative policies reduce ad-hoc privilege escalation
 
+**Auto-Discovery Phase 3: Reliability Features (Complete)**
+
+#### Phase 3.1: State Persistence
+- JSON-based state files with atomic writes (write to temp, then rename)
+- Periodic flushing with configurable interval (default: 30s)
+- Stale PID cleanup on startup (verifies process existence)
+- Statistics preservation across restarts (total scans, discoveries, attachments)
+- Per-process state tracking (PID, job ID, command, discovery/attachment timestamps)
+- CLI flags: `--enable-state`, `--state-path`, `--state-flush-interval`
+- Optional fsync for durability (disabled by default for performance)
+
+#### Phase 3.2: Error Handling and Classification
+- Error classification system with 5 types: Transient, Permanent, RateLimit, Resource, Unknown
+- `DiscoveryError` struct with operation context, PID, timestamp, and retryable flag
+- Pattern-based `ErrorClassifier` for intelligent error categorization
+- `ErrorMetrics` tracking errors by type and consecutive failures
+- Exponential backoff strategy (initial: 1s, max: 5min, multiplier: 2.0)
+
+#### Phase 3.3: Retry Queue System
+- Automatic retry mechanism for failed attachments with exponential backoff
+- Configurable maximum retry attempts (default: 3)
+- Background retry worker checking every 5 seconds for ready items
+- Dead letter handling for items exceeding max attempts
+- Per-item tracking: attempt count, last/next attempt time, error history
+- CLI flags: `--enable-retry`, `--max-retry-attempts`
+
+#### Phase 3.4: Health Check System
+- Three health states: Healthy, Degraded, Unhealthy
+- Separate tracking for scan health and attachment health
+- Automatic status updates based on configurable thresholds:
+  - Max 5 consecutive scan failures before unhealthy
+  - Max 10 consecutive attachment failures before degraded
+  - Max 2 minutes since last successful scan before unhealthy
+- Detailed health reports with metrics (consecutive failures, timestamps, status duration)
+- Automatic console logging when health degrades
+- `GetHealthStatus()` and `GetHealthReport()` API methods
+
+#### Integration and Testing
+- Integrated error handling into `scanAndAttach()` and `attachToProcess()`
+- Retry worker automatically started when enabled
+- Health status logged on scan/attachment failures
+- Comprehensive test suite: `scripts/test_phase3_reliability.sh` (6 tests)
+- All reliability features validated and passing
+
+### Performance - Phase 3 (2026-01-07)
+- State persistence: Minimal overhead with periodic flushing
+- Error classification: Sub-millisecond pattern matching
+- Retry queue: Background worker with 5-second intervals
+- Health checks: Lock-free read operations for status queries
+- Typical state file size: 1-2KB for 3-4 processes
+
+### Security - 2026-01-07
+- User-based filtering enables multi-tenant security
+- Directory filtering prevents discovery in sensitive paths
+- UID blacklisting (e.g., block root processes)
+- Declarative policies reduce ad-hoc privilege escalation
+
 ## [Previous Releases]
 
 ### Added - Dynamic Input Video Generation + Hardware-Aware Encoding
