@@ -24,7 +24,8 @@ func New(st store.Store, checkInterval time.Duration) *Scheduler {
 	}
 	
 	// Create recovery manager with default settings
-	recoveryManager := NewRecoveryManager(st, 3, 2*time.Minute)
+	// 90s = 3 missed heartbeats @ 30s interval
+	recoveryManager := NewRecoveryManager(st, 3, 90*time.Second)
 	
 	return &Scheduler{
 		store:           st,

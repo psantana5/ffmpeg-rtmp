@@ -48,7 +48,7 @@ func DefaultSchedulerConfig() *SchedulerConfig {
 		SchedulingInterval:   2 * time.Second,
 		HealthCheckInterval:  5 * time.Second,
 		CleanupInterval:      10 * time.Second,
-		WorkerTimeout:        2 * time.Minute,
+		WorkerTimeout:        90 * time.Second, // 3 missed heartbeats @ 30s interval
 		RetryPolicy:          models.DefaultRetryPolicy(),
 		JobTimeout:           models.DefaultJobTimeout(),
 	}
