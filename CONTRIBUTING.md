@@ -1,43 +1,72 @@
-# Contributing to FFmpeg RTMP Power Monitoring
+# Contributing to FFmpeg-RTMP
 
-Thank you for considering contributing to this project! We welcome contributions from the community.
+Thank you for your interest in contributing to this reference system! Contributions that improve documentation, demonstrate additional patterns, or validate existing implementations are welcome.
 
-## Code of Conduct
+## About This Project
 
-By participating in this project, you agree to maintain a respectful and inclusive environment for everyone.
+FFmpeg-RTMP is a **production-validated reference system** designed for research and education. The primary goal is to document distributed systems patterns and operational tradeoffs, not to build a commercial platform. Contributions should align with this educational mission.
 
-## How Can I Contribute?
+## How to Contribute
 
-### Reporting Bugs
+### Documentation Improvements
 
-Before creating bug reports, please check the existing issues to avoid duplicates. When creating a bug report, include as many details as possible using the bug report template.
+Documentation is the most valuable contribution to a reference system:
 
-### Suggesting Enhancements
+- Clarify design decisions and tradeoffs
+- Add examples demonstrating specific patterns
+- Document failure modes or edge cases you've observed
+- Improve explanations of architectural choices
+- Add references to related research or implementations
 
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, use the feature request template and provide:
+### Implementation Validation
 
-- A clear and descriptive title
-- A detailed description of the proposed functionality
-- Explain why this enhancement would be useful
-- List any alternatives you've considered
+Help verify that code matches documentation:
 
-### Pull Requests
+- Test documented behaviors under different conditions
+- Validate performance characteristics
+- Document observed failure modes
+- Contribute test cases demonstrating patterns
+- Report discrepancies between docs and implementation
 
-1. Fork the repository and create your branch from `main`
-2. Make your changes following the style guidelines
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Update documentation as needed
-6. Submit a pull request using the template
+### Pattern Demonstrations
+
+Add examples showing specific distributed systems patterns:
+
+- Additional failure recovery scenarios
+- Resource isolation techniques
+- Retry boundary examples
+- State machine transitions
+- Observability patterns
+
+### Bug Reports
+
+Report implementation bugs or documentation inaccuracies:
+
+- Check existing issues first to avoid duplicates
+- Provide minimal reproduction steps
+- Include relevant logs, metrics, or traces
+- Explain expected vs actual behavior
+- Reference documentation if applicable
+
+## What We're NOT Looking For
+
+To maintain focus on the educational mission:
+
+- ❌ Features for commercial use cases
+- ❌ General-purpose abstractions or frameworks
+- ❌ Support for every possible deployment scenario
+- ❌ Performance optimizations without documented tradeoffs
+- ❌ Features that obscure the underlying patterns
 
 ## Development Setup
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- Docker and Docker Compose
+- Go 1.24+ (for building master/worker binaries)
+- Python 3.10+ (optional, for analysis scripts)
+- Docker and Docker Compose (for local development)
 - Git
-- FFmpeg (for running tests)
+- FFmpeg (for testing)
 
 ### Local Development
 
@@ -47,79 +76,59 @@ git clone https://github.com/psantana5/ffmpeg-rtmp.git
 cd ffmpeg-rtmp
 ```
 
-2. Create a virtual environment:
+2. Build components:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+make build-distributed  # Build all Go binaries
 ```
 
-3. Install dependencies:
+3. Run local stack:
 ```bash
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+./scripts/run_local_stack.sh
 ```
 
-4. Install pre-commit hooks:
-```bash
-pip install pre-commit
-pre-commit install
-```
+## Contribution Guidelines
 
-5. Start the development stack:
-```bash
-make up-build
-```
+### Code Style
 
-## Style Guidelines
+**Go code**:
+- Follow standard Go conventions (`gofmt`, `go vet`)
+- Use meaningful variable names
+- Document exported functions and types
+- Keep functions focused and testable
 
-### Python Code Style
-
-We use Ruff for linting and formatting. Please ensure your code passes all checks:
-
-```bash
-# Run linting
-make lint
-
-# Run formatting
-make format
-```
-
-Key style points:
+**Python code** (analysis scripts):
 - Follow PEP 8 guidelines
 - Maximum line length: 100 characters
 - Use type hints where appropriate
-- Write descriptive docstrings for functions and classes
-- Keep functions focused and single-purpose
+- Write descriptive docstrings
 
-### Code Quality
+```bash
+# Lint Go code
+make lint
 
-- Write clear, self-documenting code
-- Add comments for complex logic
-- Avoid code duplication
-- Handle errors appropriately
-- Use meaningful variable and function names
+# Format Python code
+make format
+```
 
 ### Git Commit Messages
 
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters
-- Reference issues and pull requests when relevant
-- Consider using conventional commits format:
-  - `feat:` - New feature
-  - `fix:` - Bug fix
-  - `docs:` - Documentation changes
-  - `style:` - Code style changes (formatting, etc.)
-  - `refactor:` - Code refactoring
-  - `test:` - Adding or updating tests
-  - `chore:` - Maintenance tasks
+- Use present tense ("Add feature" not "Added feature")
+- Use imperative mood ("Move cursor to..." not "Moves cursor to...")
+- Limit first line to 72 characters
+- Reference issues when relevant
+- Use conventional commits format:
+  - `feat:` - New feature or pattern demonstration
+  - `fix:` - Bug fix or correction
+  - `docs:` - Documentation improvements
+  - `test:` - Test additions or updates
+  - `refactor:` - Code restructuring without behavior change
 
 Example:
 ```
-feat: add support for H.265 codec benchmarking
+docs: clarify retry boundary semantics in failure recovery
 
-- Implement H.265 encoder options in test runner
-- Add HEVC metrics to exporters
+- Add explicit examples of transient vs terminal errors
+- Document FFmpeg failure handling in detail
 - Update dashboards with codec comparison panels
 
 Closes #123
@@ -129,123 +138,98 @@ Closes #123
 
 ### Running Tests
 
+### Testing
+
 ```bash
-# Run all tests
+# Run all Go tests
 make test
 
-# Run tests with coverage
-python -m pytest --cov=. --cov-report=term
+# Run with race detector
+go test -race ./...
 
-# Run specific test file
-python -m pytest tests/test_cost.py
+# Run specific package tests
+go test ./shared/pkg/scheduler/...
 
-# Run tests with verbose output
-python -m pytest -v
+# View test coverage
+go test -cover ./...
 ```
 
 ### Writing Tests
 
-- Place tests in the `tests/` directory
-- Name test files with `test_` prefix
-- Name test functions with `test_` prefix
-- Use descriptive test names that explain what is being tested
-- Follow the Arrange-Act-Assert pattern
-- Mock external dependencies
-- Aim for high test coverage on new code
+- Place tests alongside code (`*_test.go` files)
+- Focus on testing observable behavior and invariants
+- Test failure modes and edge cases
+- Document what pattern or guarantee the test validates
+- Use table-driven tests for multiple scenarios
 
 Example:
-```python
-def test_cost_calculation_with_custom_rates():
-    # Arrange
-    power_watts = 100
-    duration_seconds = 3600
-    rate_per_kwh = 0.15
-
-    # Act
-    result = calculate_cost(power_watts, duration_seconds, rate_per_kwh)
-
-    # Assert
-    assert result == 0.015
+```go
+func TestJobAssignment_PreventsDuplicates(t *testing.T) {
+    // Tests that FOR UPDATE locking prevents race conditions
+    // Pattern: Row-level locking for distributed coordination
+    
+    // Test implementation...
+}
 ```
 
-## Documentation
+## Documentation Standards
 
 ### Code Documentation
 
-- Add docstrings to all public functions, classes, and modules
-- Use Google-style or NumPy-style docstrings
-- Include parameter types and return types
-- Document exceptions that can be raised
-- Provide usage examples for complex functionality
+**Go code**:
+- Document exported functions, types, and packages
+- Explain *why* not just *what* (rationale for design choices)
+- Reference related patterns or papers when applicable
+- Document invariants and failure modes
 
 Example:
-```python
-def calculate_efficiency_score(power: float, quality: float, bitrate: int) -> float:
-    """Calculate the energy efficiency score for a transcoding configuration.
-
-    Args:
-        power: Power consumption in watts
-        quality: Video quality score (0-100)
-        bitrate: Target bitrate in bits per second
-
-    Returns:
-        Efficiency score normalized to 0-100 range
-
-    Raises:
-        ValueError: If any parameter is negative or zero
-
-    Example:
-        >>> calculate_efficiency_score(75.5, 85.0, 2000000)
-        78.3
-    """
+```go
+// AssignJobToWorker assigns a queued job to a worker using row-level locking.
+// This prevents race conditions when multiple workers poll simultaneously.
+// 
+// Pattern: Optimistic concurrency control with FOR UPDATE
+// Failure mode: Returns ErrNoJobsAvailable if all jobs assigned
+//
+// Invariant: A job can only be assigned to one worker at a time
+func AssignJobToWorker(ctx context.Context, workerID string) (*Job, error) {
+    // Implementation...
+}
 ```
 
 ### Project Documentation
 
-- Update README.md for user-facing changes
-- Update relevant documentation in `docs/` directory
-- Include examples and usage instructions
-- Add screenshots for UI/dashboard changes
-- Keep documentation concise and clear
+- Update README.md for architectural changes
+- Document design decisions and tradeoffs in detail
+- Add examples demonstrating patterns
+- Include failure mode analysis
+- Reference related research or implementations
+- Keep documentation honest about limitations
 
 ## Project Structure
 
 ```
 ffmpeg-rtmp/
-├── .github/              # GitHub workflows and templates
-├── advisor/              # ML models and energy advisor
-├── alertmanager/         # Alert configuration
-├── docs/                 # Documentation
-├── grafana/             # Grafana dashboards and provisioning
-├── scripts/             # Test runners and analysis scripts
-├── src/exporters/       # Prometheus exporters
-├── tests/               # Test suite
-├── docker-compose.yml   # Stack configuration
-├── prometheus.yml       # Prometheus configuration
-└── requirements*.txt    # Python dependencies
+├── master/              # Master node orchestration
+├── worker/              # Worker node execution
+├── shared/              # Common libraries (FSM, retry, DB)
+├── deployment/          # Systemd configs, deployment scripts
+├── docs/                # Architecture and design documentation
+├── scripts/             # Test runners and analysis tools
+├── tests/               # Integration tests
+└── cmd/                 # CLI tools
 ```
 
-## Adding New Exporters
+## Questions?
 
-1. Create a new directory under `src/exporters/`
-2. Add the exporter Python script
-3. Create a Dockerfile
-4. Add service to `docker-compose.yml`
-5. Add scrape config to `prometheus.yml`
-6. Create or update Grafana dashboard
-7. Add tests in `tests/`
-8. Update documentation
+For questions about:
+- **Design decisions**: See [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [CODE_VERIFICATION_REPORT.md](CODE_VERIFICATION_REPORT.md)
+- **Implementation details**: Read the code - it's documented inline
+- **Patterns demonstrated**: Check [docs/](docs/) directory
+- **Contributing**: Open an issue for discussion before starting major work
 
-## Release Process
+## License
 
-Releases are managed by project maintainers:
-
-1. Update version numbers
-2. Update CHANGELOG.md
-3. Create release branch
-4. Run full test suite
-5. Create GitHub release with release notes
-6. Tag the release
+By contributing, you agree that your contributions will be licensed under the same MIT License that covers the project.
 7. Build and push Docker images
 
 ## Questions?
