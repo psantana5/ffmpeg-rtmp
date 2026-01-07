@@ -14,12 +14,13 @@ WorkingDirectory=/opt/ffrtmp
 EnvironmentFile=/etc/ffrtmp/worker.env
 
 # Binary
-ExecStart=/opt/ffrtmp/bin/ffrtmp-worker \
-    --master-url=${MASTER_URL} \
-    --worker-id=${WORKER_ID} \
-    --capabilities=${CAPABILITIES} \
-    --max-jobs=${MAX_JOBS:-4} \
-    --heartbeat-interval=${HEARTBEAT_INTERVAL:-30s}
+ExecStart=/opt/ffrtmp/bin/agent \
+    -master=${MASTER_URL} \
+    -api-key=${API_KEY} \
+    -max-concurrent-jobs=${MAX_JOBS:-4} \
+    -heartbeat-interval=${HEARTBEAT_INTERVAL:-30s} \
+    -enable-auto-attach=${ENABLE_AUTO_ATTACH:-false} \
+    -log-level=${LOG_LEVEL:-info}
 
 # Restart policy
 Restart=on-failure
