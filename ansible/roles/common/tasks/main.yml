@@ -1,0 +1,69 @@
+---
+# Common setup tasks for all hosts
+
+- name: Detect OS family
+  set_fact:
+    is_debian: "{{ ansible_os_family == 'Debian' }}"
+    is_redhat: "{{ ansible_os_family == 'RedHat' }}"
+
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Update package cache (Debian)
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: is_debian
+
+- name: Update package cache (RedHat)
+  yum:
+    update_cache: yes
+  when: is_redhat
+
+- name: Install common packages (Debian)
+  apt:
+    name:
+      - curl
+      - wget
+      - git
+      - build-essential
+      - openssl
+      - ca-certificates
+      - python3
+      - python3-pip
+      - systemd
+    state: present
+  when: is_debian
+
+- name: Install common packages (RedHat)
+  yum:
+    name:
+      - curl
+      - wget
+      - git
+      - gcc
+      - gcc-c++
+      - make
+      - openssl
+      - ca-certificates
+      - python3
+      - python3-pip
+      - systemd
+    state: present
+  when: is_redhat
+
+- name: Check cgroups v2
+  shell: stat -fc %T /sys/fs/cgroup
+  register: cgroup_version
+  changed_when: false
+
+- name: Enable cgroups v2 if needed
+  include_tasks: cgroups.yml
+  when:
+    - enable_cgroups_v2 | bool
+    - cgroup_version.stdout != "cgroup2fs"
+
+- name: Configure firewall
+  include_tasks: firewall.yml
+  when: configure_firewall | bool
+  tags: firewall
