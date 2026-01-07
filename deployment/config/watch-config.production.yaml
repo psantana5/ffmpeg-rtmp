@@ -1,0 +1,67 @@
+# Production Watch Daemon Configuration
+# Optimized for production edge nodes with automatic process discovery
+
+scan_interval: "10s"
+
+# Target commands - add all transcoding tools used in your environment
+target_commands:
+  - ffmpeg
+  # - gst-launch-1.0
+  # - HandBrakeCLI
+
+# Default resource limits for discovered processes
+# These apply unless overridden by per-command settings
+default_limits:
+  cpu_quota: 200      # 200% CPU (2 cores) - adjust based on hardware
+  cpu_weight: 100     # Default scheduling weight
+  memory_limit: 4096  # 4GB - adjust based on available RAM
+
+# Production filtering rules
+filters:
+  # Only discover processes running for at least 5 seconds
+  # This prevents attaching to short test commands
+  min_runtime: "5s"
+  
+  # Ignore processes in temporary directories
+  blocked_dirs:
+    - /tmp
+    - /var/tmp
+  
+  # Optional: Restrict to specific users
+  # allowed_users:
+  #   - ffrtmp
+  #   - video
+  
+  # Optional: Block root processes (recommended for security)
+  # blocked_uids:
+  #   - 0
+
+# Per-command resource limits and filters
+# Override defaults for specific commands
+commands:
+  ffmpeg:
+    limits:
+      cpu_quota: 300      # FFmpeg gets more CPU (3 cores)
+      memory_limit: 8192  # 8GB for video transcoding
+      cpu_weight: 150     # Higher priority than default
+    filters:
+      min_runtime: "10s"  # Only long-running FFmpeg jobs
+      # allowed_users:    # Optional: restrict FFmpeg to specific users
+      #   - ffrtmp
+
+  # Example: GStreamer configuration
+  # gst-launch-1.0:
+  #   limits:
+  #     cpu_quota: 200
+  #     memory_limit: 4096
+  #   filters:
+  #     min_runtime: "15s"
+
+# Notes:
+# - Empty arrays [] mean "no restriction"
+# - All filters are AND-ed together (process must pass all filters)
+# - Per-command filters override global filters
+# - Duration format: "10s", "5m", "1h", "24h"
+# - Memory limits in MB
+# - CPU quota: 100 = 1 core, 200 = 2 cores, etc.
+# - CPU weight: 1-10000 (higher = more CPU time when contended)

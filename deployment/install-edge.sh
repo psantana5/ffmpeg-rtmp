@@ -64,22 +64,40 @@ systemctl daemon-reload
 echo "✓ Cgroup delegation enabled"
 
 echo ""
-echo "[5/7] Installing systemd service..."
+echo "[5/7] Installing systemd services..."
 cp deployment/systemd/ffrtmp-worker.service /etc/systemd/system/
+cp deployment/systemd/ffrtmp-watch.service /etc/systemd/system/
 systemctl daemon-reload
-echo "✓ Systemd service installed"
+echo "✓ Systemd services installed (ffrtmp-worker, ffrtmp-watch)"
 
 echo ""
-echo "[6/7] Creating configuration..."
+echo "[6/7] Creating configuration files..."
+# Worker configuration
 if [ ! -f "$CONFIG_DIR/worker.env" ]; then
     cp deployment/systemd/worker.env.example "$CONFIG_DIR/worker.env"
-    echo "✓ Configuration template created: $CONFIG_DIR/worker.env"
+    echo "✓ Worker configuration template created: $CONFIG_DIR/worker.env"
     echo ""
     echo "⚠️  IMPORTANT: Edit $CONFIG_DIR/worker.env and set:"
     echo "   - MASTER_URL"
     echo "   - MASTER_API_KEY"
 else
-    echo "✓ Configuration already exists: $CONFIG_DIR/worker.env"
+    echo "✓ Worker configuration already exists: $CONFIG_DIR/worker.env"
+fi
+
+echo ""
+# Watch daemon configuration
+if [ ! -f "$CONFIG_DIR/watch-config.yaml" ]; then
+    cp deployment/config/watch-config.production.yaml "$CONFIG_DIR/watch-config.yaml"
+    echo "✓ Watch daemon config template created: $CONFIG_DIR/watch-config.yaml"
+else
+    echo "✓ Watch daemon config already exists: $CONFIG_DIR/watch-config.yaml"
+fi
+
+if [ ! -f "$CONFIG_DIR/watch.env" ]; then
+    cp deployment/systemd/watch.env.example "$CONFIG_DIR/watch.env"
+    echo "✓ Watch daemon environment created: $CONFIG_DIR/watch.env"
+else
+    echo "✓ Watch daemon environment already exists: $CONFIG_DIR/watch.env"
 fi
 
 echo ""
@@ -93,11 +111,26 @@ echo "  Installation Complete!"
 echo "=========================================="
 echo ""
 echo "Next steps:"
+echo ""
+echo "Worker Agent:"
 echo "  1. Edit configuration: nano $CONFIG_DIR/worker.env"
 echo "  2. Enable service: systemctl enable ffrtmp-worker"
 echo "  3. Start service: systemctl start ffrtmp-worker"
 echo "  4. Check status: systemctl status ffrtmp-worker"
 echo "  5. View logs: journalctl -u ffrtmp-worker -f"
+echo ""
+echo "Watch Daemon (Automatic Process Discovery):"
+echo "  1. Edit configuration: nano $CONFIG_DIR/watch-config.yaml"
+echo "  2. Optional: Edit environment: nano $CONFIG_DIR/watch.env"
+echo "  3. Enable service: systemctl enable ffrtmp-watch"
+echo "  4. Start service: systemctl start ffrtmp-watch"
+echo "  5. Check status: systemctl status ffrtmp-watch"
+echo "  6. View logs: journalctl -u ffrtmp-watch -f"
+echo ""
+echo "Documentation:"
+echo "  - Worker: deployment/WORKER_DEPLOYMENT.md"
+echo "  - Watch Daemon: docs/AUTO_ATTACH.md"
+echo "  - Wrapper: docs/WRAPPER.md"
 echo ""
 echo "For existing workloads (zero-downtime):"
 echo "  ffrtmp attach --pid <PID> --job-id <job-id>"

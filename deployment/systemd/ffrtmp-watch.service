@@ -1,0 +1,58 @@
+[Unit]
+Description=FFmpeg Auto-Discovery Watch Daemon
+Documentation=https://github.com/psantana5/ffmpeg-rtmp/docs/AUTO_ATTACH.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ffrtmp
+Group=ffrtmp
+WorkingDirectory=/opt/ffrtmp
+
+# Environment
+EnvironmentFile=-/etc/ffrtmp/watch.env
+
+# Configuration file
+Environment="WATCH_CONFIG=/etc/ffrtmp/watch-config.yaml"
+
+# Binary with full reliability stack
+ExecStart=/usr/local/bin/ffrtmp watch \
+    --watch-config=${WATCH_CONFIG} \
+    --enable-state \
+    --state-path=/var/lib/ffrtmp/watch-state.json \
+    --state-flush-interval=${STATE_FLUSH_INTERVAL:-30s} \
+    --enable-retry \
+    --max-retry-attempts=${MAX_RETRY_ATTEMPTS:-5} \
+    --scan-interval=${SCAN_INTERVAL:-10s} \
+    --target=${TARGET_COMMANDS:-ffmpeg}
+
+# Restart policy
+Restart=always
+RestartSec=10s
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/ffrtmp /var/log/ffrtmp /opt/ffrtmp/logs
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Cgroup delegation (CRITICAL for watch daemon to govern processes)
+# This allows the ffrtmp user to create and manage cgroups
+Delegate=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ffrtmp-watch
+
+[Install]
+WantedBy=multi-user.target

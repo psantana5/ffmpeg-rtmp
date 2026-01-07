@@ -161,7 +161,44 @@ ffrtmp attach \
   --job-id existing-job-042 \
   --cpu-weight 150 \
   --nice -5
+
+# Auto-discovery watch daemon (NEW!)
+ffrtmp watch \
+  --scan-interval 10s \
+  --enable-state \
+  --enable-retry \
+  --watch-config /etc/ffrtmp/watch-config.yaml
 ```
+
+### Auto-Discovery Watch Daemon 🆕
+
+The **watch daemon** automatically discovers and governs FFmpeg processes that start outside the wrapper's control. Perfect for:
+- Client-initiated streams
+- Legacy systems without code changes
+- External triggers spawning processes
+- Production edge nodes requiring comprehensive governance
+
+**Key Features**:
+- Automatic process discovery via /proc scanning
+- State persistence across restarts
+- Intelligent error handling and retry
+- Health monitoring with degradation tracking
+- YAML-based configuration with filtering rules
+
+**Quick Start**:
+```bash
+# Install on production node
+sudo ./deployment/install-edge.sh
+
+# Configure
+sudo nano /etc/ffrtmp/watch-config.yaml
+
+# Start service
+sudo systemctl start ffrtmp-watch
+sudo systemctl enable ffrtmp-watch
+```
+
+See **[deployment/WATCH_DEPLOYMENT.md](deployment/WATCH_DEPLOYMENT.md)** for complete deployment guide.
 
 ### Documentation
 
