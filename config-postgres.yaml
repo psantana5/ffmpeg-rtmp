@@ -37,9 +37,9 @@ timeouts:
   assigned_timeout: 30s
   running_timeout_base: 5m
   running_timeout_per_minute: 30s
-  heartbeat_timeout: 1m
+  heartbeat_timeout: 90s  # 3 missed heartbeats @ 30s interval
 
 # Worker management
 workers:
-  heartbeat_timeout: 60s
+  heartbeat_timeout: 90s  # 3 missed heartbeats @ 30s interval
   recovery_check_interval: 30s
