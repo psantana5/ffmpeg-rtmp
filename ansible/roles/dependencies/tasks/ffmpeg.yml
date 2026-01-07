@@ -1,0 +1,42 @@
+---
+- name: Install FFmpeg (Debian)
+  apt:
+    name:
+      - ffmpeg
+      - libavcodec-dev
+      - libavformat-dev
+      - libavutil-dev
+      - libswscale-dev
+      - libswresample-dev
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Enable EPEL repository (RedHat)
+  yum:
+    name: epel-release
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Enable RPM Fusion Free (RedHat)
+  yum:
+    name: "https://download1.rpmfusion.org/free/el/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Install FFmpeg (RedHat)
+  yum:
+    name:
+      - ffmpeg
+      - ffmpeg-devel
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Verify FFmpeg installation
+  command: ffmpeg -version
+  register: ffmpeg_verify
+  changed_when: false
+
+- name: Display FFmpeg version
+  debug:
+    msg: "{{ ffmpeg_verify.stdout_lines[0] }}"
