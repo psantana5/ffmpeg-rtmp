@@ -236,8 +236,8 @@ func main() {
 	stats.TotalCPUCores = getCPUCores()
 	log.Printf("Detected %d CPU cores", stats.TotalCPUCores)
 
-	// Start stats collection
-	go collectStats(5 * time.Second)
+	// Start stats collection (fast update for real-time dashboards)
+	go collectStats(10 * time.Second)
 
 	// Do initial collection
 	if err := updateDockerStats(); err != nil {

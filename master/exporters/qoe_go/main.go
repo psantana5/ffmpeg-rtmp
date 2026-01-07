@@ -47,7 +47,7 @@ var (
 		lastLoad  time.Time
 	}{}
 	resultsDir string
-	cacheTTL   = 60 * time.Second
+	cacheTTL   = 10 * time.Second // Fast refresh for real-time dashboards
 )
 
 // loadLatestResults loads the most recent test results JSON file
