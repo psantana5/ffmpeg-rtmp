@@ -9,6 +9,23 @@
 A comprehensive streaming test and power monitoring stack for analyzing energy consumption during video transcoding. Features **high-performance Go exporters**, **VictoriaMetrics** for production-grade telemetry, **distributed compute capabilities** for scaling workloads across multiple nodes, and **edge workload wrapper** for production governance. **Achieved 99.9% SLA compliance** tested with **45,000+ mixed workload jobs**.
 <img width="1899" height="963" alt="image" src="https://github.com/user-attachments/assets/a7434728-cefd-43c3-8940-1b6d1f7e4c52" />
 
+## Production-Validated Reference System
+
+**FFmpeg-RTMP is presented as a production-validated reference system.** It documents architectural choices, invariants, and failure semantics observed under real load. While the system is used in production and is available for reuse, its primary goal is to communicate design tradeoffs and operational lessons rather than to serve as a general-purpose or commercially supported platform.
+
+**Key characteristics:**
+- **Production-validated patterns**: FSM state machines, row-level locking, exponential backoff, graceful shutdown
+- **Real operational data**: 45,000+ jobs tested across 31 scenarios with documented SLA compliance
+- **Design transparency**: Explicit invariants, failure modes, and tradeoffs documented
+- **Educational focus**: Demonstrates distributed systems patterns and production architecture
+- **Reusable foundation**: Available for adaptation to specific use cases
+
+**What this means:**
+- Architectural decisions are documented with rationale and alternatives considered
+- Failure modes and recovery patterns are explicitly described
+- Performance characteristics are measured and reported honestly
+- Code quality reflects production standards but deployment is environment-specific
+- Primary value is as a reference implementation and learning resource
 
 **Production deployment uses master-agent architecture (no Docker required). Docker Compose available for local development only.**
 
