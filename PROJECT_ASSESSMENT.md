@@ -4,7 +4,7 @@
 
 ## Current State
 
-### ✅ What's Working Well
+###  What's Working Well
 
 **Architecture & Design:**
 - ✓ Pull-based master-worker pattern implemented
@@ -40,7 +40,7 @@
 - ✓ Architecture documentation exists
 - ✓ Test results documented (45K+ jobs, 99.8% SLA)
 
-### 🎯 What Could Be Improved
+###  What Could Be Improved
 
 #### 1. Master-Worker Coordination (High Priority)
 
@@ -132,7 +132,7 @@ grep -r "poll\|claim.*job" pkg/scheduler/
 
 ## Recommended Work Priority
 
-### 🔥 Critical Path (Do First)
+###  Critical Path (Do First)
 
 1. **Verify Master-Worker Protocol Implementation**
    - Review `pkg/scheduler/` thoroughly
@@ -153,7 +153,7 @@ grep -r "poll\|claim.*job" pkg/scheduler/
    - Confirm exponential backoff works
    - **Why:** Known failure mode from documentation
 
-### 🎯 High Value (Next)
+###  High Value (Next)
 
 4. **Add Comprehensive Integration Tests**
    - Worker crash during job execution
@@ -176,7 +176,7 @@ grep -r "poll\|claim.*job" pkg/scheduler/
    - Fill worker disk
    - **Why:** Proves system handles documented failure modes
 
-### 💡 Nice to Have (Later)
+###  Nice to Have (Later)
 
 7. **Performance Benchmarking Suite**
    - Automated throughput tests
