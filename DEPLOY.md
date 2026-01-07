@@ -1485,7 +1485,7 @@ worker:
 MAX_CONCURRENT_JOBS=16     # Typically cores * 2
 
 # 2. Faster heartbeat for responsiveness
-HEARTBEAT_INTERVAL=15s
+HEARTBEAT_INTERVAL=30s     # Default: 30s (3 missed = 90s timeout)
 
 # 3. Enable hardware acceleration
 ENABLE_NVENC=true          # NVIDIA GPU
@@ -1499,6 +1499,168 @@ FFMPEG_THREADS=0           # Auto-detect (recommended)
 MAX_MEMORY_MB=32768        # 32GB
 MAX_CPU_CORES=16
 ```
+
+### PostgreSQL Connection Pool Scaling
+
+**Critical for 50+ workers**: Tune connection pool to prevent bottlenecks.
+
+#### Default Configuration (up to 50 workers)
+
+```yaml
+# config-postgres.yaml
+database:
+  max_open_conns: 25      # Total connections to database
+  max_idle_conns: 5       # Idle connections kept warm
+  conn_max_lifetime: 5m   # Recycle old connections
+  conn_max_idle_time: 1m  # Close idle connections
+```
+
+**Performance:**
+- 25 connections @ 2s poll rate = **50 workers** max
+- Each query takes ~500ms including lock contention
+
+#### Production Configuration (50-100 workers)
+
+```yaml
+# config-postgres.yaml
+database:
+  max_open_conns: 50      # 2× default
+  max_idle_conns: 10      # 2× idle pool
+  conn_max_lifetime: 5m   # Keep existing
+  conn_max_idle_time: 1m  # Keep existing
+```
+
+**Performance:**
+- 50 connections @ 2s poll rate = **100 workers** max
+- Handles burst load during job assignments
+
+#### High-Scale Configuration (100-200 workers)
+
+```yaml
+# config-postgres.yaml
+database:
+  max_open_conns: 100     # High concurrency
+  max_idle_conns: 20      # Larger warm pool
+  conn_max_lifetime: 3m   # Faster recycling
+  conn_max_idle_time: 30s # Aggressive cleanup
+```
+
+**Performance:**
+- 100 connections @ 2s poll rate = **200 workers** max
+- Requires PostgreSQL `max_connections = 150+`
+
+#### PostgreSQL Server Configuration
+
+Match your connection pool to PostgreSQL limits:
+
+```bash
+# Edit /etc/postgresql/15/main/postgresql.conf
+max_connections = 150          # 100 (app) + 50 (admin/monitoring)
+shared_buffers = 4GB           # 25% of RAM (16GB server)
+effective_cache_size = 12GB    # 75% of RAM
+work_mem = 64MB                # Per-query memory
+maintenance_work_mem = 512MB   # For VACUUM/ANALYZE
+
+# Restart PostgreSQL
+sudo systemctl restart postgresql
+```
+
+#### Connection Pool Sizing Formula
+
+```
+Required Connections = (Workers × Poll Frequency) / Avg Query Time
+
+Example:
+- 100 workers
+- Poll every 2 seconds
+- Avg query time: 500ms (0.5s)
+
+Connections = (100 workers × 0.5 queries/sec) / (1 / 0.5s)
+            = 50 queries/sec / 2 queries/conn/sec
+            = 25 connections minimum
+
+Add 20% overhead: 25 × 1.2 = 30 connections
+```
+
+#### Monitoring Connection Pool Health
+
+```bash
+# 1. Check PostgreSQL active connections
+sudo -u postgres psql -c "
+  SELECT state, COUNT(*) 
+  FROM pg_stat_activity 
+  WHERE datname = 'ffrtmp' 
+  GROUP BY state;
+"
+
+# 2. Watch connection pool metrics (Prometheus)
+curl localhost:9090/metrics | grep database_connections
+
+# Expected output:
+# database_connections_open 18
+# database_connections_idle 4
+# database_connections_in_use 14
+# database_connections_wait_duration_ms 2.5
+
+# 3. Check for connection starvation
+# If wait_duration > 100ms, increase max_open_conns
+```
+
+#### Symptoms of Undersized Pool
+
+🚨 **Connection starvation signs:**
+- Workers report "timeout waiting for connection"
+- Increased job assignment latency (>5s)
+- Prometheus metric: `database_connections_wait_duration_ms > 100`
+- PostgreSQL logs: "remaining connection slots reserved"
+
+**Fix:** Increase `max_open_conns` by 50%
+
+🚨 **Connection exhaustion signs:**
+- PostgreSQL error: "FATAL: sorry, too many clients already"
+- Master crashes with "connection refused"
+- Zero idle connections in pool
+
+**Fix:** Increase PostgreSQL `max_connections` in `postgresql.conf`
+
+#### Connection Pool Best Practices
+
+✅ **Do:**
+- Start with defaults (25 conns) and scale up as needed
+- Monitor `database_connections_wait_duration_ms` metric
+- Use `conn_max_lifetime` to prevent stale connections
+- Set PostgreSQL `max_connections` = 1.5× `max_open_conns`
+- Enable connection pool metrics in production
+
+❌ **Don't:**
+- Set `max_open_conns` higher than PostgreSQL allows
+- Use `max_open_conns > 200` (indicates architectural issue)
+- Set `max_idle_conns = 0` (causes reconnection overhead)
+- Ignore connection wait times in metrics
+
+#### Scaling Beyond 200 Workers
+
+If you need >200 workers, consider:
+
+1. **PgBouncer connection pooler**
+   ```bash
+   # Install PgBouncer between app and PostgreSQL
+   max_client_conn = 200      # Application connections
+   default_pool_size = 50     # Database connections
+   reserve_pool_size = 10     # Emergency connections
+   ```
+
+2. **Redis job queue** (architectural change)
+   - Offload job assignment to Redis
+   - Reduce database polling load
+   - See: `docs/ARCHITECTURE_IMPROVEMENTS.md`
+
+3. **Read replicas** (for read-heavy queries)
+   - Route worker polling to read replicas
+   - Keep writes on primary
+   - Requires query routing logic
+
+### Worker Node Optimization (continued)
 
 ### System-Level Tuning
 
