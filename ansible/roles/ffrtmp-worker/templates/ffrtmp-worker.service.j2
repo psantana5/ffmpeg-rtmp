@@ -1,0 +1,46 @@
+[Unit]
+Description=FFmpeg-RTMP Edge Worker with Wrapper
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ ffrtmp_user }}
+Group={{ ffrtmp_group }}
+WorkingDirectory={{ ffrtmp_base_dir }}
+
+EnvironmentFile={{ ffrtmp_config_dir }}/worker.env
+
+ExecStart={{ ffrtmp_base_dir }}/bin/agent \
+    -master=${MASTER_URL} \
+    -api-key=${API_KEY} \
+    -max-concurrent-jobs=${MAX_JOBS} \
+    -heartbeat-interval=${HEARTBEAT_INTERVAL} \
+    -enable-auto-attach=${ENABLE_AUTO_ATTACH} \
+    -log-level=${LOG_LEVEL}
+
+Restart=on-failure
+RestartSec=10s
+KillMode=process
+TimeoutStopSec=30s
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ ffrtmp_stream_dir }} {{ ffrtmp_log_dir }} {{ ffrtmp_data_dir }}
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Cgroup delegation
+Delegate=yes
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ffrtmp-worker
+
+[Install]
+WantedBy=multi-user.target
