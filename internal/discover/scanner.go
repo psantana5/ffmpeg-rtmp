@@ -6,16 +6,24 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
-// Process represents a discovered running process
+// Process represents a discovered running process with rich metadata
 type Process struct {
-	PID         int
-	Command     string
-	CommandLine []string
-	StartTime   time.Time
-	Monitored   bool
+	PID            int
+	Command        string
+	CommandLine    []string
+	StartTime      time.Time
+	Monitored      bool
+	
+	// Enhanced metadata (Phase 2)
+	UserID         int           // UID of process owner
+	Username       string        // Username of process owner
+	ParentPID      int           // Parent process ID
+	WorkingDir     string        // Current working directory
+	ProcessAge     time.Duration // Time since process started
 }
 
 // Scanner discovers running FFmpeg/transcoding processes
@@ -24,6 +32,7 @@ type Scanner struct {
 	trackedPIDs    map[int]bool
 	ownPID         int              // Scanner's own PID (to filter out self)
 	excludePPIDs   map[int]bool     // Parent PIDs to exclude
+	filter         *FilterConfig    // Advanced filtering rules
 }
 
 // NewScanner creates a new process scanner
@@ -36,7 +45,13 @@ func NewScanner(targetCommands []string) *Scanner {
 		trackedPIDs:    make(map[int]bool),
 		ownPID:         os.Getpid(),
 		excludePPIDs:   make(map[int]bool),
+		filter:         NewFilterConfig(), // Default: allow all
 	}
+}
+
+// SetFilter sets the filtering rules for the scanner
+func (s *Scanner) SetFilter(filter *FilterConfig) {
+	s.filter = filter
 }
 
 // ExcludeParentPID adds a parent PID to exclude (e.g., watch daemon's own PID)
@@ -96,25 +111,50 @@ func (s *Scanner) ScanRunningProcesses() ([]*Process, error) {
 		}
 
 		// Get parent PID and check if we should exclude it
-		ppid := s.getParentPID(filepath.Join(procDir, pidStr, "stat"))
+		statPath := filepath.Join(procDir, pidStr, "stat")
+		ppid := s.getParentPID(statPath)
 		if s.excludePPIDs[ppid] {
 			continue
 		}
 
 		// Get process start time
-		statPath := filepath.Join(procDir, pidStr, "stat")
 		startTime, err := s.getProcessStartTime(statPath)
 		if err != nil {
 			startTime = time.Time{}
 		}
+		
+		// Calculate process age
+		processAge := time.Duration(0)
+		if !startTime.IsZero() {
+			processAge = time.Since(startTime)
+		}
+		
+		// Get user ID and username
+		uid := s.getUserID(filepath.Join(procDir, pidStr))
+		username := s.getUsername(uid)
+		
+		// Get working directory
+		workingDir := s.getWorkingDir(filepath.Join(procDir, pidStr, "cwd"))
 
-		processes = append(processes, &Process{
+		proc := &Process{
 			PID:         pid,
 			Command:     command,
 			CommandLine: parts,
 			StartTime:   startTime,
 			Monitored:   s.trackedPIDs[pid],
-		})
+			UserID:      uid,
+			Username:    username,
+			ParentPID:   ppid,
+			WorkingDir:  workingDir,
+			ProcessAge:  processAge,
+		}
+		
+		// Apply filtering rules
+		if !s.filter.ShouldDiscover(proc) {
+			continue
+		}
+
+		processes = append(processes, proc)
 	}
 
 	return processes, nil
@@ -239,4 +279,60 @@ func (s *Scanner) getParentPID(statPath string) int {
 	}
 
 	return ppid
+}
+
+// getUserID extracts the UID of the process owner from /proc/[pid]
+func (s *Scanner) getUserID(procPath string) int {
+	fileInfo, err := os.Stat(procPath)
+	if err != nil {
+		return -1
+	}
+	
+	// Get UID from file ownership
+	if stat, ok := fileInfo.Sys().(*syscall.Stat_t); ok {
+		return int(stat.Uid)
+	}
+	
+	return -1
+}
+
+// getUsername converts UID to username
+func (s *Scanner) getUsername(uid int) string {
+	if uid < 0 {
+		return "unknown"
+	}
+	
+	// Read /etc/passwd to map UID to username
+	data, err := os.ReadFile("/etc/passwd")
+	if err != nil {
+		return fmt.Sprintf("uid:%d", uid)
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		
+		fields := strings.Split(line, ":")
+		if len(fields) >= 3 {
+			username := fields[0]
+			uidStr := fields[2]
+			
+			if uidStr == strconv.Itoa(uid) {
+				return username
+			}
+		}
+	}
+	
+	return fmt.Sprintf("uid:%d", uid)
+}
+
+// getWorkingDir reads the current working directory of a process
+func (s *Scanner) getWorkingDir(cwdPath string) string {
+	target, err := os.Readlink(cwdPath)
+	if err != nil {
+		return ""
+	}
+	return target
 }

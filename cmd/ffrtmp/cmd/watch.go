@@ -20,6 +20,7 @@ var (
 	daemonCPUQuota int
 	daemonCPUWeight int
 	daemonMemLimit int
+	watchConfigFile string // Config file path
 )
 
 var watchCmd = &cobra.Command{
@@ -44,6 +45,7 @@ Example:
 func init() {
 	rootCmd.AddCommand(watchCmd)
 	
+	watchCmd.Flags().StringVar(&watchConfigFile, "watch-config", "", "Path to watch daemon configuration file (YAML)")
 	watchCmd.Flags().DurationVar(&scanInterval, "scan-interval", 10*time.Second, "How often to scan for new processes")
 	watchCmd.Flags().StringSliceVar(&targetCommands, "target", []string{"ffmpeg", "gst-launch-1.0"}, "Target commands to discover")
 	watchCmd.Flags().IntVar(&daemonCPUQuota, "cpu-quota", 0, "Default CPU quota for discovered processes (0=unlimited)")
@@ -52,49 +54,101 @@ func init() {
 }
 
 func runWatchDaemon(cmd *cobra.Command, args []string) error {
-	fmt.Printf("╔════════════════════════════════════════════════════════════════╗\n")
-	fmt.Printf("║ FFmpeg Auto-Attach Daemon                                      ║\n")
-	fmt.Printf("╠════════════════════════════════════════════════════════════════╣\n")
-	fmt.Printf("║ Scan Interval: %-47s ║\n", scanInterval)
-	fmt.Printf("║ Target Commands: %-45s ║\n", fmt.Sprintf("%v", targetCommands))
-	fmt.Printf("║ Default CPU Quota: %-43d ║\n", daemonCPUQuota)
-	fmt.Printf("║ Default CPU Weight: %-42d ║\n", daemonCPUWeight)
-	fmt.Printf("║ Default Memory Limit: %-38d MB ║\n", daemonMemLimit)
-	fmt.Printf("╚════════════════════════════════════════════════════════════════╝\n")
+	var config *discover.AttachConfig
+	var filterConfig *discover.FilterConfig
+	var scanner *discover.Scanner
 	
-	// Build default limits
-	limits := &cgroups.Limits{
-		CPUWeight: daemonCPUWeight,
-	}
-	
-	if daemonCPUQuota > 0 {
-		quota := daemonCPUQuota * 1000
-		limits.CPUMax = fmt.Sprintf("%d 100000", quota)
-	}
-	
-	if daemonMemLimit > 0 {
-		limits.MemoryMax = int64(daemonMemLimit) * 1024 * 1024
+	// Check if config file provided
+	if watchConfigFile != "" {
+		watchCfg, err := discover.LoadConfig(watchConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to load config file: %w", err)
+		}
+		
+		// Convert to AttachConfig
+		config, err = watchCfg.ToAttachConfig()
+		if err != nil {
+			return fmt.Errorf("failed to parse config: %w", err)
+		}
+		
+		// Convert filters
+		filterConfig, err = watchCfg.Filters.ToFilterConfig()
+		if err != nil {
+			return fmt.Errorf("failed to parse filters: %w", err)
+		}
+		
+		// Apply command-specific filters
+		if err := watchCfg.ApplyCommandFilters(filterConfig); err != nil {
+			return fmt.Errorf("failed to apply command filters: %w", err)
+		}
+		
+		scanInterval = config.ScanInterval
+		targetCommands = config.TargetCommands
+		
+		fmt.Printf("╔════════════════════════════════════════════════════════════════╗\n")
+		fmt.Printf("║ FFmpeg Auto-Attach Daemon (Config File Mode)                  ║\n")
+		fmt.Printf("╠════════════════════════════════════════════════════════════════╣\n")
+		fmt.Printf("║ Config File: %-49s ║\n", watchConfigFile)
+		fmt.Printf("║ Scan Interval: %-47s ║\n", scanInterval)
+		fmt.Printf("║ Target Commands: %-45s ║\n", fmt.Sprintf("%v", targetCommands))
+		fmt.Printf("║ Filters Active: %-46s ║\n", "Yes")
+		fmt.Printf("╚════════════════════════════════════════════════════════════════╝\n")
+	} else {
+		// Use command-line flags
+		fmt.Printf("╔════════════════════════════════════════════════════════════════╗\n")
+		fmt.Printf("║ FFmpeg Auto-Attach Daemon                                      ║\n")
+		fmt.Printf("╠════════════════════════════════════════════════════════════════╣\n")
+		fmt.Printf("║ Scan Interval: %-47s ║\n", scanInterval)
+		fmt.Printf("║ Target Commands: %-45s ║\n", fmt.Sprintf("%v", targetCommands))
+		fmt.Printf("║ Default CPU Quota: %-43d ║\n", daemonCPUQuota)
+		fmt.Printf("║ Default CPU Weight: %-42d ║\n", daemonCPUWeight)
+		fmt.Printf("║ Default Memory Limit: %-38d MB ║\n", daemonMemLimit)
+		fmt.Printf("╚════════════════════════════════════════════════════════════════╝\n")
+		
+		// Build default limits
+		limits := &cgroups.Limits{
+			CPUWeight: daemonCPUWeight,
+		}
+		
+		if daemonCPUQuota > 0 {
+			quota := daemonCPUQuota * 1000
+			limits.CPUMax = fmt.Sprintf("%d 100000", quota)
+		}
+		
+		if daemonMemLimit > 0 {
+			limits.MemoryMax = int64(daemonMemLimit) * 1024 * 1024
+		}
+		
+		config = &discover.AttachConfig{
+			ScanInterval:   scanInterval,
+			TargetCommands: targetCommands,
+			DefaultLimits:  limits,
+		}
+		
+		filterConfig = discover.NewFilterConfig() // Default: allow all
 	}
 	
 	// Create logger
 	logger := log.New(os.Stdout, "[watch] ", log.LstdFlags)
+	config.Logger = logger
 	
 	// Configure auto-attach service
-	config := &discover.AttachConfig{
-		ScanInterval:   scanInterval,
-		TargetCommands: targetCommands,
-		DefaultLimits:  limits,
-		Logger:         logger,
-		OnAttach: func(pid int, jobID string) {
-			logger.Printf("✓ Attached to PID %d (job: %s)", pid, jobID)
-		},
-		OnDetach: func(pid int, jobID string) {
-			logger.Printf("⊗ Detached from PID %d (job: %s)", pid, jobID)
-		},
+	config.OnAttach = func(pid int, jobID string) {
+		logger.Printf("✓ Attached to PID %d (job: %s)", pid, jobID)
+	}
+	config.OnDetach = func(pid int, jobID string) {
+		logger.Printf("⊗ Detached from PID %d (job: %s)", pid, jobID)
 	}
 	
 	// Create service
 	service := discover.NewAutoAttachService(config)
+	
+	// Apply filters to scanner
+	scanner = service.GetScanner()
+	if scanner != nil && filterConfig != nil {
+		scanner.SetFilter(filterConfig)
+		logger.Println("Filters applied to scanner")
+	}
 	
 	// Setup context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())

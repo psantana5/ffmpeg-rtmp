@@ -272,3 +272,8 @@ func (s *AutoAttachService) GetStats() Stats {
 		LastScanTime:     s.stats.LastScanTime,
 	}
 }
+
+// GetScanner returns the underlying scanner (for applying filters)
+func (s *AutoAttachService) GetScanner() *Scanner {
+	return s.scanner
+}

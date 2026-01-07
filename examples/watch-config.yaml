@@ -1,0 +1,53 @@
+# FFmpeg Auto-Discovery Watch Daemon Configuration
+# Example configuration showing all available options
+
+# How often to scan for new processes
+scan_interval: "10s"
+
+# Commands to discover (process names)
+target_commands:
+  - ffmpeg
+  - gst-launch-1.0
+
+# Default resource limits applied to discovered processes
+default_limits:
+  cpu_quota: 200      # 200% CPU (2 cores)
+  cpu_weight: 100     # CPU scheduling weight (1-10000)
+  memory_limit: 4096  # 4GB memory limit
+
+# Global filtering rules
+filters:
+  # User-based filtering
+  allowed_users: []     # Empty = allow all users
+  blocked_users: []     # Block specific users
+  allowed_uids: []      # Allow specific UIDs
+  blocked_uids: []      # Block specific UIDs
+  
+  # Parent process filtering
+  allowed_parents: []   # Only discover children of these PIDs
+  blocked_parents: []   # Never discover children of these PIDs
+  
+  # Runtime-based filtering
+  min_runtime: "5s"     # Ignore processes younger than 5s
+  max_runtime: ""       # No maximum (empty = unlimited)
+  
+  # Working directory filtering
+  allowed_dirs: []      # Only discover processes in these dirs
+  blocked_dirs:         # Never discover processes in these dirs
+    - /tmp
+
+# Per-command overrides
+commands:
+  ffmpeg:
+    limits:
+      cpu_quota: 300      # FFmpeg gets 3 cores
+      memory_limit: 8192  # FFmpeg gets 8GB
+    filters:
+      min_runtime: "10s"  # Only long-running FFmpeg jobs
+  
+  gst-launch-1.0:
+    limits:
+      cpu_quota: 150
+      memory_limit: 2048
+    filters:
+      min_runtime: "30s"  # Only discover GStreamer jobs running >30s
