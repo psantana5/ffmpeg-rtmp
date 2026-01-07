@@ -1,0 +1,84 @@
+---
+# Deploy FFmpeg-RTMP Master Node
+
+- name: Create master user
+  user:
+    name: "{{ ffrtmp_master_user }}"
+    system: yes
+    shell: /bin/false
+    home: "{{ ffrtmp_master_data_dir }}"
+    create_home: no
+
+- name: Create master directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ffrtmp_master_user }}"
+    group: "{{ ffrtmp_master_group }}"
+    mode: '0755'
+  loop:
+    - "{{ ffrtmp_master_base_dir }}/bin"
+    - "{{ ffrtmp_master_config_dir }}"
+    - "{{ ffrtmp_master_data_dir }}"
+    - "{{ ffrtmp_master_log_dir }}"
+
+- name: Clone or update repository
+  git:
+    repo: "{{ ffrtmp_git_repo }}"
+    dest: "/tmp/ffrtmp-build"
+    version: "{{ ffrtmp_git_branch }}"
+    force: yes
+  when: build_from_source | bool
+
+- name: Build master binary
+  shell: |
+    export PATH=$PATH:/usr/local/go/bin
+    cd /tmp/ffrtmp-build
+    make build-master
+  when: build_from_source | bool
+
+- name: Copy master binary
+  copy:
+    src: "/tmp/ffrtmp-build/bin/master"
+    dest: "{{ ffrtmp_master_base_dir }}/bin/ffrtmp-master"
+    mode: '0755'
+    remote_src: yes
+
+- name: Generate API key
+  shell: openssl rand -base64 32 > {{ ffrtmp_master_api_key_file }}
+  args:
+    creates: "{{ ffrtmp_master_api_key_file }}"
+  when: ffrtmp_master_generate_api_key | bool
+
+- name: Set API key permissions
+  file:
+    path: "{{ ffrtmp_master_api_key_file }}"
+    owner: "{{ ffrtmp_master_user }}"
+    group: "{{ ffrtmp_master_group }}"
+    mode: '0600'
+
+- name: Create master configuration
+  template:
+    src: master.env.j2
+    dest: "{{ ffrtmp_master_config_dir }}/master.env"
+    owner: "{{ ffrtmp_master_user }}"
+    group: "{{ ffrtmp_master_group }}"
+    mode: '0644'
+
+- name: Install systemd service
+  template:
+    src: ffrtmp-master.service.j2
+    dest: /etc/systemd/system/ffrtmp-master.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable and start master service
+  systemd:
+    name: ffrtmp-master
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Open firewall ports
+  include_tasks: firewall.yml
+  tags: firewall
