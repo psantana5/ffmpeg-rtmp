@@ -263,7 +263,7 @@ Every job supports configurable resource limits to ensure system stability:
 - Compression ratio analysis
 - Capacity planning support
 
-**7. SLA Tracking** 🆕
+**7. SLA Tracking**
 - **99.8% SLA compliance** achieved with 45,000+ production jobs
 - Intelligent job classification (production vs test/benchmark/debug)
 - Automatic SLA-worthy detection based on scenario, duration, and queue
@@ -271,6 +271,16 @@ Every job supports configurable resource limits to ensure system stability:
 - Real-time SLA status in job logs
 - Projected: Trend indicates 99.9% compliance with continued optimization
 - See [SLA Classification Guide](docs/SLA_CLASSIFICATION.md) for complete methodology
+
+**8. Automatic Process Discovery and Resource Governance**
+- Automatically discover and govern FFmpeg processes started outside wrapper control
+- Three operational modes: run (spawn), attach (observe existing), watch (auto-discover)
+- Configuration-driven discovery policies with advanced filtering
+- Non-owning governance: processes survive wrapper crashes
+- Filter by user, directory, runtime, parent process
+- Per-command resource limit overrides
+- Statistics tracking: scan duration, discoveries, active attachments
+- See [Auto-Attach Documentation](docs/AUTO_ATTACH.md) for complete guide
 
 ### Monitoring & Metrics
 
@@ -281,10 +291,12 @@ Available metrics include:
 - **Job Metrics**: Active jobs, completion rate, latency, success/failure counts
 - **Hardware**: GPU power, temperature (NVIDIA)
 - **Encoder Availability**: NVENC, QSV, VAAPI runtime validation
-- **Bandwidth**: Input/output bytes, bandwidth utilization (Mbps) 🆕
-- **SLA Tracking**: 99.8% compliance rate (45K+ jobs), intelligent classification, trend analysis 🆕
+- **Bandwidth**: Input/output bytes, bandwidth utilization (Mbps)
+- **SLA Tracking**: 99.8% compliance rate (45K+ jobs), intelligent classification, trend analysis
+- **Auto-Discovery**: Discovered processes, active attachments, scan duration
 
 **Documentation:**
+- [Auto-Attach Documentation](docs/AUTO_ATTACH.md) - Automatic process discovery and governance
 - [Bandwidth Metrics Guide](docs/BANDWIDTH_METRICS.md) - Bandwidth tracking and capacity planning
 - [SLA Tracking Guide](docs/SLA_TRACKING.md) - Service level agreement monitoring
 - [SLA Classification Guide](docs/SLA_CLASSIFICATION.md) - 99.8% compliance methodology (45K+ jobs)

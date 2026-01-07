@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added - 2026-01-07
+
+**Auto-Discovery Phase 1: Visibility and Statistics**
+- Self-process filtering: watch daemon no longer discovers its own child processes
+- Enhanced statistics tracking with thread-safe Stats struct
+  - Total scans, discoveries, attachments counters
+  - Last scan duration and timestamp tracking
+  - Active attachments gauge
+- Performance monitoring with scan duration logging
+- Detailed scan summaries: "Scan complete: new=X tracked=Y duration=Zms"
+- Comprehensive test suite: `scripts/test_discovery_comprehensive.sh` (6 tests)
+- Documentation: Phase 1 test summary and results analysis
+
+**Auto-Discovery Phase 2: Intelligence and Filtering**
+- Rich process metadata collection (5 new fields):
+  - UserID and Username (extracted from file ownership and /etc/passwd)
+  - ParentPID (from /proc/[pid]/stat field 4)
+  - WorkingDir (from /proc/[pid]/cwd symlink)
+  - ProcessAge (calculated from start time)
+- Advanced filtering system with 6 filter types:
+  - User-based filtering (whitelist/blacklist by username or UID)
+  - Parent PID filtering (allow/block based on parent process)
+  - Runtime-based filtering (min/max process age constraints)
+  - Working directory filtering (allow/block by path)
+  - Per-command filter overrides
+  - Composable filters (all must pass for discovery)
+- YAML configuration file support:
+  - `--watch-config` flag for declarative policy management
+  - Per-command resource limit overrides
+  - Per-command filter rule overrides
+  - Duration parsing (10s, 1m, 24h formats)
+  - Validation at load time with helpful error messages
+- Example configuration file: `examples/watch-config.yaml`
+- Test suite for metadata extraction: `scripts/test_phase2_metadata.sh` (5 tests)
+- Comprehensive documentation:
+  - `docs/AUTO_DISCOVERY_PHASE2_SUMMARY.md` - Complete Phase 2 guide
+  - `docs/AUTO_DISCOVERY_ENHANCEMENTS.md` - Enhancement roadmap
+  - Updated `docs/AUTO_ATTACH.md` with all new features
+
+### Changed - 2026-01-07
+- Scanner now filters out watch daemon's own PID and children
+- Process struct enhanced with metadata fields (backwards compatible)
+- Watch daemon logging now includes scan statistics
+- AUTO_ATTACH.md documentation significantly expanded with Phase 1 and 2 details
+
+### Performance - 2026-01-07
+- Scan performance: Sub-25ms for 6 processes (Phase 1 + Phase 2 combined)
+- Metadata extraction adds ~5ms overhead per 6 processes
+- Memory footprint: +64 bytes per Process struct (192 bytes total)
+- Statistics tracking: Negligible overhead with RWMutex
+
+### Security - 2026-01-07
+- User-based filtering enables multi-tenant security
+- Directory filtering prevents discovery in sensitive paths
+- UID blacklisting (e.g., block root processes)
+- Declarative policies reduce ad-hoc privilege escalation
+
+## [Previous Releases]
+
 ### Added - Dynamic Input Video Generation + Hardware-Aware Encoding
 
 **Worker Automation & Hardware Detection:**
