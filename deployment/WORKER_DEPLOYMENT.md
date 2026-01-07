@@ -98,18 +98,18 @@ sudo reboot
 
 | Feature | With Root | Without Root |
 |---------|-----------|--------------|
-| **CPU Limits** | ✅ Full enforcement via cgroups | ⚠️ Soft limits (nice only) |
-| **Memory Limits** | ✅ Hard caps with OOM protection | ❌ No enforcement |
-| **Process Isolation** | ✅ Complete cgroup isolation | ⚠️ Limited |
-| **Disk Monitoring** | ✅ Always enforced | ✅ Always enforced |
-| **Timeout Enforcement** | ✅ Always enforced | ✅ Always enforced |
-| **Multi-tenant Safety** | ✅ Full isolation | ⚠️ Shared resources |
+| **CPU Limits** |  Full enforcement via cgroups |  Soft limits (nice only) |
+| **Memory Limits** |  Hard caps with OOM protection |  No enforcement |
+| **Process Isolation** |  Complete cgroup isolation |  Limited |
+| **Disk Monitoring** |  Always enforced |  Always enforced |
+| **Timeout Enforcement** |  Always enforced |  Always enforced |
+| **Multi-tenant Safety** |  Full isolation |  Shared resources |
 
 ### Security Considerations
 
 Running as root is safe when properly configured:
 
-**✅ Security Measures in Place:**
+** Security Measures in Place:**
 - Process isolation via cgroups (each job in separate cgroup)
 - Resource limits prevent DoS attacks
 - Automatic cleanup of job processes
@@ -117,7 +117,7 @@ Running as root is safe when properly configured:
 - Input validation on all parameters
 - Separate cgroup namespace per job
 
-**✅ Best Practices:**
+** Best Practices:**
 - Use dedicated server/VM for workers (no other services)
 - Keep system and dependencies updated
 - Configure firewall (only outbound HTTPS to master)

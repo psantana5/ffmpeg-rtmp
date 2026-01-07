@@ -277,7 +277,7 @@ make prom-reload
 
 1. Open Grafana: http://localhost:3000
 2. Navigate to a dashboard
-3. Click the gear icon (⚙️) to edit
+3. Click the gear icon () to edit
 4. Add panels, modify queries, change visualizations
 5. Save your changes
 

@@ -18,7 +18,7 @@ The system supports two distinct deployment modes:
 | **Resource Requirements** | Single machine (4+ GB RAM) | Master + multiple compute nodes |
 | **Scalability** | Limited to single machine | Horizontal scaling across nodes |
 | **Setup Time** | 2-5 minutes | 10-15 minutes |
-| **Production Ready** | ❌ No | ✅ Yes |
+| **Production Ready** |  No |  Yes |
 | **Best For** | Quick tests, feature development | Long-running benchmarks, multi-node workloads |
 
 ---
@@ -60,7 +60,7 @@ Local Testing mode deploys all components on a single machine using Docker Compo
 
 ### When to Use
 
-✅ **Use Local Testing Mode when:**
+ **Use Local Testing Mode when:**
 - Developing new features or exporters
 - Testing configuration changes
 - Running quick performance tests
@@ -68,7 +68,7 @@ Local Testing mode deploys all components on a single machine using Docker Compo
 - Creating demos or tutorials
 - Debugging issues locally
 
-❌ **Do NOT use Local Testing Mode for:**
+ **Do NOT use Local Testing Mode for:**
 - Production workloads
 - Long-running benchmarks (>1 hour)
 - Multi-node scaling requirements
@@ -206,7 +206,7 @@ Distributed Compute mode separates the control plane (master) from the data plan
 
 ### When to Use
 
-✅ **Use Distributed Compute Mode when:**
+ **Use Distributed Compute Mode when:**
 - Running production workloads
 - Scaling across multiple machines
 - Executing long-running benchmarks (hours to days)
@@ -216,7 +216,7 @@ Distributed Compute mode separates the control plane (master) from the data plan
 - Running automated CI/CD pipelines
 - Need to isolate compute from coordination
 
-❌ **Do NOT use Distributed Compute Mode when:**
+ **Do NOT use Distributed Compute Mode when:**
 - Quick local testing (use Local Testing instead)
 - Single machine is sufficient
 - Setup complexity is a concern
@@ -616,17 +616,17 @@ nslookup master.example.com
 ## Comparison Summary
 
 ### Use Local Testing Mode if:
-- ✅ You're developing features
-- ✅ You need quick tests
-- ✅ Single machine is enough
-- ✅ Minimal setup complexity desired
+-  You're developing features
+-  You need quick tests
+-  Single machine is enough
+-  Minimal setup complexity desired
 
 ### Use Distributed Compute Mode if:
-- ✅ Running production workloads
-- ✅ Need to scale horizontally
-- ✅ Long-running benchmarks
-- ✅ High availability required
-- ✅ Resource optimization needed
+-  Running production workloads
+-  Need to scale horizontally
+-  Long-running benchmarks
+-  High availability required
+-  Resource optimization needed
 
 ---
 

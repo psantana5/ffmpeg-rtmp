@@ -276,11 +276,11 @@ sum by(priority) (ffrtmp_queue_by_priority)
 ## Summary
 
 The improved dashboard now provides:
-- ✅ **Accurate metrics** that handle edge cases (no failures, missing data)
-- ✅ **Fast performance** with optimized database queries
-- ✅ **Comprehensive visibility** into all system aspects
-- ✅ **Proper thresholds** for alerting and monitoring
-- ✅ **Best practices** for PromQL queries
-- ✅ **Clear visualizations** with appropriate panel types
+-  **Accurate metrics** that handle edge cases (no failures, missing data)
+-  **Fast performance** with optimized database queries
+-  **Comprehensive visibility** into all system aspects
+-  **Proper thresholds** for alerting and monitoring
+-  **Best practices** for PromQL queries
+-  **Clear visualizations** with appropriate panel types
 
 All queries have been tested and verified to work correctly with the current system state.

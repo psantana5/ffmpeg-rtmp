@@ -46,11 +46,11 @@ sudo ./deployment/install-edge.sh
 ```
 
 **Installs**:
-- ✅ ffrtmp binary → `/usr/local/bin/ffrtmp`
-- ✅ Watch daemon service → `/etc/systemd/system/ffrtmp-watch.service`
-- ✅ Configuration templates → `/etc/ffrtmp/`
-- ✅ State directory → `/var/lib/ffrtmp/`
-- ✅ Cgroup delegation enabled
+-  ffrtmp binary → `/usr/local/bin/ffrtmp`
+-  Watch daemon service → `/etc/systemd/system/ffrtmp-watch.service`
+-  Configuration templates → `/etc/ffrtmp/`
+-  State directory → `/var/lib/ffrtmp/`
+-  Cgroup delegation enabled
 
 ### 2. Configure (2 minutes)
 ```bash
@@ -273,6 +273,6 @@ After successful deployment:
 
 ---
 
-**Status**: Production Integration (Option 1) COMPLETE ✅
+**Status**: Production Integration (Option 1) COMPLETE 
 
 **Next**: Option 2 - Prometheus Metrics Integration

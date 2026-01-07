@@ -339,10 +339,10 @@ func main() {
 
 ## Summary
 
-- ✅ Centralized logging to `/var/log/ffrtmp/<component>/`
-- ✅ Automatic daily rotation (14 days retention)
-- ✅ Graceful fallback to `./logs/` in development
-- ✅ Structured logging with fields
-- ✅ Multiple log levels (debug, info, warn, error, fatal)
-- ✅ Integration with systemd journald
-- ✅ Logrotate configuration included
+-  Centralized logging to `/var/log/ffrtmp/<component>/`
+-  Automatic daily rotation (14 days retention)
+-  Graceful fallback to `./logs/` in development
+-  Structured logging with fields
+-  Multiple log levels (debug, info, warn, error, fatal)
+-  Integration with systemd journald
+-  Logrotate configuration included

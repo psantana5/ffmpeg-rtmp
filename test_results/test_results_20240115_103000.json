@@ -1859,12 +1859,204 @@
       "end_time": 1767343701,
       "name": "480p60-retro",
       "start_time": 1767342647
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.161786169,
+      "encoder_type": "auto",
+      "end_time": 1767784274,
+      "name": "bitrate-10M",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.142843506,
+      "encoder_type": "auto",
+      "end_time": 1767784284,
+      "name": "burst-medium-1",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.041431018,
+      "encoder_type": "auto",
+      "end_time": 1767784294,
+      "name": "burst-medium-2",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.051714093,
+      "encoder_type": "auto",
+      "end_time": 1767784304,
+      "name": "burst-medium-3",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.067877068,
+      "encoder_type": "auto",
+      "end_time": 1767784314,
+      "name": "burst-medium-4",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.066641311,
+      "encoder_type": "auto",
+      "end_time": 1767784324,
+      "name": "burst-medium-5",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.026090827,
+      "encoder_type": "auto",
+      "end_time": 1767784333,
+      "name": "confidence-auto",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.071225589,
+      "encoder_type": "auto",
+      "end_time": 1767784344,
+      "name": "confidence-high",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.044201328,
+      "encoder_type": "auto",
+      "end_time": 1767784354,
+      "name": "confidence-medium",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.027629049,
+      "encoder_type": "auto",
+      "end_time": 1767784363,
+      "name": "confidence-low",
+      "start_time": 1767660643
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.006957384,
+      "encoder_type": "auto",
+      "end_time": 1767784373,
+      "name": "test-medium-priority-1",
+      "start_time": 1767660658
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.09853354,
+      "encoder_type": "auto",
+      "end_time": 1767784384,
+      "name": "default-job-1",
+      "start_time": 1767660658
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.038162358,
+      "encoder_type": "ffmpeg",
+      "end_time": 1767784394,
+      "name": "ffmpeg-job",
+      "start_time": 1767660658
+    },
+    {
+      "bitrate": "0k",
+      "duration": 2.114443008,
+      "encoder_type": "gstreamer",
+      "end_time": 1767784405,
+      "name": "gstreamer-job",
+      "start_time": 1767660658
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.046860556,
+      "encoder_type": "auto",
+      "end_time": 1767784414,
+      "name": "auto-engine-job",
+      "start_time": 1767660659
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.996185551,
+      "encoder_type": "auto",
+      "end_time": 1767784423,
+      "name": "bitrate-1M",
+      "start_time": 1767660659
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.281051412,
+      "encoder_type": "auto",
+      "end_time": 1767784434,
+      "name": "bitrate-5M",
+      "start_time": 1767660660
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.118527685,
+      "encoder_type": "auto",
+      "end_time": 1767784444,
+      "name": "bitrate-10M",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.015119936,
+      "encoder_type": "auto",
+      "end_time": 1767784453,
+      "name": "burst-medium-1",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.100296623,
+      "encoder_type": "auto",
+      "end_time": 1767784464,
+      "name": "burst-medium-2",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 1.040443545,
+      "encoder_type": "auto",
+      "end_time": 1767784474,
+      "name": "burst-medium-3",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.988730571,
+      "encoder_type": "auto",
+      "end_time": 1767784483,
+      "name": "burst-medium-4",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.976562062,
+      "encoder_type": "auto",
+      "end_time": 1767784493,
+      "name": "burst-medium-5",
+      "start_time": 1767660661
+    },
+    {
+      "bitrate": "0k",
+      "duration": 0.981538645,
+      "encoder_type": "auto",
+      "end_time": 1767784503,
+      "name": "confidence-auto",
+      "start_time": 1767660662
     }
   ],
-  "test_date": "2026-01-02T09:48:21+01:00",
+  "test_date": "2026-01-07T12:15:03+01:00",
   "test_metadata": {
     "platform": "distributed",
     "source": "scheduler",
-    "timestamp": "2026-01-02T09:48:21+01:00"
+    "timestamp": "2026-01-07T12:15:03+01:00"
   }
 }

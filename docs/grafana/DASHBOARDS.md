@@ -2,7 +2,7 @@
 
 ## 6 Dashboards - Clear Purposes
 
-### 1. Production Monitoring ⭐
+### 1. Production Monitoring 
 **When:** Daily operations, on-call monitoring  
 **URL:** http://localhost:3000/d/ffmpeg-rtmp-prod/  
 **Panels:** SLA compliance, job success, bandwidth, resources, exporter health

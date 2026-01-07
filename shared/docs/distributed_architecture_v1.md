@@ -247,7 +247,7 @@ Master and worker on same machine:
 ./bin/agent --register --master http://localhost:8080 --allow-master-as-worker
 ```
 
-⚠️ **Warning:** This configuration is for development only. Master and worker compete for resources.
+ **Warning:** This configuration is for development only. Master and worker compete for resources.
 
 ### Multi-Node (Production)
 
@@ -396,11 +396,11 @@ ping master-ip
 
 ## Success Criteria
 
-✅ **Node Registration:** Nodes appear via `GET /nodes`  
-✅ **Job Dispatch:** Jobs assigned and executed on workers  
-✅ **Results Collection:** Results recorded and visible in logs  
-✅ **Single-Node Workflow:** Existing workflow unchanged  
-✅ **Master-as-Worker:** Development mode with safety warnings  
+ **Node Registration:** Nodes appear via `GET /nodes`  
+ **Job Dispatch:** Jobs assigned and executed on workers  
+ **Results Collection:** Results recorded and visible in logs  
+ **Single-Node Workflow:** Existing workflow unchanged  
+ **Master-as-Worker:** Development mode with safety warnings  
 
 ## Next Steps
 

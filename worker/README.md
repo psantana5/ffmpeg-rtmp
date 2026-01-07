@@ -95,7 +95,7 @@ export MASTER_API_KEY="your-api-key-here"
 
 ### Development Mode (Master as Worker)
 
-**⚠️ WARNING**: Only for development/testing!
+** WARNING**: Only for development/testing!
 
 ```bash
 # Allow master node to also act as worker

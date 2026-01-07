@@ -5,17 +5,17 @@ This document explains the production-ready features that have been implemented 
 ## Overview
 
 As of v2.2, the master node now defaults to production-ready configuration with:
-- ✅ **TLS/HTTPS encryption** enabled by default
-- ✅ **SQLite persistence** instead of in-memory storage
-- ✅ **Automatic job retry** on failure (up to 3 attempts)
-- ✅ **Prometheus metrics** endpoint for monitoring
-- ✅ **Required API authentication** via environment variable
+-  **TLS/HTTPS encryption** enabled by default
+-  **SQLite persistence** instead of in-memory storage
+-  **Automatic job retry** on failure (up to 3 attempts)
+-  **Prometheus metrics** endpoint for monitoring
+-  **Required API authentication** via environment variable
 
 ## Feature Details
 
 ### 1. TLS/HTTPS Security
 
-**Status**: ✅ Enabled by default
+**Status**:  Enabled by default
 
 **Configuration**:
 ```bash
@@ -54,7 +54,7 @@ As of v2.2, the master node now defaults to production-ready configuration with:
 
 ### 2. API Authentication
 
-**Status**: ✅ Required by default
+**Status**:  Required by default
 
 **Configuration**:
 ```bash
@@ -85,7 +85,7 @@ export MASTER_API_KEY="same-key-as-master"
 
 ### 3. SQLite Persistence
 
-**Status**: ✅ Enabled by default
+**Status**:  Enabled by default
 
 **Configuration**:
 ```bash
@@ -119,7 +119,7 @@ export MASTER_API_KEY="same-key-as-master"
 
 ### 4. Automatic Job Retry
 
-**Status**: ✅ Enabled by default (3 attempts)
+**Status**:  Enabled by default (3 attempts)
 
 **Configuration**:
 ```bash
@@ -161,7 +161,7 @@ Job 550e8400-... failed after 3 attempts - max retries reached
 
 ### 5. Prometheus Metrics
 
-**Status**: ✅ Enabled by default on port 9090
+**Status**:  Enabled by default on port 9090
 
 **Configuration**:
 ```bash
@@ -247,7 +247,7 @@ sum(ffmpeg_master_nodes_by_status{status="busy"}) / sum(ffmpeg_master_nodes_tota
 
 ### 6. Structured Logging
 
-**Status**: ✅ JSON logging available
+**Status**:  JSON logging available
 
 **Configuration**:
 ```bash
@@ -528,4 +528,4 @@ Planned for v2.3+:
 
 **Version**: 2.2  
 **Last Updated**: 2025-12-30  
-**Status**: Production-Ready ✅
+**Status**: Production-Ready 

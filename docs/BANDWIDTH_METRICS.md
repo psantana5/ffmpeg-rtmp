@@ -505,7 +505,7 @@ def monitor_bandwidth(interval=10, threshold=100):
         print(f"Current bandwidth: {mbps:.2f} MB/s")
         
         if mbps > threshold:
-            print(f"⚠️  WARNING: Bandwidth {mbps:.2f} MB/s exceeds threshold {threshold} MB/s")
+            print(f"  WARNING: Bandwidth {mbps:.2f} MB/s exceeds threshold {threshold} MB/s")
         
         time.sleep(interval)
 
@@ -530,10 +530,10 @@ CURRENT=$(curl -s "${PROMETHEUS_URL}/api/v1/query?query=${QUERY}" | jq -r '.data
 echo "Current bandwidth utilization: ${CURRENT}%"
 
 if (( $(echo "$CURRENT > $THRESHOLD" | bc -l) )); then
-    echo "❌ WARNING: Bandwidth utilization above ${THRESHOLD}%"
+    echo " WARNING: Bandwidth utilization above ${THRESHOLD}%"
     exit 1
 else
-    echo "✅ Bandwidth capacity available"
+    echo " Bandwidth capacity available"
     exit 0
 fi
 ```

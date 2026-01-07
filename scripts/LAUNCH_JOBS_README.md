@@ -6,14 +6,14 @@
 
 ## Features
 
-- ✅ **Batch Processing**: Submit jobs in configurable batches to avoid overwhelming the master
-- ✅ **Progress Monitoring**: Real-time progress bar and detailed logging
-- ✅ **Error Handling**: Graceful error recovery and detailed failure reporting
-- ✅ **Health Checks**: Pre-flight verification of master server availability
-- ✅ **Flexible Configuration**: Support for random or fixed job parameters
-- ✅ **Dry Run Mode**: Test without actually submitting jobs
-- ✅ **JSON Output**: Machine-readable results for automation
-- ✅ **Performance Metrics**: Submission rate and timing statistics
+-  **Batch Processing**: Submit jobs in configurable batches to avoid overwhelming the master
+-  **Progress Monitoring**: Real-time progress bar and detailed logging
+-  **Error Handling**: Graceful error recovery and detailed failure reporting
+-  **Health Checks**: Pre-flight verification of master server availability
+-  **Flexible Configuration**: Support for random or fixed job parameters
+-  **Dry Run Mode**: Test without actually submitting jobs
+-  **JSON Output**: Machine-readable results for automation
+-  **Performance Metrics**: Submission rate and timing statistics
 
 ## Quick Start
 

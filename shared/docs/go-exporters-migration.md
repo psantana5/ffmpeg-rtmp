@@ -232,7 +232,7 @@ curl 'http://localhost:8428/api/v1/query_range?query=gpu_power_draw_watts&start=
 
 ## Migration Timeline
 
-### Phase 1: Side-by-Side Deployment ✅
+### Phase 1: Side-by-Side Deployment 
 - Go exporters run alongside Python exporters
 - Both scrape to Prometheus + VictoriaMetrics
 - Validate metric compatibility

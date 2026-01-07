@@ -1,4 +1,4 @@
-# 🚀 Quick Start - FFmpeg-RTMP Production Stack
+#  Quick Start - FFmpeg-RTMP Production Stack
 
 ## One Command Deployment
 
@@ -7,11 +7,11 @@
 ```
 
 **That's it!** 30 seconds later you have:
-- ✅ Master + Worker (job processing)
-- ✅ NGINX RTMP (streaming)
-- ✅ Grafana (dashboards) 
-- ✅ 12+ exporters (monitoring)
-- ✅ 17 services total
+-  Master + Worker (job processing)
+-  NGINX RTMP (streaming)
+-  Grafana (dashboards) 
+-  12+ exporters (monitoring)
+-  17 services total
 
 ## Access
 

@@ -12,12 +12,12 @@ docker compose up -d --build
 ```
 
 That's it! Docker Compose will:
-1. ✅ Build the Go CPU exporter from source
-2. ✅ Build the Go GPU exporter from source  
-3. ✅ Start VictoriaMetrics for high-performance metrics storage
-4. ✅ Start Prometheus for comparison
-5. ✅ Start Grafana with both datasources configured
-6. ✅ Start all other monitoring services
+1.  Build the Go CPU exporter from source
+2.  Build the Go GPU exporter from source  
+3.  Start VictoriaMetrics for high-performance metrics storage
+4.  Start Prometheus for comparison
+5.  Start Grafana with both datasources configured
+6.  Start all other monitoring services
 
 **No Go installation required. No manual builds. Just Docker.**
 
@@ -133,7 +133,7 @@ docker compose logs cpu-exporter-go
 
 In traditional Go projects, you'd need to:
 ```bash
-# ❌ Old way - requires Go installed
+#  Old way - requires Go installed
 go mod download
 go build -o cpu_exporter ./src/exporters/cpu_exporter/
 ./cpu_exporter
@@ -141,7 +141,7 @@ go build -o cpu_exporter ./src/exporters/cpu_exporter/
 
 With this setup:
 ```bash
-# ✅ New way - only requires Docker
+#  New way - only requires Docker
 docker compose up -d cpu-exporter-go
 # Build happens automatically inside the container
 ```

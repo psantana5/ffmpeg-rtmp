@@ -53,7 +53,7 @@ ffmpeg-rtmp/
 ### After (Organized Structure)
 ```
 ffmpeg-rtmp/
-├── master/                     ⭐ MASTER NODE COMPONENTS
+├── master/                      MASTER NODE COMPONENTS
 │   ├── cmd/master/             (Master binary)
 │   ├── exporters/              (Master-side exporters)
 │   │   ├── results/
@@ -69,7 +69,7 @@ ffmpeg-rtmp/
 │   │   └── ffmpeg-master.service
 │   └── README.md               (Master setup guide)
 │
-├── worker/                     ⭐ WORKER NODE COMPONENTS
+├── worker/                      WORKER NODE COMPONENTS
 │   ├── cmd/agent/              (Agent binary)
 │   ├── exporters/              (Worker-side exporters)
 │   │   ├── cpu_exporter/
@@ -80,7 +80,7 @@ ffmpeg-rtmp/
 │   │   └── ffmpeg-agent.service
 │   └── README.md               (Worker setup guide)
 │
-├── shared/                     ⭐ SHARED COMPONENTS
+├── shared/                      SHARED COMPONENTS
 │   ├── pkg/                    (Shared Go packages)
 │   │   ├── api/
 │   │   ├── models/
@@ -99,7 +99,7 @@ ffmpeg-rtmp/
 │   ├── docs/                   (Documentation)
 │   └── README.md               (Shared components guide)
 │
-├── [ROOT - Development Tools]  ⭐ DEVELOPMENT ENVIRONMENT
+├── [ROOT - Development Tools]   DEVELOPMENT ENVIRONMENT
 │   ├── docker-compose.yml      (Local testing stack)
 │   ├── Makefile                (Build orchestration)
 │   ├── README.md               (Main project README)

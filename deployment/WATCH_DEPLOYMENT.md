@@ -50,11 +50,11 @@ sudo ./deployment/install-edge.sh
 ```
 
 This installs:
-- ✅ `ffrtmp` wrapper binary → `/usr/local/bin/ffrtmp`
-- ✅ Systemd service → `/etc/systemd/system/ffrtmp-watch.service`
-- ✅ Configuration files → `/etc/ffrtmp/`
-- ✅ State directory → `/var/lib/ffrtmp/`
-- ✅ Cgroup delegation enabled
+-  `ffrtmp` wrapper binary → `/usr/local/bin/ffrtmp`
+-  Systemd service → `/etc/systemd/system/ffrtmp-watch.service`
+-  Configuration files → `/etc/ffrtmp/`
+-  State directory → `/var/lib/ffrtmp/`
+-  Cgroup delegation enabled
 
 ## Configuration
 

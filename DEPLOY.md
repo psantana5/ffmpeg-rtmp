@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-## 🚀 Quick Start (5 Minutes)
+##  Quick Start (5 Minutes)
 
 ### Option 1: Interactive Wizard (Easiest)
 
@@ -48,17 +48,17 @@ sudo ./deploy.sh --master --non-interactive
 ```
 
 **System will be running with:**
-- ✅ Master node on port 8080 (HTTPS)
-- ✅ Worker agent registered and polling
-- ✅ API authentication enabled
-- ✅ Metrics on ports 9090-9091
-- ✅ SQLite or PostgreSQL database
-- ✅ Health checks passed
-- ✅ Systemd services configured
+-  Master node on port 8080 (HTTPS)
+-  Worker agent registered and polling
+-  API authentication enabled
+-  Metrics on ports 9090-9091
+-  SQLite or PostgreSQL database
+-  Health checks passed
+-  Systemd services configured
 
 ---
 
-## 🎯 Deployment Methods
+##  Deployment Methods
 
 ### Method 1: Interactive Wizard (Recommended)
 
@@ -203,7 +203,7 @@ See `ansible/ANSIBLE_GUIDE.md` for detailed instructions.
 
 ---
 
-## 🔍 Pre-Deployment Validation
+##  Pre-Deployment Validation
 
 ### Pre-flight Checks
 
@@ -219,18 +219,18 @@ Always run pre-flight checks before deployment:
 ```
 
 **Validates:**
-- ✅ Operating system compatibility (Ubuntu, Debian, Rocky, AlmaLinux)
-- ✅ CPU cores (2+ for master, 2+ for worker)
-- ✅ Memory (4GB+ for master, 8GB+ for worker)
-- ✅ Disk space (20GB+ root, 10GB+ /var for master, 100GB+ for worker)
-- ✅ Port availability (8080 for master, 1935 optional)
-- ✅ Required commands (curl, wget, git, tar, gzip)
-- ✅ Go version (1.24+)
-- ✅ FFmpeg installation and codecs (workers)
-- ✅ Cgroups v2 support
-- ✅ Network connectivity and DNS
-- ✅ Firewall configuration
-- ✅ SELinux status (RHEL-based systems)
+-  Operating system compatibility (Ubuntu, Debian, Rocky, AlmaLinux)
+-  CPU cores (2+ for master, 2+ for worker)
+-  Memory (4GB+ for master, 8GB+ for worker)
+-  Disk space (20GB+ root, 10GB+ /var for master, 100GB+ for worker)
+-  Port availability (8080 for master, 1935 optional)
+-  Required commands (curl, wget, git, tar, gzip)
+-  Go version (1.24+)
+-  FFmpeg installation and codecs (workers)
+-  Cgroups v2 support
+-  Network connectivity and DNS
+-  Firewall configuration
+-  SELinux status (RHEL-based systems)
 
 ### Configuration Validation
 
@@ -273,20 +273,20 @@ Verify deployment success with comprehensive health checks:
 ```
 
 **Verifies:**
-- ✅ Service status (systemd)
-- ✅ Port listening (8080 for master)
-- ✅ HTTP endpoints responding
-- ✅ API authentication working
-- ✅ File and directory structure
-- ✅ Configuration files present
-- ✅ Disk space available
-- ✅ Log files accessible
-- ✅ No critical errors in logs
-- ✅ Database connectivity (master)
-- ✅ FFmpeg installation (workers)
-- ✅ Cgroups v2 enabled (workers)
-- ✅ Master connectivity (workers)
-- ✅ Worker registration successful
+-  Service status (systemd)
+-  Port listening (8080 for master)
+-  HTTP endpoints responding
+-  API authentication working
+-  File and directory structure
+-  Configuration files present
+-  Disk space available
+-  Log files accessible
+-  No critical errors in logs
+-  Database connectivity (master)
+-  FFmpeg installation (workers)
+-  Cgroups v2 enabled (workers)
+-  Master connectivity (workers)
+-  Worker registration successful
 
 **Output:**
 ```
@@ -300,7 +300,7 @@ Failed:   0
 
 ---
 
-## 🎛️ Configuration Management
+##  Configuration Management
 
 ### Environment-Specific Configs
 
@@ -346,7 +346,7 @@ sudo ./deploy.sh --master --config /etc/ffrtmp-master/config.yaml
 
 ---
 
-## 🏗️ Deployment Scenarios
+##  Deployment Scenarios
 
 ### Scenario 1: Single Server (Development)
 
@@ -491,7 +491,7 @@ See `ansible/ANSIBLE_GUIDE.md` for complete Ansible documentation.
 
 ---
 
-## 🔐 TLS/SSL Configuration
+##  TLS/SSL Configuration
 
 ### Automated Certificate Generation
 
@@ -606,7 +606,7 @@ See `deployment/postgres/README.md` for PostgreSQL high-availability setup.
 
 ---
 
-## 📊 Monitoring and Observability
+##  Monitoring and Observability
 
 ### Built-in Metrics (Prometheus)
 
@@ -806,7 +806,7 @@ curl -X GET -H "X-API-Key: wrong-key" http://localhost:8080/api/v1/jobs  # Shoul
 
 ---
 
-## 📋 System Requirements
+##  System Requirements
 
 ### Minimum (Development/Testing)
 - **CPU**: 2 cores
@@ -847,7 +847,7 @@ curl -X GET -H "X-API-Key: wrong-key" http://localhost:8080/api/v1/jobs  # Shoul
 
 ---
 
-## 📁 File and Directory Structure
+##  File and Directory Structure
 
 ```
 ffmpeg-rtmp/
@@ -932,7 +932,7 @@ ffmpeg-rtmp/
 
 ---
 
-## 🚨 Troubleshooting
+##  Troubleshooting
 
 ### Quick Diagnostics
 
@@ -1177,7 +1177,7 @@ sudo systemctl start ffrtmp-worker ffrtmp-watch
 
 ---
 
-## 🔧 Maintenance and Operations
+##  Maintenance and Operations
 
 ### Regular Maintenance Tasks
 
@@ -1349,7 +1349,7 @@ find /var/lib/ffrtmp/results -type f -mtime +30 -delete
 
 ---
 
-## 🚀 Upgrading to New Versions
+##  Upgrading to New Versions
 
 ### Zero-Downtime Upgrade (Master - Recommended)
 
@@ -1445,7 +1445,7 @@ After upgrading:
 
 ---
 
-## ⚡ Performance Tuning
+##  Performance Tuning
 
 ### Master Node Optimization
 
@@ -1608,7 +1608,7 @@ curl localhost:9090/metrics | grep database_connections
 
 #### Symptoms of Undersized Pool
 
-🚨 **Connection starvation signs:**
+ **Connection starvation signs:**
 - Workers report "timeout waiting for connection"
 - Increased job assignment latency (>5s)
 - Prometheus metric: `database_connections_wait_duration_ms > 100`
@@ -1616,7 +1616,7 @@ curl localhost:9090/metrics | grep database_connections
 
 **Fix:** Increase `max_open_conns` by 50%
 
-🚨 **Connection exhaustion signs:**
+ **Connection exhaustion signs:**
 - PostgreSQL error: "FATAL: sorry, too many clients already"
 - Master crashes with "connection refused"
 - Zero idle connections in pool
@@ -1625,14 +1625,14 @@ curl localhost:9090/metrics | grep database_connections
 
 #### Connection Pool Best Practices
 
-✅ **Do:**
+ **Do:**
 - Start with defaults (25 conns) and scale up as needed
 - Monitor `database_connections_wait_duration_ms` metric
 - Use `conn_max_lifetime` to prevent stale connections
 - Set PostgreSQL `max_connections` = 1.5× `max_open_conns`
 - Enable connection pool metrics in production
 
-❌ **Don't:**
+ **Don't:**
 - Set `max_open_conns` higher than PostgreSQL allows
 - Use `max_open_conns > 200` (indicates architectural issue)
 - Set `max_idle_conns = 0` (causes reconnection overhead)
@@ -1737,7 +1737,7 @@ api:
 
 ---
 
-## 📚 Additional Resources
+##  Additional Resources
 
 ### Documentation
 
@@ -1823,7 +1823,7 @@ sudo systemctl disable ffrtmp-worker
 
 ---
 
-## 🎯 Quick Reference by Use Case
+##  Quick Reference by Use Case
 
 ### I want to... Then use...
 
@@ -1848,7 +1848,7 @@ sudo systemctl disable ffrtmp-worker
 
 ---
 
-## ✅ Deployment Checklist
+##  Deployment Checklist
 
 ### Pre-Deployment
 - [ ] Read `docs/DEPLOYMENT_IMPROVEMENTS.md`
@@ -1894,26 +1894,26 @@ sudo systemctl disable ffrtmp-worker
 
 ---
 
-## 🚦 Deployment Status
+##  Deployment Status
 
 **Version**: 2.0.0+  
-**Status**: ✅ Production-Ready  
+**Status**:  Production-Ready  
 **Last Updated**: 2026-01-07
 
 ### What's New in Deployment System v2.0
 
-- ✨ Interactive deployment wizard
-- ✅ Pre-flight system validation
-- ✅ Post-deployment health checks
-- ✅ Configuration validation
-- ✅ Blue-green deployments (zero downtime)
-- ✅ Rolling worker updates
-- ✅ Automated backups and rollback
-- ✅ TLS certificate generation
-- ✅ Environment-specific configs (dev/prod)
-- ✅ Comprehensive documentation
-- ✅ GitHub Actions CI/CD integration
-- ✅ Ansible automation for multi-server deployments
+-  Interactive deployment wizard
+-  Pre-flight system validation
+-  Post-deployment health checks
+-  Configuration validation
+-  Blue-green deployments (zero downtime)
+-  Rolling worker updates
+-  Automated backups and rollback
+-  TLS certificate generation
+-  Environment-specific configs (dev/prod)
+-  Comprehensive documentation
+-  GitHub Actions CI/CD integration
+-  Ansible automation for multi-server deployments
 
 ### Previous Versions
 
@@ -1923,12 +1923,12 @@ See `CHANGELOG.md` for complete version history.
 
 **Next Steps**:
 
-1. 🎯 **Quick Start**: Run `./deployment/deployment-wizard.sh`
-2. 📚 **Learn More**: Read `docs/DEPLOYMENT_IMPROVEMENTS.md`
-3. 🔧 **Advanced**: Explore `ansible/ANSIBLE_GUIDE.md`
-4. 🚨 **Troubleshoot**: See troubleshooting section above
-5. 💬 **Get Help**: Open a GitHub issue
+1.  **Quick Start**: Run `./deployment/deployment-wizard.sh`
+2.  **Learn More**: Read `docs/DEPLOYMENT_IMPROVEMENTS.md`
+3.  **Advanced**: Explore `ansible/ANSIBLE_GUIDE.md`
+4.  **Troubleshoot**: See troubleshooting section above
+5.  **Get Help**: Open a GitHub issue
 
 ---
 
-**Happy Deploying! 🚀**
+**Happy Deploying! **

@@ -600,24 +600,24 @@ name,bitrate,resolution,fps,duration,mean_power_w,predicted_mean_power_w,...
 
 ### Not Accounted For
 
-❌ **Different Codecs**: H.264 vs H.265 vs AV1 have different power profiles
-❌ **Different Resolutions**: 720p vs 1080p vs 4K per stream
-❌ **Different Bitrates**: 2500k vs 5000k per stream
-❌ **Different Presets**: ultrafast vs medium vs slow
-❌ **Ambient Temperature**: Heat affects CPU frequency and power
-❌ **Power Management**: Governor settings (performance vs powersave)
-❌ **Background Load**: Other processes competing for CPU
-❌ **Turbo Boost State**: Enabled vs disabled
-❌ **NUMA Effects**: Multi-socket systems with non-uniform memory access
+ **Different Codecs**: H.264 vs H.265 vs AV1 have different power profiles
+ **Different Resolutions**: 720p vs 1080p vs 4K per stream
+ **Different Bitrates**: 2500k vs 5000k per stream
+ **Different Presets**: ultrafast vs medium vs slow
+ **Ambient Temperature**: Heat affects CPU frequency and power
+ **Power Management**: Governor settings (performance vs powersave)
+ **Background Load**: Other processes competing for CPU
+ **Turbo Boost State**: Enabled vs disabled
+ **NUMA Effects**: Multi-socket systems with non-uniform memory access
 
 ### When Model May Be Inaccurate
 
-⚠️ **Small Datasets**: < 3 training points
-⚠️ **Extrapolation**: Predicting > 2x max training stream count
-⚠️ **Heterogeneous Data**: Mixed codecs, resolutions, or settings
-⚠️ **Thermal Throttling**: Training data includes throttled measurements
-⚠️ **Inconsistent Measurements**: Wide variance in power readings
-⚠️ **Low R² Score**: < 0.70 indicates poor model fit
+ **Small Datasets**: < 3 training points
+ **Extrapolation**: Predicting > 2x max training stream count
+ **Heterogeneous Data**: Mixed codecs, resolutions, or settings
+ **Thermal Throttling**: Training data includes throttled measurements
+ **Inconsistent Measurements**: Wide variance in power readings
+ **Low R² Score**: < 0.70 indicates poor model fit
 
 ---
 
@@ -670,7 +670,7 @@ for streams in [4, 8, 12, 16]:
     print(f"{streams} streams → {power:.0f}W")
 
     if power > 250:  # Server cooling limit
-        print(f"  ⚠️  Exceeds thermal capacity")
+        print(f"    Exceeds thermal capacity")
 ```
 
 ### 4. Infrastructure Sizing

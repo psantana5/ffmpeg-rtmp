@@ -185,7 +185,7 @@ WARNING: Process 12345 using 2500 MB (limit: 2048 MB)
 
 ### Error Conditions
 ```
-❌ insufficient disk space: 96.2% used
+ insufficient disk space: 96.2% used
 Process 12345 exceeded timeout (600 seconds), killing...
 ```
 

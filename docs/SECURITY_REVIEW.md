@@ -9,10 +9,10 @@
 All security patterns reviewed and found acceptable for production use.
 
 **Findings**:
-- ✅ No hardcoded secrets
-- ✅ TLS properly configured
-- ✅ InsecureSkipVerify appropriately guarded
-- ✅ API keys from environment/flags only
+-  No hardcoded secrets
+-  TLS properly configured
+-  InsecureSkipVerify appropriately guarded
+-  API keys from environment/flags only
 
 ---
 
@@ -25,7 +25,7 @@ All security patterns reviewed and found acceptable for production use.
 ```go
 logger.Info("  2. Or use flag: --api-key=your-secure-key")
 ```
-**Status**: ✅ Safe - This is example text in help documentation
+**Status**:  Safe - This is example text in help documentation
 
 ### Finding 2-3: Configuration Reading
 **Location**: `cmd/ffrtmp/cmd/root.go:88,97`
@@ -34,7 +34,7 @@ if viper.GetString("api_key") != "" {
     // Reading from config
 }
 ```
-**Status**: ✅ Safe - Reading API key from configuration, not hardcoding
+**Status**:  Safe - Reading API key from configuration, not hardcoding
 
 **Conclusion**: No actual secrets hardcoded in source code.
 
@@ -53,7 +53,7 @@ if *insecureSkipVerify {
     tlsConfig.InsecureSkipVerify = true
 }
 ```
-**Status**: ✅ Safe
+**Status**:  Safe
 - Requires explicit `--insecure-skip-verify` flag
 - Logs WARNING message
 - User must consciously enable
@@ -65,7 +65,7 @@ if *insecureSkipVerify {
     tlsConfig.InsecureSkipVerify = true
 }
 ```
-**Status**: ✅ Safe
+**Status**:  Safe
 - Same pattern as above
 - Explicit flag required
 
@@ -78,7 +78,7 @@ else if *caFile == "" && isLocalhost {
     tlsConfig.InsecureSkipVerify = true
 }
 ```
-**Status**: ✅ Safe
+**Status**:  Safe
 - **ONLY** for localhost/127.0.0.1
 - **ONLY** when no CA file provided
 - Logs warning about production usage
@@ -98,7 +98,7 @@ func isLocalhostURL(rawURL string) bool {
 ```go
 tlsConfig.InsecureSkipVerify = true // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 ```
-**Status**: ✅ Acceptable
+**Status**:  Acceptable
 - Has `nosemgrep` annotation (security scanner exception)
 - Used in CLI tool context
 - Not in production server code
@@ -123,7 +123,7 @@ grep -rn "api.*key.*=.*\"[a-zA-Z0-9]" --include="*.go" .
 # (Returns only documentation examples)
 ```
 
-**Status**: ✅ Secure
+**Status**:  Secure
 - Never hardcoded in source
 - Always from external configuration
 - Logged source (flag vs env) for debugging
@@ -139,7 +139,7 @@ if *generateCert {
     tlsutil.GenerateSelfSignedCert(*certFile, *keyFile, "master", sans...)
 }
 ```
-**Status**: ✅ Good
+**Status**:  Good
 - Generates certs on demand
 - Supports Subject Alternative Names (SANs)
 - Does not hardcode certificates
@@ -148,7 +148,7 @@ if *generateCert {
 ```go
 tlsConfig, err := tlsutil.LoadClientTLSConfig(*certFile, *keyFile, *caFile)
 ```
-**Status**: ✅ Good
+**Status**:  Good
 - Loads from files (not embedded)
 - Supports mutual TLS (mTLS)
 - CA verification available
@@ -157,7 +157,7 @@ tlsConfig, err := tlsutil.LoadClientTLSConfig(*certFile, *keyFile, *caFile)
 
 ## 5. Security Best Practices
 
-### ✅ Implemented
+###  Implemented
 
 1. **API Authentication**
    - Bearer token authentication
@@ -179,7 +179,7 @@ tlsConfig, err := tlsutil.LoadClientTLSConfig(*certFile, *keyFile, *caFile)
    - Localhost-only exceptions well documented
    - Production guidance provided
 
-### ⚠️ Recommendations for Production
+###  Recommendations for Production
 
 1. **Always Use TLS**
    ```bash
@@ -250,7 +250,7 @@ tlsConfig, err := tlsutil.LoadClientTLSConfig(*certFile, *keyFile, *caFile)
 
 ## Conclusion
 
-✅ **Security Status**: APPROVED FOR PRODUCTION
+ **Security Status**: APPROVED FOR PRODUCTION
 
 All security concerns from audit have been reviewed:
 - No hardcoded secrets found

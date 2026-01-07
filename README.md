@@ -225,16 +225,16 @@ sudo ./bin/agent \
 ```
 
 **Benefits of running as root:**
-- ✅ **Full CPU limits**: Enforce per-job CPU quotas via cgroups
-- ✅ **Memory limits**: Hard memory caps with OOM protection
-- ✅ **Resource isolation**: Complete process isolation per job
-- ✅ **Production stability**: Prevent resource exhaustion and runaway jobs
+-  **Full CPU limits**: Enforce per-job CPU quotas via cgroups
+-  **Memory limits**: Hard memory caps with OOM protection
+-  **Resource isolation**: Complete process isolation per job
+-  **Production stability**: Prevent resource exhaustion and runaway jobs
 
 **Without root privileges**, the system gracefully falls back to:
-- ✅ Disk space monitoring (always enforced)
-- ✅ Timeout enforcement (always enforced)  
-- ✅ Process priority control via nice (always enforced)
-- ⚠️ CPU/Memory limits disabled (soft limits only)
+-  Disk space monitoring (always enforced)
+-  Timeout enforcement (always enforced)  
+-  Process priority control via nice (always enforced)
+-  CPU/Memory limits disabled (soft limits only)
 
 ### Resource Limits Per Job
 
@@ -515,10 +515,10 @@ See [docs/README.md](docs/README.md) for comprehensive documentation.
 - **Rotation ready**: Logrotate configs in `deployment/logrotate/`
 
 ### Security & Quality Assurance
-- **Security review complete** ✅ - All TLS configs properly guarded, no hardcoded secrets
-- **Critical panic eliminated** ✅ - Replaced with graceful error handling
-- **Integration tests added** ✅ - 10 tests covering retry, shutdown, readiness
-- **Dependencies updated** ✅ - 6 packages updated, all tests passing
+- **Security review complete**  - All TLS configs properly guarded, no hardcoded secrets
+- **Critical panic eliminated**  - Replaced with graceful error handling
+- **Integration tests added**  - 10 tests covering retry, shutdown, readiness
+- **Dependencies updated**  - 6 packages updated, all tests passing
 
 **Documentation:**
 - [Production Readiness Guide](docs/PRODUCTION_READINESS.md) - Complete feature documentation

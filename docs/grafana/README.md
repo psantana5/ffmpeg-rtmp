@@ -208,10 +208,10 @@ docker-compose up -d
 ## Consolidation Changes
 
 **Removed (consolidated into other dashboards):**
-- ❌ scheduler-jobs → Merged into job-scheduler
-- ❌ qoe-metrics + results-overview → Merged into quality-metrics
-- ❌ exporter-health → Integrated into production-monitoring
-- ❌ production-scheduler → Deleted (empty)
+-  scheduler-jobs → Merged into job-scheduler
+-  qoe-metrics + results-overview → Merged into quality-metrics
+-  exporter-health → Integrated into production-monitoring
+-  production-scheduler → Deleted (empty)
 
 **Before:** 10 dashboards with overlap  
 **After:** 6 dashboards, clear purpose, no duplication

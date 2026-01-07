@@ -71,13 +71,13 @@
 
 ## Key Metrics Explained
 
-### 🎯 Efficiency Score
+###  Efficiency Score
 **What:** Pixels delivered per joule of energy consumed
 **Unit:** pixels/J (e.g., 1,200,000 pixels/J)
 **Better:** Higher values
 **Use:** Compare overall efficiency across scenarios
 
-### ⚡ Power Consumption
+###  Power Consumption
 **What:** Average electrical power during transcoding
 **Unit:** Watts (W)
 **Better:** Lower values (but consider throughput)
@@ -89,7 +89,7 @@
 **Better:** Lower values (per unit of work)
 **Use:** Compare energy efficiency of different configs
 
-### 📊 Wasted Energy
+###  Wasted Energy
 **What:** Extra energy vs optimal config (same ladder)
 **Unit:** Joules (J)
 **Better:** Zero (means you're using optimal config)

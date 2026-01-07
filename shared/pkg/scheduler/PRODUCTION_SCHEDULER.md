@@ -360,11 +360,11 @@ go test ./shared/pkg/...
 
 ## Definition of Done
 
-✅ Any worker or master can crash at any time without job loss  
-✅ All job state transitions are explainable and logged  
-✅ All failure scenarios recover automatically  
-✅ No job can be stuck indefinitely  
-✅ Tests prove correctness under failure  
+ Any worker or master can crash at any time without job loss  
+ All job state transitions are explainable and logged  
+ All failure scenarios recover automatically  
+ No job can be stuck indefinitely  
+ Tests prove correctness under failure  
 
 ## Performance Characteristics
 

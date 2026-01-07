@@ -67,8 +67,8 @@ curl http://localhost:9091/metrics | grep ffrtmp_worker
 ```
 
 **Current Status:**
-- ✅ **Exporter Health**: Working (shows 9 exporters)
-- ✅ **CPU/Memory**: Working (basic system metrics)
+-  **Exporter Health**: Working (shows 9 exporters)
+-  **CPU/Memory**: Working (basic system metrics)
 - ⏳ **Job metrics**: Need Phase 1 worker updates (SLA, bandwidth, cancellations)
 
 **Why "No Data":**
@@ -112,9 +112,9 @@ curl -k -X POST https://localhost:8080/jobs \
 ```
 
 **Current Status:**
-- ✅ **Master metrics**: Available (`ffrtmp_jobs_total`, `ffrtmp_active_jobs`, etc.)
-- ✅ **Queue metrics**: Available (`ffrtmp_queue_length`, `ffrtmp_queue_by_priority`)
-- ✅ **Node metrics**: Available when workers register
+-  **Master metrics**: Available (`ffrtmp_jobs_total`, `ffrtmp_active_jobs`, etc.)
+-  **Queue metrics**: Available (`ffrtmp_queue_length`, `ffrtmp_queue_by_priority`)
+-  **Node metrics**: Available when workers register
 
 ---
 
@@ -147,10 +147,10 @@ curl http://localhost:9505/metrics | grep gpu   # GPU exporter
 ```
 
 **Current Status:**
-- ✅ **CPU/Memory/Active Jobs**: Working
-- ✅ **Heartbeats/Uptime**: Working
+-  **CPU/Memory/Active Jobs**: Working
+-  **Heartbeats/Uptime**: Working
 - ⏳ **GPU metrics**: Only if GPU hardware present
-- ✅ **Encoder availability**: Working (NVENC/QSV/VAAPI checks)
+-  **Encoder availability**: Working (NVENC/QSV/VAAPI checks)
 
 ---
 
@@ -182,8 +182,8 @@ curl http://localhost:9502/metrics | grep result
 ```
 
 **Current Status:**
-- ✅ **QoE exporter**: Running (available on :9503)
-- ✅ **Results exporter**: Running (available on :9502)
+-  **QoE exporter**: Running (available on :9503)
+-  **Results exporter**: Running (available on :9502)
 - ⏳ **Data**: Need jobs with quality analysis enabled
 
 ---
@@ -215,8 +215,8 @@ curl http://localhost:9500/metrics | grep energy
 ```
 
 **Current Status:**
-- ✅ **Cost exporter**: Running (available on :9504)
-- ✅ **CPU/Energy exporter**: Running (available on :9500)
+-  **Cost exporter**: Running (available on :9504)
+-  **CPU/Energy exporter**: Running (available on :9500)
 - ⏳ **Data**: Accumulates as jobs run
 
 ---
@@ -245,7 +245,7 @@ curl http://localhost:9505/metrics | grep ml
 ```
 
 **Current Status:**
-- ✅ **ML exporter**: Running (available on :9505)
+-  **ML exporter**: Running (available on :9505)
 - ⏳ **Predictions**: Need trained model and inference runs
 
 ---

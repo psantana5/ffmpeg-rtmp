@@ -110,7 +110,7 @@ After login, you'll see the Grafana home page with:
 
 ### Recommended Exploration Order
 
-#### 1. System Overview (Start Here) ⭐
+#### 1. System Overview (Start Here) 
 
 **Purpose:** Get an overall view of system health and all exporters.
 
@@ -569,9 +569,9 @@ Grafana supports alerting on metric thresholds:
 
 Now that you understand how to use Grafana:
 
-1. ✅ **Verified exporters are working** - System Overview shows all UP
-2. ✅ **Explored all dashboards** - Understand what each shows
-3. ✅ **Monitored a test** - Saw real-time data
+1.  **Verified exporters are working** - System Overview shows all UP
+2.  **Explored all dashboards** - Understand what each shows
+3.  **Monitored a test** - Saw real-time data
 
 **What's Next:**
 - Run batch tests to populate Energy Efficiency and Cost dashboards

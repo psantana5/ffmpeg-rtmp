@@ -257,17 +257,17 @@ make pre-commit
 
 Tests for the `EnergyEfficiencyScorer` class:
 
-- ✅ Algorithm initialization (default and custom)
-- ✅ Invalid algorithm handling
-- ✅ Single stream score computation
-- ✅ Multi-stream score computation
-- ✅ GPU power inclusion in calculations
-- ✅ Baseline scenario handling
-- ✅ Missing power data handling
-- ✅ Zero power edge case
-- ✅ Bitrate parsing (various formats: k, M, numeric)
-- ✅ Stream count extraction from scenario names
-- ✅ Not-implemented placeholder methods
+-  Algorithm initialization (default and custom)
+-  Invalid algorithm handling
+-  Single stream score computation
+-  Multi-stream score computation
+-  GPU power inclusion in calculations
+-  Baseline scenario handling
+-  Missing power data handling
+-  Zero power edge case
+-  Bitrate parsing (various formats: k, M, numeric)
+-  Stream count extraction from scenario names
+-  Not-implemented placeholder methods
 
 **Example Test Run**:
 ```bash
@@ -283,17 +283,17 @@ tests/test_scoring.py::TestEnergyEfficiencyScorer::test_compute_score_multi_stre
 
 Tests for the `TranscodingRecommender` class:
 
-- ✅ Recommender initialization (default and custom scorer)
-- ✅ Scenario analysis and ranking
-- ✅ Rank sorting (highest efficiency first)
-- ✅ Input preservation (non-destructive operations)
-- ✅ Best configuration selection
-- ✅ Handling scenarios with no valid scores
-- ✅ Top-N configuration retrieval
-- ✅ Handling N exceeding available scenarios
-- ✅ Recommendation summary generation
-- ✅ Configuration comparison
-- ✅ Missing score handling
+-  Recommender initialization (default and custom scorer)
+-  Scenario analysis and ranking
+-  Rank sorting (highest efficiency first)
+-  Input preservation (non-destructive operations)
+-  Best configuration selection
+-  Handling scenarios with no valid scores
+-  Top-N configuration retrieval
+-  Handling N exceeding available scenarios
+-  Recommendation summary generation
+-  Configuration comparison
+-  Missing score handling
 
 **Example Test Run**:
 ```bash
@@ -308,17 +308,17 @@ tests/test_recommender.py::TestTranscodingRecommender::test_get_best_configurati
 
 Tests for the `PowerPredictor` class (v0.1 - univariate):
 
-- ✅ Predictor initialization
-- ✅ Linear regression training
-- ✅ Polynomial regression training (degree 2)
-- ✅ Power prediction for new stream counts
-- ✅ Prediction extrapolation beyond training range
-- ✅ Model information retrieval (untrained, linear, polynomial)
-- ✅ Small dataset fallback (< 4 samples)
-- ✅ Single datapoint handling
-- ✅ Duplicate stream count handling
-- ✅ Zero stream count prediction
-- ✅ Large stream count prediction
+-  Predictor initialization
+-  Linear regression training
+-  Polynomial regression training (degree 2)
+-  Power prediction for new stream counts
+-  Prediction extrapolation beyond training range
+-  Model information retrieval (untrained, linear, polynomial)
+-  Small dataset fallback (< 4 samples)
+-  Single datapoint handling
+-  Duplicate stream count handling
+-  Zero stream count prediction
+-  Large stream count prediction
 
 **Example Test Run**:
 ```bash
@@ -334,23 +334,23 @@ tests/test_modeling.py::TestPowerPredictor::test_fit_polynomial PASSED
 
 Tests for the `MultivariatePredictor` class (v0.2 - multivariate ensemble):
 
-- ✅ Predictor initialization (default and custom parameters)
-- ✅ Feature extraction (stream count, bitrate, resolution, CPU, encoder, hardware)
-- ✅ Multi-resolution scenario feature extraction
-- ✅ Missing name handling
-- ✅ Model training for power, energy, and efficiency prediction
-- ✅ Insufficient data handling (< 3 samples)
-- ✅ No valid data handling
-- ✅ Power prediction for new configurations
-- ✅ Prediction with confidence intervals
-- ✅ Prediction before training error
-- ✅ Batch prediction
-- ✅ Model information retrieval
-- ✅ Model selection (Linear, Polynomial, RandomForest, GradientBoosting)
-- ✅ Model persistence (save/load)
-- ✅ Different encoder types (CPU vs GPU)
-- ✅ Cross-validation scores
-- ✅ Hardware ID tracking
+-  Predictor initialization (default and custom parameters)
+-  Feature extraction (stream count, bitrate, resolution, CPU, encoder, hardware)
+-  Multi-resolution scenario feature extraction
+-  Missing name handling
+-  Model training for power, energy, and efficiency prediction
+-  Insufficient data handling (< 3 samples)
+-  No valid data handling
+-  Power prediction for new configurations
+-  Prediction with confidence intervals
+-  Prediction before training error
+-  Batch prediction
+-  Model information retrieval
+-  Model selection (Linear, Polynomial, RandomForest, GradientBoosting)
+-  Model persistence (save/load)
+-  Different encoder types (CPU vs GPU)
+-  Cross-validation scores
+-  Hardware ID tracking
 
 **Example Test Run**:
 ```bash
@@ -366,25 +366,25 @@ tests/test_multivariate_modeling.py::TestMultivariatePredictor::test_model_selec
 
 Tests for multi-resolution transcoding scenarios:
 
-- ✅ Resolution parsing (1920x1080, 1280x720, etc.)
-- ✅ Output ladder extraction (single resolution)
-- ✅ Output ladder extraction (multi-resolution)
-- ✅ Unsorted outputs handling (automatic sorting)
-- ✅ No data scenarios
-- ✅ Total pixels computation (single resolution)
-- ✅ Total pixels computation (multi-resolution)
-- ✅ Missing duration handling
-- ✅ Pixels-per-joule scoring
-- ✅ Pixels-per-joule for multi-resolution
-- ✅ Missing energy data handling
-- ✅ Ranking by output ladder groups
-- ✅ Ranking within ladder groups
-- ✅ Best configuration per ladder
-- ✅ Output ladder field in results
-- ✅ Backward compatibility (scenarios without outputs)
-- ✅ Mixed scenarios (with and without outputs)
-- ✅ End-to-end pixels scoring
-- ✅ Algorithm selection impact on ranking
+-  Resolution parsing (1920x1080, 1280x720, etc.)
+-  Output ladder extraction (single resolution)
+-  Output ladder extraction (multi-resolution)
+-  Unsorted outputs handling (automatic sorting)
+-  No data scenarios
+-  Total pixels computation (single resolution)
+-  Total pixels computation (multi-resolution)
+-  Missing duration handling
+-  Pixels-per-joule scoring
+-  Pixels-per-joule for multi-resolution
+-  Missing energy data handling
+-  Ranking by output ladder groups
+-  Ranking within ladder groups
+-  Best configuration per ladder
+-  Output ladder field in results
+-  Backward compatibility (scenarios without outputs)
+-  Mixed scenarios (with and without outputs)
+-  End-to-end pixels scoring
+-  Algorithm selection impact on ranking
 
 **Example Test Run**:
 ```bash
@@ -399,14 +399,14 @@ tests/test_output_ladder.py::TestOutputLadderRecommender::test_analyze_and_rank_
 
 Tests for the Prometheus metrics exporter:
 
-- ✅ Stream count extraction from scenario names
-- ✅ Encoder type detection (GPU vs CPU)
-- ✅ Output ladder ID generation (single resolution)
-- ✅ Output ladder ID generation (multi-resolution)
-- ✅ Resolution parsing
-- ✅ Efficiency score computation (pixels-per-joule)
-- ✅ Efficiency score for multi-resolution
-- ✅ Scenario labels including new fields
+-  Stream count extraction from scenario names
+-  Encoder type detection (GPU vs CPU)
+-  Output ladder ID generation (single resolution)
+-  Output ladder ID generation (multi-resolution)
+-  Resolution parsing
+-  Efficiency score computation (pixels-per-joule)
+-  Efficiency score for multi-resolution
+-  Scenario labels including new fields
 
 **Example Test Run**:
 ```bash
@@ -421,13 +421,13 @@ tests/test_results_exporter.py::TestResultsExporterEnhancements::test_compute_ef
 
 End-to-end tests verifying the advisor works with the analysis pipeline:
 
-- ✅ Sample test results creation
-- ✅ Integration with `analyze_results.py`
-- ✅ Prometheus metric queries (mocked)
-- ✅ Energy efficiency recommendation generation
-- ✅ CSV export with efficiency scores
-- ✅ Ranking and best configuration selection
-- ✅ Complete analysis workflow
+-  Sample test results creation
+-  Integration with `analyze_results.py`
+-  Prometheus metric queries (mocked)
+-  Energy efficiency recommendation generation
+-  CSV export with efficiency scores
+-  Ranking and best configuration selection
+-  Complete analysis workflow
 
 **Example Test Run**:
 ```bash
@@ -605,10 +605,10 @@ make test    # Run all tests
 ### Test Stability
 
 All tests are designed to be:
-- ✅ **Deterministic** - Same input always produces same output
-- ✅ **Isolated** - Tests don't depend on each other
-- ✅ **Fast** - Complete test suite runs in < 2 seconds
-- ✅ **Reliable** - No flaky tests or random failures
+-  **Deterministic** - Same input always produces same output
+-  **Isolated** - Tests don't depend on each other
+-  **Fast** - Complete test suite runs in < 2 seconds
+-  **Reliable** - No flaky tests or random failures
 
 ---
 

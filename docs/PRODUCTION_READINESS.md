@@ -1,6 +1,6 @@
 # Production Readiness Features
 
-**Status**: ✅ Complete  
+**Status**:  Complete  
 **Date**: 2026-01-06  
 **Architecture**: Swedish principles - boring, correct, non-reactive
 
@@ -25,12 +25,12 @@ This document describes the production-grade features added to the FFmpeg RTMP d
 - `shared/pkg/agent/client.go` (added retry.Config and retry.Do wrapping)
 
 **Scope:**
-- ✅ `SendHeartbeat()` - Retry heartbeat delivery to master
-- ✅ `GetNextJob()` - Retry job polling from master
-- ✅ `SendResults()` - Retry result delivery to master
-- ❌ **NEVER** retry job execution
-- ❌ **NEVER** retry wrapper actions
-- ❌ **NEVER** retry FFmpeg workloads
+-  `SendHeartbeat()` - Retry heartbeat delivery to master
+-  `GetNextJob()` - Retry job polling from master
+-  `SendResults()` - Retry result delivery to master
+-  **NEVER** retry job execution
+-  **NEVER** retry wrapper actions
+-  **NEVER** retry FFmpeg workloads
 
 ### Configuration
 
@@ -93,13 +93,13 @@ If you can phrase an operation as "sending a message" or "checking for messages"
 
 ### Critical Rules
 
-**✅ Allowed:**
+** Allowed:**
 - Stop accepting new jobs
 - Let running jobs finish
 - Bounded wait (30 seconds)
 - Emit final JobResult
 
-**❌ NEVER:**
+** NEVER:**
 - Kill workloads to speed up shutdown
 - Change workload behavior
 - Force-terminate FFmpeg processes
@@ -213,9 +213,9 @@ readinessProbe:
 
 ### Migration Complete
 
-- Master: ✅ 56/56 log calls migrated to logger.Info/Error/Fatal
-- Worker: ✅ Already using logger
-- Wrapper: ✅ Uses report.LogSummary (correct - not reactive)
+- Master:  56/56 log calls migrated to logger.Info/Error/Fatal
+- Worker:  Already using logger
+- Wrapper:  Uses report.LogSummary (correct - not reactive)
 
 ---
 
@@ -358,13 +358,13 @@ curl http://localhost:9091/ready | jq
 **Critical Scope Limits:**
 
 ```
-✅ Retry:
+ Retry:
   - HTTP requests to master
   - Heartbeat delivery
   - Job polling
   - Result reporting
 
-❌ NO Retry:
+ NO Retry:
   - Job execution
   - Wrapper run/attach
   - FFmpeg execution
@@ -469,12 +469,12 @@ Before deploying to production:
 
 All production readiness features are implemented following strict architectural principles:
 
-✅ **Retry Logic**: Messages only, never work  
-✅ **Graceful Shutdown**: Let jobs finish, no killing  
-✅ **Readiness Checks**: FFmpeg, disk, master connectivity  
-✅ **Centralized Logging**: File + stdout, /var/log/ffrtmp  
-✅ **Metrics Endpoints**: Prometheus + health/ready probes  
-✅ **No Broken Principles**: Retries scoped correctly, shutdown clean  
+ **Retry Logic**: Messages only, never work  
+ **Graceful Shutdown**: Let jobs finish, no killing  
+ **Readiness Checks**: FFmpeg, disk, master connectivity  
+ **Centralized Logging**: File + stdout, /var/log/ffrtmp  
+ **Metrics Endpoints**: Prometheus + health/ready probes  
+ **No Broken Principles**: Retries scoped correctly, shutdown clean  
 
 **Total Changes:**
 - 4 files modified (client.go, shutdown.go, master/main.go, worker/main.go)

@@ -538,10 +538,10 @@ For questions about SLA classification:
 - 800 jobs: Capability mismatches (requested unavailable GPU)
 
 These failures are NOT the platform's fault. The platform:
-- ✅ Assigned jobs promptly
-- ✅ Started execution correctly
-- ✅ Detected errors and failed gracefully
-- ✅ Logged appropriate error messages
+-  Assigned jobs promptly
+-  Started execution correctly
+-  Detected errors and failed gracefully
+-  Logged appropriate error messages
 
 ### Platform SLA Violations (The 90 Jobs)
 
@@ -560,11 +560,11 @@ These ARE the platform's fault and count as SLA violations.
 Job Status: FAILED
 Error: "Invalid bitrate parameter: -5M"
 Failure Reason: user_error
-Platform SLA: ✅ COMPLIANT
+Platform SLA:  COMPLIANT
 
 Why? User provided invalid input. Platform detected it correctly.
-Queue time: 5s ✅
-Processing time: 2s ✅
+Queue time: 5s 
+Processing time: 2s 
 Platform behaved perfectly.
 ```
 
@@ -573,7 +573,7 @@ Platform behaved perfectly.
 Job Status: FAILED
 Error: "Worker process crashed"
 Failure Reason: platform_error
-Platform SLA: ❌ VIOLATION
+Platform SLA:  VIOLATION
 
 Why? Platform crashed during execution.
 This is our fault - needs investigation and fix.
@@ -583,7 +583,7 @@ This is our fault - needs investigation and fix.
 ```
 Job Status: COMPLETED (successful!)
 Queue Time: 45 seconds (target: 30s)
-Platform SLA: ❌ VIOLATION
+Platform SLA:  VIOLATION
 
 Why? Job succeeded but platform was too slow to assign it.
 This is our fault - scheduler needs optimization.
@@ -594,11 +594,11 @@ This is our fault - scheduler needs optimization.
 Job Status: FAILED
 Error: "Connection timeout to external service"
 Failure Reason: network_error
-Platform SLA: ✅ COMPLIANT
+Platform SLA:  COMPLIANT
 
 Why? External network issue. Platform can't control external networks.
-Queue time: 8s ✅
-Failure handling: Correct ✅
+Queue time: 8s 
+Failure handling: Correct 
 ```
 
 ## SLA Metrics in Job Results
@@ -704,11 +704,11 @@ sum(ffrtmp_worker_jobs_sla_violation_total)
 ### Successful Job
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║ ✅ JOB COMPLETED: job-abc123
+║  JOB COMPLETED: job-abc123
 ║ Total Duration: 285.40 seconds
 ║ Queue Time: 5.20 seconds (target: 30s)
 ║ Processing Time: 280.20 seconds (target: 600s)
-║ Platform SLA: ✅ PLATFORM SLA MET
+║ Platform SLA:  PLATFORM SLA MET
 ║ Engine Used: ffmpeg
 ╚════════════════════════════════════════════════════════════════╝
 ```
@@ -716,35 +716,35 @@ sum(ffrtmp_worker_jobs_sla_violation_total)
 ### Failed Job (External Error)
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║ ❌ JOB FAILED: job-xyz789
+║  JOB FAILED: job-xyz789
 ║ Error: invalid input file format
 ║ Duration: 12.50 seconds
 ║ Failure Reason: input_error
 ║ Failure Type: External (NOT our fault)
-║ Platform SLA: ✅ COMPLIANT (external failure)
+║ Platform SLA:  COMPLIANT (external failure)
 ╚════════════════════════════════════════════════════════════════╝
 ```
 
 ### Failed Job (Platform Error)
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║ ❌ JOB FAILED: job-platform-123
+║  JOB FAILED: job-platform-123
 ║ Error: worker process crashed
 ║ Duration: 45.30 seconds
 ║ Failure Reason: platform_error
 ║ Failure Type: Platform (IS our fault)
-║ Platform SLA: ❌ VIOLATION (platform failure)
+║ Platform SLA:  VIOLATION (platform failure)
 ╚════════════════════════════════════════════════════════════════╝
 ```
 
 ### Slow Queue (SLA Violation Despite Success)
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║ ✅ JOB COMPLETED: job-slow-queue-456
+║  JOB COMPLETED: job-slow-queue-456
 ║ Total Duration: 320.00 seconds
 ║ Queue Time: 45.00 seconds (target: 30s)
 ║ Processing Time: 275.00 seconds (target: 600s)
-║ Platform SLA: ⚠️  PLATFORM SLA VIOLATED (queue_time_exceeded)
+║ Platform SLA:   PLATFORM SLA VIOLATED (queue_time_exceeded)
 ║ Engine Used: ffmpeg
 ╚════════════════════════════════════════════════════════════════╝
 ```

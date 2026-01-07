@@ -10,7 +10,7 @@ The dashboard collection has been reorganized for clarity and efficiency. **Obso
 
 ## Core Dashboards
 
-### 1. System Overview ⭐ **START HERE**
+### 1. System Overview  **START HERE**
 **File:** `system-overview.json`  
 **UID:** `system-overview`  
 **Purpose:** Primary dashboard showing overall system health and resource utilization
@@ -202,7 +202,7 @@ http://localhost:3000
 
 1. Click on **Dashboards** (四 icon) in the left sidebar
 2. You'll see all 7 dashboards:
-   - **System Overview** - Start here for overall health ⭐
+   - **System Overview** - Start here for overall health 
    - **Transcoding Performance** - FFmpeg and encoding metrics
    - **Hardware Details** - Deep hardware monitoring
    - **Energy Efficiency Analysis** - Optimization insights
@@ -503,8 +503,8 @@ Optimize PromQL queries:
 **Common Causes:**
 
 1. **Dashboard file in wrong directory:**
-   - ✅ Dashboards belong in: `grafana/provisioning/dashboards/`
-   - ❌ **NOT** in: `grafana/provisioning/datasources/`
+   -  Dashboards belong in: `grafana/provisioning/dashboards/`
+   -  **NOT** in: `grafana/provisioning/datasources/`
    - Only `prometheus.yml` should be in datasources directory
 
 2. **Datasource variable not defined:**
@@ -748,11 +748,11 @@ victoriametrics:
 
 ## Next Steps
 
-1. ✅ **Verify Setup:** Open System Overview and confirm all exporters are UP
-2. 📊 **Run Tests:** Execute transcoding tests to populate metrics
-3. 🔍 **Explore:** Navigate through all 7 dashboards
-4. ⚡ **Optimize:** Use Energy Efficiency dashboard to find optimal settings
-5. 💰 **Analyze:** Check Cost & ROI dashboard for business insights
+1.  **Verify Setup:** Open System Overview and confirm all exporters are UP
+2.  **Run Tests:** Execute transcoding tests to populate metrics
+3.  **Explore:** Navigate through all 7 dashboards
+4.  **Optimize:** Use Energy Efficiency dashboard to find optimal settings
+5.  **Analyze:** Check Cost & ROI dashboard for business insights
 
 For more information, see:
 - [VictoriaMetrics Configuration](../victoriametrics.yml)

@@ -29,7 +29,7 @@ Threads: 32
 GPU: NVIDIA RTX 3080 (Driver: 525.147)
 System Type: DESKTOP
 
-✅ Recommended Command:
+ Recommended Command:
 python3 scripts/run_tests.py single \
   --name recommended_test \
   --encoder h264_nvenc \

@@ -50,7 +50,7 @@ This comprehensive test suite proves that workloads survive wrapper crashes thro
 
 ### Important Notes
 
-⚠️ **The "Killed" messages are EXPECTED behavior!**
+ **The "Killed" messages are EXPECTED behavior!**
 
 This test intentionally kills wrapper processes to prove workloads survive. Any messages like:
 - `Dödad` (Swedish for "Killed")

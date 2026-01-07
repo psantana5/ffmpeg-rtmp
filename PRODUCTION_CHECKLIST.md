@@ -1,4 +1,4 @@
-# Production Deployment Checklist ✅
+# Production Deployment Checklist 
 
 Use this checklist when deploying to production environments.
 

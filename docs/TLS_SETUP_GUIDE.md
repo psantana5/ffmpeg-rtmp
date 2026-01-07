@@ -288,29 +288,29 @@ For automated certificate rotation, consider:
 
 ### Certificate Generation
 
-- ✅ Use 2048-bit RSA keys minimum (4096-bit for CA)
-- ✅ Include all relevant SANs (IPs and hostnames)
-- ✅ Use strong passwords for key encryption (if encrypting)
-- ✅ Limit certificate validity (1 year recommended)
-- ✅ Generate unique certificates per node
+-  Use 2048-bit RSA keys minimum (4096-bit for CA)
+-  Include all relevant SANs (IPs and hostnames)
+-  Use strong passwords for key encryption (if encrypting)
+-  Limit certificate validity (1 year recommended)
+-  Generate unique certificates per node
 
 ### Storage
 
-- ✅ Store private keys with `600` permissions
-- ✅ Store certificates with `644` permissions
-- ✅ Use dedicated directories (`/etc/ffrtmp*/certs`)
-- ✅ Set proper ownership (ffrtmp-master, ffrtmp users)
-- ✅ Backup certificates securely
-- ❌ Never commit certificates to version control
+-  Store private keys with `600` permissions
+-  Store certificates with `644` permissions
+-  Use dedicated directories (`/etc/ffrtmp*/certs`)
+-  Set proper ownership (ffrtmp-master, ffrtmp users)
+-  Backup certificates securely
+-  Never commit certificates to version control
 
 ### Deployment
 
-- ✅ Use TLS 1.2 or higher (configured in code)
-- ✅ Use strong cipher suites (configured in code)
-- ✅ Enable mTLS for production environments
-- ✅ Verify certificates (don't skip verification)
-- ✅ Use HTTPS URLs (`https://` not `http://`)
-- ❌ Don't use `INSECURE_SKIP_VERIFY` in production
+-  Use TLS 1.2 or higher (configured in code)
+-  Use strong cipher suites (configured in code)
+-  Enable mTLS for production environments
+-  Verify certificates (don't skip verification)
+-  Use HTTPS URLs (`https://` not `http://`)
+-  Don't use `INSECURE_SKIP_VERIFY` in production
 
 ## Troubleshooting
 

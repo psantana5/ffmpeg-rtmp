@@ -13,13 +13,13 @@ SKIP_TEST_JOB=true ./scripts/run_local_stack.sh
 ```
 
 The script will:
-1. ✅ Check prerequisites (Go, Python, FFmpeg, curl)
+1.  Check prerequisites (Go, Python, FFmpeg, curl)
 2. 🔨 Build all binaries (master, agent, CLI)
-3. 🚀 Start the master node with TLS
-4. 🖥️ Register and start the compute agent
+3.  Start the master node with TLS
+4.  Register and start the compute agent
 5. ✔️ Verify the stack is running
-6. 📊 Submit a test job (optional)
-7. 📋 Display helpful commands and URLs
+6.  Submit a test job (optional)
+7.  Display helpful commands and URLs
 
 ## What Gets Started
 
@@ -290,7 +290,7 @@ For heavier workloads:
 
 ## Production Deployment
 
-⚠️ **This local setup is for development/testing only**
+ **This local setup is for development/testing only**
 
 For production:
 1. Deploy master on dedicated server

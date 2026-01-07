@@ -610,7 +610,7 @@ import (
 )
 
 func ExecuteWithWrapper(ctx context.Context, job *models.Job, command string, args []string) (*report.Result, error) {
-    log.Printf("🔧 Using workload wrapper for job %s", job.ID)
+    log.Printf(" Using workload wrapper for job %s", job.ID)
     
     // Build constraints from job
     limits := buildWrapperLimits(job)
@@ -645,7 +645,7 @@ func executeEngineJob(job *models.Job, ...) (...) {
     args, err := engine.BuildCommand(job, masterURL)
     cmdPath := "/usr/bin/ffmpeg" // or gst-launch-1.0
     
-    // ⭐ NEW: Check wrapper flag
+    //  NEW: Check wrapper flag
     if job.WrapperEnabled {
         return executeWithWrapperPath(job, cmdPath, cmdName, args, limits, metricsExporter)
     }
@@ -1141,23 +1141,23 @@ awk '/sla=COMPLIANT/ {c++} /sla=VIOLATION/ {v++} END {print "SLA:", c/(c+v)*100"
 
 Before marking replication complete, verify:
 
-- [ ] ✅ Core wrapper compiles and runs
-- [ ] ✅ Crash safety test passes (kill -9 → workload continues)
-- [ ] ✅ Run mode works with cgroup limits
-- [ ] ✅ Attach mode observes existing processes
-- [ ] ✅ Worker agent routes to wrapper when enabled
-- [ ] ✅ Legacy execution path preserved
-- [ ] ✅ Systemd service files created
-- [ ] ✅ Cgroup delegation configured
-- [ ] ✅ Three visibility layers implemented
-- [ ] ✅ Violation sampling works
-- [ ] ✅ Prometheus export available
-- [ ] ✅ No reactive behavior (visibility derived only)
-- [ ] ✅ All test suites pass (30+ tests)
-- [ ] ✅ Documentation complete (4 guides)
-- [ ] ✅ Production deployment tested
+- [ ]  Core wrapper compiles and runs
+- [ ]  Crash safety test passes (kill -9 → workload continues)
+- [ ]  Run mode works with cgroup limits
+- [ ]  Attach mode observes existing processes
+- [ ]  Worker agent routes to wrapper when enabled
+- [ ]  Legacy execution path preserved
+- [ ]  Systemd service files created
+- [ ]  Cgroup delegation configured
+- [ ]  Three visibility layers implemented
+- [ ]  Violation sampling works
+- [ ]  Prometheus export available
+- [ ]  No reactive behavior (visibility derived only)
+- [ ]  All test suites pass (30+ tests)
+- [ ]  Documentation complete (4 guides)
+- [ ]  Production deployment tested
 
-If all checkboxes pass → **replication successful** ✅
+If all checkboxes pass → **replication successful** 
 
 ---
 

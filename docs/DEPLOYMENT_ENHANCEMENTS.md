@@ -1,10 +1,10 @@
-# Deployment Enhancements Complete ✅
+# Deployment Enhancements Complete 
 
 ## Summary
 
 Added comprehensive deployment validation, dry-run simulation, rollback capability, and idempotency support to all deployment scripts.
 
-## Critical Bug Fixed 🐛
+## Critical Bug Fixed 
 
 **Issue:** Worker service failing with "flag provided but not defined: -master-url"
 
@@ -39,10 +39,10 @@ ExecStart=/opt/ffrtmp/bin/agent \
 ### 1. Deployment Validator (`validate-and-rollback.sh`)
 
 **Features:**
-- ✅ Pre-deployment validation (no root required)
-- ✅ Dry-run simulation (shows what would happen)
-- ✅ Rollback capability (restore previous state)
-- ✅ Idempotency checks (safe to re-run)
+-  Pre-deployment validation (no root required)
+-  Dry-run simulation (shows what would happen)
+-  Rollback capability (restore previous state)
+-  Idempotency checks (safe to re-run)
 
 **Usage:**
 ```bash
@@ -57,25 +57,25 @@ sudo ./deployment/validate-and-rollback.sh --rollback --worker
 ```
 
 **Validation Checks:**
-- ✅ Root privileges (for deploy modes)
-- ✅ Operating system and systemd
-- ✅ cgroups v2 support
-- ✅ Go installation (for building)
-- ✅ Binary existence
-- ✅ Disk space (minimum 1GB)
-- ✅ Port availability
-- ✅ Existing service detection
-- ✅ Idempotency safety
+-  Root privileges (for deploy modes)
+-  Operating system and systemd
+-  cgroups v2 support
+-  Go installation (for building)
+-  Binary existence
+-  Disk space (minimum 1GB)
+-  Port availability
+-  Existing service detection
+-  Idempotency safety
 
 ### 2. Idempotent Installation
 
 **Enhanced `install-edge.sh`:**
-- ✅ Detects existing installations automatically
-- ✅ Runs in UPDATE mode when services exist
-- ✅ Preserves configuration files
-- ✅ Preserves state files (watch-state.json)
-- ✅ Creates backups before modifying
-- ✅ Safe to re-run multiple times
+-  Detects existing installations automatically
+-  Runs in UPDATE mode when services exist
+-  Preserves configuration files
+-  Preserves state files (watch-state.json)
+-  Creates backups before modifying
+-  Safe to re-run multiple times
 
 **Auto-Detection:**
 ```bash
@@ -218,11 +218,11 @@ sudo ./deployment/validate-and-rollback.sh --rollback --worker
 ## Idempotency Guarantees
 
 **Safe Operations (can repeat):**
-- ✅ Directory creation (`mkdir -p`)
-- ✅ User creation (checks if exists first)
-- ✅ Binary installation (overwrites safely)
-- ✅ Service installation (updates cleanly)
-- ✅ Configuration files (preserves existing)
+-  Directory creation (`mkdir -p`)
+-  User creation (checks if exists first)
+-  Binary installation (overwrites safely)
+-  Service installation (updates cleanly)
+-  Configuration files (preserves existing)
 
 **Side Effects (intentional):**
 - Service restart (if already running)
@@ -294,7 +294,7 @@ ExecStart=/opt/ffrtmp/bin/agent
 
 ---
 
-**Status:** ✅ All deployment enhancements complete
+**Status:**  All deployment enhancements complete
 - Bug fix validated
 - Validator tested
 - Idempotency implemented

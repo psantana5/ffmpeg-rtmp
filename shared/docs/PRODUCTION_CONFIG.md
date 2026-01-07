@@ -4,11 +4,11 @@ This guide shows how to configure and deploy the distributed compute system for 
 
 ## Features
 
-- ✅ **SQLite Persistence**: Jobs and nodes persist across restarts
-- ✅ **TLS/mTLS**: Encrypted communication with mutual authentication
-- ✅ **API Key Authentication**: Token-based access control
-- ✅ **Graceful Shutdown**: Clean shutdown with connection draining
-- ✅ **Production Timeouts**: Increased timeouts for stability
+-  **SQLite Persistence**: Jobs and nodes persist across restarts
+-  **TLS/mTLS**: Encrypted communication with mutual authentication
+-  **API Key Authentication**: Token-based access control
+-  **Graceful Shutdown**: Clean shutdown with connection draining
+-  **Production Timeouts**: Increased timeouts for stability
 
 ## Quick Start (Production Mode)
 

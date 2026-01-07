@@ -266,7 +266,7 @@ Alternatively, set the environment variable directly in the systemd service file
 
 ### 3. Save the API Key
 
-**⚠️ IMPORTANT:** Save this API key securely. You will need to provide it to all worker nodes that connect to this master.
+** IMPORTANT:** Save this API key securely. You will need to provide it to all worker nodes that connect to this master.
 
 ```bash
 # Save to a password manager or secure location
@@ -374,7 +374,7 @@ ExecStart=/opt/ffmpeg-rtmp/bin/master \
     --metrics-port 9090
 ```
 
-**⚠️ WARNING:** Running without TLS in production exposes your API key and data to network eavesdropping.
+** WARNING:** Running without TLS in production exposes your API key and data to network eavesdropping.
 
 ---
 

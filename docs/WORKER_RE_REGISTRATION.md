@@ -46,12 +46,12 @@ When a node tries to register with an address that already exists:
    ```
 
 **Benefits**:
-- ✅ Existing node is reused (keeps Node ID, registration timestamp)
-- ✅ Hardware capabilities are updated (in case hardware changed)
-- ✅ Status reset to "available"
-- ✅ Heartbeat updated
-- ✅ Stale job assignments cleared
-- ✅ No manual database cleanup needed
+-  Existing node is reused (keeps Node ID, registration timestamp)
+-  Hardware capabilities are updated (in case hardware changed)
+-  Status reset to "available"
+-  Heartbeat updated
+-  Stale job assignments cleared
+-  No manual database cleanup needed
 
 #### Agent Side (`shared/pkg/agent/client.go`)
 
@@ -91,7 +91,7 @@ if node.RegisteredAt.Before(time.Now().Add(-1 * time.Minute)) {
 |--------|---------|------|
 | **201 Created** | New registration | First time this address registers |
 | **200 OK** | Re-registration | Address already exists, node updated |
-| **409 Conflict** | ❌ Removed | No longer returned |
+| **409 Conflict** |  Removed | No longer returned |
 
 ---
 
@@ -151,7 +151,7 @@ if node.RegisteredAt.Before(time.Now().Add(-1 * time.Minute)) {
 
 ## Backward Compatibility
 
-✅ **Fully Backward Compatible**
+ **Fully Backward Compatible**
 - Existing agents work without changes
 - First registration still returns 201 Created
 - Only re-registrations return 200 OK
@@ -292,6 +292,6 @@ Possible future improvements:
 **Solution**: Smart re-registration - update existing node instead of rejecting  
 **Result**: Workers can restart freely, no manual cleanup needed
 
-**Status**: ✅ Implemented and tested  
+**Status**:  Implemented and tested  
 **Version**: 2.3.0+  
 **Date**: 2026-01-05

@@ -236,9 +236,9 @@ type Limits struct {
 ## Implementation Plan
 
 ### Phase 1: Visibility (1-2 days)
-1. ✅ Enhanced logging with stats
-2. ✅ Self-process filtering
-3. ✅ Prometheus metrics
+1.  Enhanced logging with stats
+2.  Self-process filtering
+3.  Prometheus metrics
 
 ### Phase 2: Intelligence (2-3 days)
 4. Process metadata collection
