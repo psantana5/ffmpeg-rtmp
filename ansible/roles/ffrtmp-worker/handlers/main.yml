@@ -1,0 +1,14 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart worker
+  systemd:
+    name: ffrtmp-worker
+    state: restarted
+
+- name: restart watch
+  systemd:
+    name: ffrtmp-watch
+    state: restarted
