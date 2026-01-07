@@ -22,7 +22,8 @@ func NewRecoveryManager(st store.Store, maxRetries int, nodeFailureThreshold tim
 		maxRetries = 3
 	}
 	if nodeFailureThreshold <= 0 {
-		nodeFailureThreshold = 2 * time.Minute
+		// Default: 90s = 3 missed heartbeats @ 30s interval
+		nodeFailureThreshold = 90 * time.Second
 	}
 	return &RecoveryManager{
 		store:                st,
