@@ -1,0 +1,43 @@
+---
+- name: Check if Go is installed
+  command: go version
+  register: go_installed
+  ignore_errors: yes
+  changed_when: false
+
+- name: Download Go
+  get_url:
+    url: "{{ go_download_url }}"
+    dest: "/tmp/{{ go_archive }}"
+  when: go_installed.rc != 0 or go_version not in go_installed.stdout
+
+- name: Remove old Go installation
+  file:
+    path: "{{ go_install_dir }}/go"
+    state: absent
+  when: go_installed.rc != 0 or go_version not in go_installed.stdout
+
+- name: Extract Go
+  unarchive:
+    src: "/tmp/{{ go_archive }}"
+    dest: "{{ go_install_dir }}"
+    remote_src: yes
+  when: go_installed.rc != 0 or go_version not in go_installed.stdout
+
+- name: Add Go to PATH
+  copy:
+    dest: /etc/profile.d/go.sh
+    content: |
+      export PATH=$PATH:{{ go_install_dir }}/go/bin
+      export GOPATH=$HOME/go
+      export PATH=$PATH:$GOPATH/bin
+    mode: '0644'
+
+- name: Verify Go installation
+  shell: "{{ go_install_dir }}/go/bin/go version"
+  register: go_verify
+  changed_when: false
+
+- name: Display Go version
+  debug:
+    msg: "Go installed: {{ go_verify.stdout }}"
